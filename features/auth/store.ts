@@ -7,19 +7,10 @@ import { AUTH_TOKEN_KEY, USER_KEY } from "../../lib/storage";
 
 type AuthStore = AuthState & AuthActions;
 
-// Mock user for development (no backend yet)
-const MOCK_USER: User = {
-  id: "1",
-  email: "",
-  firstName: "Jean",
-  lastName: "Laurent",
-  phone: "+33 6 12 34 56 78",
-  accountType: "particulier",
-  addresses: [],
-  createdAt: new Date().toISOString(),
-};
-
-const MOCK_TOKEN = "dev-mock-token";
+function errorMessage(e: unknown): string {
+  const m = (e as { message?: string })?.message;
+  return m ?? "Une erreur s’est produite";
+}
 
 export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
@@ -35,17 +26,9 @@ export const useAuthStore = create<AuthStore>((set) => ({
       await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
       await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
       set({ user, token, isAuthenticated: true, isLoading: false });
-    } catch {
-      // Fallback to mock auth for development
-      const mockUser = { ...MOCK_USER, email };
-      await SecureStore.setItemAsync(AUTH_TOKEN_KEY, MOCK_TOKEN);
-      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(mockUser));
-      set({
-        user: mockUser,
-        token: MOCK_TOKEN,
-        isAuthenticated: true,
-        isLoading: false,
-      });
+    } catch (e) {
+      set({ isLoading: false, error: errorMessage(e), isAuthenticated: false });
+      throw e;
     }
   },
 
@@ -56,26 +39,9 @@ export const useAuthStore = create<AuthStore>((set) => ({
       await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
       await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
       set({ user, token, isAuthenticated: true, isLoading: false });
-    } catch {
-      // Fallback to mock auth for development
-      const mockUser: User = {
-        ...MOCK_USER,
-        email: data.email,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        phone: data.phone,
-        accountType: data.accountType,
-        company: data.company,
-        siret: data.siret,
-      };
-      await SecureStore.setItemAsync(AUTH_TOKEN_KEY, MOCK_TOKEN);
-      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(mockUser));
-      set({
-        user: mockUser,
-        token: MOCK_TOKEN,
-        isAuthenticated: true,
-        isLoading: false,
-      });
+    } catch (e) {
+      set({ isLoading: false, error: errorMessage(e), isAuthenticated: false });
+      throw e;
     }
   },
 

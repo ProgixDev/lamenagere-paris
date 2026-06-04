@@ -53,8 +53,9 @@
       "apiUrl": "https://api.lamenagereparis.fr",
       "router": {},
       "eas": {
-        "projectId": "15cbfe89-b71d-49a6-8edb-36bd8d276fca"
+        "projectId": "789a7326-53fb-4bf6-98b9-f0c2a2529a04"
       }
-    }
+    },
+    "owner": "mohameddev7"
   }
 }
