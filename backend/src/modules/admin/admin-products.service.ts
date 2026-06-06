@@ -63,9 +63,11 @@ export class AdminProductsService {
   }
 
   async getRaw(id: string): Promise<ProductRow> {
+    // Full column set (+ relations) so the admin edit form round-trips every
+    // field, not just the catalog subset in PRODUCT_SELECT.
     const { data } = await this.supabase.client
       .from('products')
-      .select(PRODUCT_SELECT)
+      .select('*, category:categories(*), media:product_media(*)')
       .eq('id', id)
       .maybeSingle<ProductRow>();
     if (!data) throw new NotFoundException('Produit introuvable');

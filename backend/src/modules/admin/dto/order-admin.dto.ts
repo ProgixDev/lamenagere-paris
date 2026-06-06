@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   IsEnum,
   IsInt,
@@ -39,6 +40,6 @@ export class OrderListQuery {
   @IsOptional() @IsString() territory?: string;
   @IsOptional() @IsString() accountType?: string;
   @IsOptional() @IsString() q?: string;
-  @IsOptional() @IsInt() page?: number;
-  @IsOptional() @IsInt() limit?: number;
+  @IsOptional() @Type(() => Number) @IsInt() page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() limit?: number;
 }

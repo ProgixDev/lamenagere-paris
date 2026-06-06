@@ -47,7 +47,8 @@
       "expo-secure-store",
       "expo-local-authentication",
       "expo-font",
-      "expo-video"
+      "expo-video",
+      "expo-web-browser"
     ],
     "extra": {
       "apiUrl": "https://api.lamenagereparis.fr",

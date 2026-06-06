@@ -31,6 +31,7 @@ export interface AuthState {
 
 export interface AuthActions {
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   register: (data: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
   loadSession: () => Promise<void>;

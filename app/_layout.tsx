@@ -17,10 +17,17 @@ import {
   Manrope_800ExtraBold,
 } from "@expo-google-fonts/manrope";
 import * as Notifications from "expo-notifications";
+import * as SecureStore from "expo-secure-store";
 import { useAuthStore } from "../features/auth/store";
 import { useOnboardingStore } from "../features/onboarding/store";
 import AnimatedSplash from "../components/AnimatedSplash";
-import { buildDeepLinkFromTarget, type CampaignTarget } from "../lib/notifications";
+import {
+  buildDeepLinkFromTarget,
+  registerForPushNotifications,
+  type CampaignTarget,
+} from "../lib/notifications";
+import { registerDeviceApi } from "../features/notifications/api";
+import { PUSH_TOKEN_KEY } from "../lib/storage";
 import "../lib/nativewind-interop";
 import "../global.css";
 
@@ -46,6 +53,28 @@ function NotificationRouter() {
     });
     return () => sub.remove();
   }, [router]);
+  return null;
+}
+
+function PushRegistrar() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    (async () => {
+      const token = await registerForPushNotifications();
+      if (!token || cancelled) return;
+      try {
+        await registerDeviceApi(token);
+        await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token);
+      } catch {
+        // best-effort; will retry next launch
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
   return null;
 }
 
@@ -120,6 +149,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <AuthGate>
             <NotificationRouter />
+            <PushRegistrar />
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen
                 name="(onboarding)"

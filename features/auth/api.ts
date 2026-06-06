@@ -19,6 +19,15 @@ export const registerApi = async (
   return data;
 };
 
+export const googleOAuthApi = async (
+  idToken: string,
+): Promise<AuthResponse> => {
+  const { data } = await apiClient.post<AuthResponse>("/auth/oauth/google", {
+    idToken,
+  });
+  return data;
+};
+
 export const logoutApi = async (): Promise<void> => {
   await apiClient.post("/auth/logout");
 };

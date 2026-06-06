@@ -19,3 +19,4 @@ export const USER_KEY = "user";
 export const CART_KEY = "cart";
 export const FAVORITES_KEY = "favorites";
 export const ONBOARDING_SEEN_KEY = "onboarding_seen";
+export const PUSH_TOKEN_KEY = "push_token";

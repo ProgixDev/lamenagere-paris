@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -15,7 +15,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as Google from "expo-auth-session/providers/google";
+import * as WebBrowser from "expo-web-browser";
 import { COLORS } from "../../lib/constants";
+
+WebBrowser.maybeCompleteAuthSession();
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import Toast from "../../components/ui/Toast";
@@ -33,12 +37,41 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, isLoading, error, clearError } = useAuthStore();
+  const { login, loginWithGoogle, isLoading, error, clearError } = useAuthStore();
   const [toast, setToast] = useState({
     visible: false,
     message: "",
     type: "error" as const,
   });
+
+  const [googleRequest, googleResponse, googlePrompt] =
+    Google.useIdTokenAuthRequest({
+      iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+      androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    });
+
+  useEffect(() => {
+    if (googleResponse?.type !== "success") return;
+    const idToken = googleResponse.params?.id_token;
+    if (!idToken) return;
+    loginWithGoogle(idToken).catch(() =>
+      setToast({ visible: true, message: "Connexion Google échouée", type: "error" }),
+    );
+  }, [googleResponse, loginWithGoogle]);
+
+  const onGoogle = async () => {
+    if (!googleRequest) {
+      setToast({
+        visible: true,
+        message: "Connexion Google non configurée",
+        type: "error",
+      });
+      return;
+    }
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await googlePrompt();
+  };
 
   const {
     control,
@@ -173,6 +206,8 @@ export default function LoginScreen() {
         {/* Social buttons */}
         <View style={{ gap: 10 }}>
           <TouchableOpacity
+            onPress={onGoogle}
+            disabled={!googleRequest}
             style={{
               flexDirection: "row",
               alignItems: "center",
@@ -182,6 +217,7 @@ export default function LoginScreen() {
               borderWidth: 1,
               borderColor: COLORS.outlineVariant,
               gap: 10,
+              opacity: googleRequest ? 1 : 0.5,
             }}
           >
             <MaterialCommunityIcons name="google" size={18} color={COLORS.onSurface} />

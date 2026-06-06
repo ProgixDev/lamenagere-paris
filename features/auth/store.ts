@@ -2,8 +2,9 @@ import { create } from "zustand";
 import * as SecureStore from "expo-secure-store";
 import type { User } from "../../lib/types";
 import type { AuthActions, AuthState, RegisterPayload } from "./types";
-import { loginApi, logoutApi, registerApi } from "./api";
-import { AUTH_TOKEN_KEY, USER_KEY } from "../../lib/storage";
+import { googleOAuthApi, loginApi, logoutApi, registerApi } from "./api";
+import { unregisterDeviceApi } from "../notifications/api";
+import { AUTH_TOKEN_KEY, PUSH_TOKEN_KEY, USER_KEY } from "../../lib/storage";
 
 type AuthStore = AuthState & AuthActions;
 
@@ -32,6 +33,19 @@ export const useAuthStore = create<AuthStore>((set) => ({
     }
   },
 
+  loginWithGoogle: async (idToken: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { user, token } = await googleOAuthApi(idToken);
+      await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
+      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
+      set({ user, token, isAuthenticated: true, isLoading: false });
+    } catch (e) {
+      set({ isLoading: false, error: errorMessage(e), isAuthenticated: false });
+      throw e;
+    }
+  },
+
   register: async (data: RegisterPayload) => {
     set({ isLoading: true, error: null });
     try {
@@ -47,12 +61,19 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
   logout: async () => {
     try {
+      const pushToken = await SecureStore.getItemAsync(PUSH_TOKEN_KEY);
+      if (pushToken) await unregisterDeviceApi(pushToken);
+    } catch {
+      // ignore push unregister errors
+    }
+    try {
       await logoutApi();
     } catch {
       // ignore logout API errors
     }
     await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
     await SecureStore.deleteItemAsync(USER_KEY);
+    await SecureStore.deleteItemAsync(PUSH_TOKEN_KEY);
     set({
       user: null,
       token: null,
