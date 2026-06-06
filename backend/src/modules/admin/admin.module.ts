@@ -20,6 +20,8 @@ import { AdminConversationsController } from './admin-conversations.controller';
 import { AdminConversationsService } from './admin-conversations.service';
 import { AdminCampaignsController } from './admin-campaigns.controller';
 import { AdminCampaignsService } from './admin-campaigns.service';
+import { AdminAnalyticsController } from './admin-analytics.controller';
+import { AdminAnalyticsService } from './admin-analytics.service';
 import { HomeController } from '../catalog/home.controller';
 
 /**
@@ -40,6 +42,7 @@ import { HomeController } from '../catalog/home.controller';
     AdminSettingsController,
     AdminConversationsController,
     AdminCampaignsController,
+    AdminAnalyticsController,
     HomeController,
   ],
   providers: [
@@ -53,6 +56,7 @@ import { HomeController } from '../catalog/home.controller';
     AdminSettingsService,
     AdminConversationsService,
     AdminCampaignsService,
+    AdminAnalyticsService,
   ],
 })
 export class AdminModule {}

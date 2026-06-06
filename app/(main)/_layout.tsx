@@ -18,6 +18,7 @@ export default function MainLayout() {
       <Stack.Screen name="addresses" />
       <Stack.Screen name="settings" />
       <Stack.Screen name="about" />
+      <Stack.Screen name="support" />
       <Stack.Screen name="legal/terms" />
       <Stack.Screen name="legal/privacy" />
       <Stack.Screen name="legal/cgv" />

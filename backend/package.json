@@ -9,6 +9,7 @@
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
     "seed": "ts-node -r tsconfig-paths/register scripts/seed.ts",
+    "seed:demo": "ts-node -r tsconfig-paths/register scripts/seed-demo.ts",
     "test": "jest",
     "lint": "eslint \"{src,test,scripts}/**/*.ts\""
   },

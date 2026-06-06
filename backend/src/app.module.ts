@@ -14,6 +14,7 @@ import { QuotesModule } from './modules/quotes/quotes.module';
 import { MessagingModule } from './modules/messaging/messaging.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { TicketsModule } from './modules/tickets/tickets.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { AppController } from './app.controller';
 
@@ -33,6 +34,7 @@ import { AppController } from './app.controller';
     MessagingModule,
     NotificationsModule,
     PaymentsModule,
+    TicketsModule,
     AdminModule,
   ],
   controllers: [AppController],

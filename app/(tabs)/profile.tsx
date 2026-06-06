@@ -34,6 +34,7 @@ const MENU_SECTIONS = [
   {
     title: "Aide",
     items: [
+      { icon: "lifebuoy", label: "Signaler un problème", route: "/(main)/support", badge: null },
       { icon: "help-circle-outline", label: "Aide & Contact", route: "/(main)/about", badge: null },
       { icon: "information-outline", label: "À propos", route: "/(main)/about", badge: null },
     ],
