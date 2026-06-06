@@ -46,8 +46,6 @@ export class NotificationsService {
   async send(tokens: DeviceTokenRow[], payload: PushPayload): Promise<SendResult> {
     const fcm = tokens.filter((t) => t.provider === 'fcm');
     const expoTokens = tokens.filter((t) => t.provider === 'expo');
-    // APNs raw tokens are routed through Expo when an Expo token is used; raw
-    // APNs delivery would require an APNs provider — out of scope for now.
     const results: SendResult['results'] = [];
 
     const [fcmRes, expoRes] = await Promise.all([
@@ -119,6 +117,7 @@ export class NotificationsService {
     payload: PushPayload,
   ): Promise<SendResult['results']> {
     if (tokens.length === 0) return [];
+
     const valid = tokens.filter((t) => Expo.isExpoPushToken(t.token));
     const invalid = tokens
       .filter((t) => !Expo.isExpoPushToken(t.token))
