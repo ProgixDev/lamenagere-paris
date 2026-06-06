@@ -40,6 +40,7 @@ async function bootstrap() {
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
   });
 
+  // Port comes from the hosting platform (PORT env) or .env locally; 3000 fallback.
   const port = config.get<number>('PORT') ?? 3000;
   await app.listen(port, '0.0.0.0');
   Logger.log(`🚀 lamenagere-backend listening on :${port}`, 'Bootstrap');

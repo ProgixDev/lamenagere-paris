@@ -6,11 +6,8 @@ import { z } from 'zod';
  * iterations that need them are wired up.
  */
 const envSchema = z.object({
-  PORT: z.coerce.number().default(3000),
-  NODE_ENV: z
-    .enum(['development', 'production', 'test'])
-    .default('development'),
-  CORS_ORIGINS: z.string().default(''),
+  // Optional — provided by the hosting platform; not required to deploy.
+  PORT: z.coerce.number().optional(),
 
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
@@ -41,12 +38,4 @@ export function validateEnv(config: Record<string, unknown>): Env {
     throw new Error(`Invalid environment configuration:\n${issues}`);
   }
   return parsed.data;
-}
-
-/** Parse CORS_ORIGINS into an array, trimming blanks. */
-export function parseCorsOrigins(raw: string): string[] {
-  return raw
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
 }
