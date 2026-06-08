@@ -113,10 +113,11 @@ export class AuditInterceptor implements NestInterceptor {
 
     const { method, url } = req;
 
-    // Only log mutations on admin routes
+    // Only log mutations on admin routes; skip the activity endpoint itself to avoid recursion
     const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
     const isAdminRoute = url.startsWith('/admin');
-    if (!isMutation || !isAdminRoute) return next.handle();
+    const isActivityRoute = url.startsWith('/admin/activity');
+    if (!isMutation || !isAdminRoute || isActivityRoute) return next.handle();
 
     return next.handle().pipe(
       tap(() => {

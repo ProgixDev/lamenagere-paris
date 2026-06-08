@@ -56,6 +56,17 @@ export class ActivityService {
     if (opts.kind) query = query.eq('kind', opts.kind);
 
     const { data } = await query;
-    return data ?? [];
+    return (data ?? []).map((row: Record<string, unknown>) => ({
+      id: row.id as string,
+      kind: row.kind as ActivityKind,
+      actorId: (row.actor_id as string) ?? null,
+      actorEmail: (row.actor_email as string) ?? null,
+      summary: row.summary as string,
+      entityRef: (row.entity_ref as string) ?? null,
+      action: (row.action as string) ?? null,
+      ipAddress: (row.ip_address as string) ?? null,
+      meta: (row.meta as Record<string, unknown>) ?? {},
+      createdAt: row.created_at as string,
+    }));
   }
 }
