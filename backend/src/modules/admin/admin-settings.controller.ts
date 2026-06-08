@@ -6,7 +6,7 @@ import {
   UpdateZoneFeeDto,
 } from './dto/settings-admin.dto';
 
-@Roles('admin', 'super_admin')
+@Roles('super_admin')
 @Controller('admin/settings')
 export class AdminSettingsController {
   constructor(private readonly settings: AdminSettingsService) {}

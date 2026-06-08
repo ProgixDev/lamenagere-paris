@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AdminProductsController } from './admin-products.controller';
 import { AdminProductsService } from './admin-products.service';
 import { AdminCategoriesController } from './admin-categories.controller';
@@ -22,13 +23,12 @@ import { AdminCampaignsController } from './admin-campaigns.controller';
 import { AdminCampaignsService } from './admin-campaigns.service';
 import { AdminAnalyticsController } from './admin-analytics.controller';
 import { AdminAnalyticsService } from './admin-analytics.service';
+import { AdminUsersController } from './admin-users.controller';
+import { AdminUsersService } from './admin-users.service';
+import { AdminActivityController } from './admin-activity.controller';
+import { AuditInterceptor } from '../../common/interceptors/audit.interceptor';
 import { HomeController } from '../catalog/home.controller';
 
-/**
- * Admin surface (all controllers gated with @Roles('admin','super_admin'))
- * plus the public storefront HomeController (carousel/banners/featured).
- * Campaigns + push are added in iteration 6.
- */
 @Module({
   controllers: [
     AdminProductsController,
@@ -43,6 +43,8 @@ import { HomeController } from '../catalog/home.controller';
     AdminConversationsController,
     AdminCampaignsController,
     AdminAnalyticsController,
+    AdminUsersController,
+    AdminActivityController,
     HomeController,
   ],
   providers: [
@@ -57,6 +59,8 @@ import { HomeController } from '../catalog/home.controller';
     AdminConversationsService,
     AdminCampaignsService,
     AdminAnalyticsService,
+    AdminUsersService,
+    { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })
 export class AdminModule {}

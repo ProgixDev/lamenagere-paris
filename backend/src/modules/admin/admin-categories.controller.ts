@@ -12,7 +12,7 @@ import { Roles } from '../../common/auth/roles.decorator';
 import { AdminCategoriesService } from './admin-categories.service';
 import { ReorderDto, UpsertCategoryDto } from './dto/category-admin.dto';
 
-@Roles('admin', 'super_admin')
+@Roles('admin', 'super_admin', 'editor')
 @Controller('admin/categories')
 export class AdminCategoriesController {
   constructor(private readonly categories: AdminCategoriesService) {}

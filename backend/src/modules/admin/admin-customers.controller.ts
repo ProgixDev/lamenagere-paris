@@ -3,7 +3,7 @@ import { Roles } from '../../common/auth/roles.decorator';
 import { AccountType } from '../../common/serialization/status-labels';
 import { AdminCustomersService } from './admin-customers.service';
 
-@Roles('admin', 'super_admin')
+@Roles('admin', 'super_admin', 'manager', 'support')
 @Controller('admin/customers')
 export class AdminCustomersController {
   constructor(private readonly customers: AdminCustomersService) {}

@@ -15,7 +15,7 @@ import {
   PinEntityDto,
 } from './dto/conversation-admin.dto';
 
-@Roles('admin', 'super_admin')
+@Roles('admin', 'super_admin', 'manager', 'support')
 @Controller('admin/conversations')
 export class AdminConversationsController {
   constructor(private readonly conversations: AdminConversationsService) {}

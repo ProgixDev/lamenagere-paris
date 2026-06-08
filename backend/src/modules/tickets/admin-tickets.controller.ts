@@ -13,7 +13,7 @@ import { AuthUser } from '../../common/auth/auth-user';
 import { TicketsService } from './tickets.service';
 import { TicketMessageDtoIn, UpdateTicketDto } from './dto/ticket.dto';
 
-@Roles('admin', 'super_admin')
+@Roles('admin', 'super_admin', 'manager', 'support')
 @Controller('admin/tickets')
 export class AdminTicketsController {
   constructor(private readonly tickets: TicketsService) {}

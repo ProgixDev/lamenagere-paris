@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
+import { ActivityService } from '../../common/activity/activity.service';
 import {
   AddressRow,
   ProfileRow,
@@ -26,17 +27,39 @@ export interface AuthResult {
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly activity: ActivityService,
+  ) {}
 
-  async login(dto: LoginDto): Promise<AuthResult> {
+  async login(dto: LoginDto, ipAddress?: string): Promise<AuthResult> {
     const { data, error } = await this.supabase.auth.signInWithPassword({
       email: dto.email,
       password: dto.password,
     });
     if (error || !data.session || !data.user) {
+      this.activity
+        .log({
+          kind: 'auth',
+          actorEmail: dto.email,
+          summary: `Tentative de connexion échouée — ${dto.email}`,
+          action: 'LOGIN',
+          ipAddress,
+        })
+        .catch(() => {});
       throw new UnauthorizedException('Email ou mot de passe incorrect');
     }
     const user = await this.loadUser(data.user.id);
+    this.activity
+      .log({
+        kind: 'auth',
+        actorId: data.user.id,
+        actorEmail: dto.email,
+        summary: `Connexion — ${dto.email}`,
+        action: 'LOGIN',
+        ipAddress,
+      })
+      .catch(() => {});
     return { user, token: data.session.access_token };
   }
 

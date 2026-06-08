@@ -16,7 +16,7 @@ import {
   UpdateQuoteStatusDto,
 } from './dto/quote-admin.dto';
 
-@Roles('admin', 'super_admin')
+@Roles('admin', 'super_admin', 'manager')
 @Controller('admin/quotes')
 export class AdminQuotesController {
   constructor(private readonly quotes: AdminQuotesService) {}

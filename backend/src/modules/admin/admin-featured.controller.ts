@@ -17,7 +17,7 @@ import {
   UpsertSlideDto,
 } from './dto/featured-admin.dto';
 
-@Roles('admin', 'super_admin')
+@Roles('admin', 'super_admin', 'editor')
 @Controller('admin/featured')
 export class AdminFeaturedController {
   constructor(private readonly featured: AdminFeaturedService) {}

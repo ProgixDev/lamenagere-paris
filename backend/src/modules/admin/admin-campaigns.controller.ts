@@ -15,7 +15,7 @@ import { AuthUser } from '../../common/auth/auth-user';
 import { AdminCampaignsService } from './admin-campaigns.service';
 import { UpsertCampaignDto } from './dto/campaign-admin.dto';
 
-@Roles('admin', 'super_admin')
+@Roles('admin', 'super_admin', 'editor')
 @Controller('admin/campaigns')
 export class AdminCampaignsController {
   constructor(private readonly campaigns: AdminCampaignsService) {}

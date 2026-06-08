@@ -22,7 +22,7 @@ import {
   UpdateOrderStatusDto,
 } from './dto/order-admin.dto';
 
-@Roles('admin', 'super_admin')
+@Roles('admin', 'super_admin', 'manager')
 @Controller('admin/orders')
 export class AdminOrdersController {
   constructor(private readonly orders: AdminOrdersService) {}

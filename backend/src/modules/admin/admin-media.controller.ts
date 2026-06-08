@@ -23,7 +23,7 @@ const ALLOWED: MediaFolder[] = [
 ];
 
 /** Admin media upload -> Supabase Storage. Returns the public URL. */
-@Roles('admin', 'super_admin')
+@Roles('admin', 'super_admin', 'editor')
 @Controller('admin/media')
 export class AdminMediaController {
   constructor(private readonly storage: StorageService) {}

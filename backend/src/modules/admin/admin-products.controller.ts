@@ -18,7 +18,7 @@ import {
   UpsertProductDto,
 } from './dto/product-admin.dto';
 
-@Roles('admin', 'super_admin')
+@Roles('admin', 'super_admin', 'editor')
 @Controller('admin/products')
 export class AdminProductsController {
   constructor(private readonly products: AdminProductsService) {}
