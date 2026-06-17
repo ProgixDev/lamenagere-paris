@@ -271,8 +271,14 @@ export const MOCK_PRODUCTS: Product[] = [
   },
 ];
 
-// Helper to get image source by key
-export const getProductImage = (key: string) => {
+// Helper to get an Image source from a product image value. Real products from
+// the backend carry remote URLs (http/https) or local file URIs; legacy mock
+// data uses local asset keys mapped in PRODUCT_IMAGES.
+export const getProductImage = (key?: string | null) => {
+  if (!key) return null;
+  if (/^(https?:|file:|data:|content:)/.test(key)) {
+    return { uri: key };
+  }
   return (PRODUCT_IMAGES as any)[key] ?? null;
 };
 

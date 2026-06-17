@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React, { useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -15,24 +17,35 @@ import { COLORS } from "../../../lib/constants";
 import { formatPrice } from "../../../lib/utils";
 import MessageBubble from "../../../components/messaging/MessageBubble";
 import MessageInput from "../../../components/messaging/MessageInput";
+import { getProductImage } from "../../../lib/mock-data";
 import {
-  MOCK_CONVERSATIONS,
-  MOCK_MESSAGES,
-  getProductImage,
-} from "../../../lib/mock-data";
-import type { Message } from "../../../lib/types";
+  useConversations,
+  useConversationThread,
+  useSendMessage,
+  useMarkAsRead,
+} from "../../../features/messaging/hooks";
 
 export default function ConversationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
 
-  const conversation = MOCK_CONVERSATIONS.find((c) => c.id === id);
-  const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES[id] || []);
+  const { data: conversations } = useConversations();
+  const conversation = conversations?.find((c) => c.id === id);
+
+  const { data: messages = [], isLoading: messagesLoading } =
+    useConversationThread(id);
+  const sendMessage = useSendMessage();
+  const markAsRead = useMarkAsRead();
 
   const productImg = conversation?.product?.images[0]
     ? getProductImage(conversation.product.images[0])
     : null;
+
+  useEffect(() => {
+    if (id) markAsRead.mutate(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   useEffect(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 150);
@@ -40,17 +53,26 @@ export default function ConversationScreen() {
 
   const handleSend = useCallback(
     (content: string) => {
-      const newMsg: Message = {
-        id: `local-${Date.now()}`,
-        conversationId: id,
-        content,
-        sender: "user",
-        createdAt: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, newMsg]);
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+      if (!id) return;
+      sendMessage.mutate(
+        { conversationId: id, content },
+        {
+          onSuccess: () => {
+            setTimeout(
+              () => scrollRef.current?.scrollToEnd({ animated: true }),
+              100,
+            );
+          },
+          onError: () => {
+            Alert.alert(
+              "Erreur",
+              "Votre message n'a pas pu être envoyé. Veuillez réessayer.",
+            );
+          },
+        },
+      );
     },
-    [id],
+    [id, sendMessage],
   );
 
   if (!conversation) {
@@ -168,18 +190,24 @@ export default function ConversationScreen() {
           )}
 
           {/* Messages */}
-          {messages.map((msg, idx) => {
-            const prevMsg = idx > 0 ? messages[idx - 1] : null;
-            const showAvatar = !prevMsg || prevMsg.sender !== msg.sender;
-            return (
-              <MessageBubble key={msg.id} message={msg} showAvatar={showAvatar} />
-            );
-          })}
+          {messagesLoading && messages.length === 0 ? (
+            <View style={{ alignItems: "center", justifyContent: "center", paddingTop: 60 }}>
+              <ActivityIndicator color={COLORS.secondary} />
+            </View>
+          ) : (
+            messages.map((msg, idx) => {
+              const prevMsg = idx > 0 ? messages[idx - 1] : null;
+              const showAvatar = !prevMsg || prevMsg.sender !== msg.sender;
+              return (
+                <MessageBubble key={msg.id} message={msg} showAvatar={showAvatar} />
+              );
+            })
+          )}
         </ScrollView>
 
         {/* Input */}
         <SafeAreaView edges={["bottom"]} style={{ backgroundColor: "#ffffff" }}>
-          <MessageInput onSend={handleSend} />
+          <MessageInput onSend={handleSend} disabled={sendMessage.isPending} />
         </SafeAreaView>
       </KeyboardAvoidingView>
     </SafeAreaView>

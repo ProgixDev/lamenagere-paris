@@ -13,12 +13,14 @@ import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../lib/constants";
 import {
-  MOCK_CATEGORIES,
-  MOCK_PRODUCTS,
   PRODUCT_IMAGES,
   getProductImage,
 } from "../../lib/mock-data";
 import { useFeaturedProducts } from "../../features/featured/store";
+import {
+  useCategories,
+  usePopularProducts,
+} from "../../features/products/hooks";
 import { formatPrice } from "../../lib/utils";
 import type { Product, Category } from "../../lib/types";
 import SearchBar from "../../components/SearchBar";
@@ -52,12 +54,15 @@ const HERO_CATEGORY_ID = "2"; // Cuisines
 export default function CategoriesScreen() {
   const router = useRouter();
   const featured = useFeaturedProducts();
-  const heroCat = MOCK_CATEGORIES.find((c) => c.id === HERO_CATEGORY_ID);
-  const otherCats = MOCK_CATEGORIES.filter((c) => c.id !== HERO_CATEGORY_ID);
-  const heroProducts = featured.length > 0 ? featured : MOCK_PRODUCTS.slice(0, 6);
+  const { data: categories = [] } = useCategories();
+  const { data: popular = [] } = usePopularProducts(6);
+  const heroCat = categories.find((c) => c.id === HERO_CATEGORY_ID) ?? categories[0];
+  const otherCats = heroCat
+    ? categories.filter((c) => c.id !== heroCat.id)
+    : categories;
+  const heroProducts = featured.length > 0 ? featured : popular;
 
-  const productCount = (catId: string) =>
-    MOCK_PRODUCTS.filter((p) => p.category.id === catId).length;
+  const productCount = (cat: Category | undefined) => cat?.productCount ?? 0;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
@@ -174,7 +179,7 @@ export default function CategoriesScreen() {
                   marginTop: 4,
                 }}
               >
-                {productCount(heroCat.id)} créations · {CATEGORY_TAGLINES[heroCat.id] ?? ""}
+                {productCount(heroCat)} créations · {CATEGORY_TAGLINES[heroCat.id] ?? ""}
               </Text>
               <View
                 style={{
@@ -261,7 +266,7 @@ export default function CategoriesScreen() {
               key={cat.id}
               category={cat}
               tall={idx % 3 === 0}
-              count={productCount(cat.id)}
+              count={productCount(cat)}
               onPress={() => router.push(`/(main)/categories/${cat.id}`)}
             />
           ))}

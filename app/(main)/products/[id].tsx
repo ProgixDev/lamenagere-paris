@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
+  ActivityIndicator,
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from "react-native";
@@ -18,9 +19,10 @@ import { formatPrice } from "../../../lib/utils";
 import Button from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
 import Toast from "../../../components/ui/Toast";
-import { MOCK_PRODUCTS, getProductImage } from "../../../lib/mock-data";
+import { getProductImage } from "../../../lib/mock-data";
 import { useCartStore } from "../../../features/cart/store";
 import { useFavoritesStore } from "../../../features/favorites/store";
+import { useProduct, usePopularProducts } from "../../../features/products/hooks";
 import type { Product } from "../../../lib/types";
 
 const { width: W, height: H } = Dimensions.get("window");
@@ -54,7 +56,8 @@ function deriveSold(product: Product) {
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const product = MOCK_PRODUCTS.find((p) => p.id === id);
+  const { data: product, isLoading } = useProduct(id);
+  const { data: popular = [] } = usePopularProducts(12);
 
   const addItem = useCartStore((s) => s.addItem);
   const isFavorited = useFavoritesStore((s) => s.favorites.includes(id));
@@ -72,6 +75,14 @@ export default function ProductDetailScreen() {
   const rating = useMemo(() => (product ? deriveRating(product) : 0), [product]);
   const reviewCount = useMemo(() => (product ? deriveReviewCount(product) : 0), [product]);
   const soldCount = useMemo(() => (product ? deriveSold(product) : 0), [product]);
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </SafeAreaView>
+    );
+  }
 
   if (!product) {
     return (
@@ -564,8 +575,8 @@ export default function ProductDetailScreen() {
         <View style={{ marginTop: 16 }}>
           <Section title="Articles similaires" noBackground>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 16 }}>
-              {MOCK_PRODUCTS
-                .filter((p) => p.id !== product.id && p.category.id === product.category.id)
+              {popular
+                .filter((p) => p.id !== product.id)
                 .slice(0, 6)
                 .map((p) => {
                   const img = getProductImage(p.images[0]);

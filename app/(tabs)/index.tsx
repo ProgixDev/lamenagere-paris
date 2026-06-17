@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -16,16 +16,17 @@ import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../lib/constants";
-import {
-  MOCK_CATEGORIES,
-  MOCK_PRODUCTS,
-  getProductImage,
-} from "../../lib/mock-data";
+import { getProductImage } from "../../lib/mock-data";
 import { formatPrice } from "../../lib/utils";
 import type { Product } from "../../lib/types";
 import { useFavoritesStore } from "../../features/favorites/store";
 import { useCartStore } from "../../features/cart/store";
 import { useFeaturedProducts } from "../../features/featured/store";
+import {
+  useCategories,
+  usePopularProducts,
+  useProductsByCategory,
+} from "../../features/products/hooks";
 import HeroCarousel from "../../components/HeroCarousel";
 import SearchBar from "../../components/SearchBar";
 import PromoBanner from "../../components/PromoBanner";
@@ -40,11 +41,13 @@ type FilterKind = "all" | "deals" | "rated" | "best";
 function TopCategoryTabs({
   active,
   onSelect,
+  categories,
 }: {
   active: string;
   onSelect: (id: string) => void;
+  categories: { id: string; name: string }[];
 }) {
-  const cats = [{ id: "all", name: "Tout" }, ...MOCK_CATEGORIES];
+  const cats = [{ id: "all", name: "Tout" }, ...categories];
   return (
     <ScrollView
       horizontal
@@ -358,66 +361,82 @@ function MasonryFeed({ items }: { items: FeedItem[] }) {
 }
 
 // ─── Home screen ──────────────────────────────────────────
-const PAGE_SIZE = 8;
 const NEAR_BOTTOM_PX = 600;
 
 export default function HomeScreen() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [activeFilter, setActiveFilter] = useState<FilterKind>("all");
   const [refreshing, setRefreshing] = useState(false);
-  const [loaded, setLoaded] = useState(PAGE_SIZE);
   const featured = useFeaturedProducts();
 
+  const isAll = activeCategory === "all";
+
+  const categoriesQuery = useCategories();
+  const popularQuery = usePopularProducts(40);
+  const categoryQuery = useProductsByCategory(isAll ? "" : activeCategory);
+
+  // Active product source depends on selected top tab.
+  const baseProducts = useMemo<Product[]>(() => {
+    if (isAll) return popularQuery.data ?? [];
+    return categoryQuery.data?.pages.flatMap((p) => p.items) ?? [];
+  }, [isAll, popularQuery.data, categoryQuery.data]);
+
+  const isLoading = isAll
+    ? popularQuery.isLoading
+    : categoryQuery.isLoading;
+
+  // Client-side filter chips over the loaded list.
   const products = useMemo(() => {
-    let list = activeCategory === "all" ? MOCK_PRODUCTS : MOCK_PRODUCTS.filter((p) => p.category.id === activeCategory);
+    let list = baseProducts;
     if (activeFilter === "deals") {
       list = list.filter((p) => p.priceMode === "fixed");
     } else if (activeFilter === "rated") {
       list = list.filter((_, i) => i % 2 === 0);
     } else if (activeFilter === "best") {
-      list = featured.length > 0 ? featured : list.slice(0, 8);
+      list = featured.length > 0 ? featured : list;
     }
     return list;
-  }, [activeCategory, activeFilter, featured]);
+  }, [baseProducts, activeFilter, featured]);
 
-  // Reset pagination when filters change
-  useEffect(() => {
-    setLoaded(PAGE_SIZE);
-  }, [activeCategory, activeFilter]);
-
-  // Build the FIFO-cycled feed up to `loaded`
+  // Build the masonry feed from the real product list.
   const feed = useMemo<FeedItem[]>(() => {
-    if (products.length === 0) return [];
-    const items: FeedItem[] = [];
-    for (let i = 0; i < loaded; i++) {
-      const product = products[i % products.length];
-      const cycle = Math.floor(i / products.length);
+    return products.map((product, i) => {
       const variance = (product.id.charCodeAt(product.id.length - 1) % 5) * 18;
-      items.push({
-        key: `${product.id}-${cycle}-${i}`,
+      return {
+        key: `${product.id}-${i}`,
         product,
         imgHeight: 160 + variance,
-      });
-    }
-    return items;
-  }, [products, loaded]);
+      };
+    });
+  }, [products]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setLoaded(PAGE_SIZE);
-    setTimeout(() => setRefreshing(false), 600);
-  }, []);
+    if (isAll) {
+      await popularQuery.refetch();
+    } else {
+      await categoryQuery.refetch();
+    }
+    setRefreshing(false);
+  }, [isAll, popularQuery, categoryQuery]);
 
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
       const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
-      if (distanceFromBottom < NEAR_BOTTOM_PX && products.length > 0) {
-        setLoaded((prev) => prev + PAGE_SIZE);
+      if (
+        distanceFromBottom < NEAR_BOTTOM_PX &&
+        !isAll &&
+        categoryQuery.hasNextPage &&
+        !categoryQuery.isFetchingNextPage
+      ) {
+        categoryQuery.fetchNextPage();
       }
     },
-    [products.length],
+    [isAll, categoryQuery],
   );
+
+  const categories = categoriesQuery.data ?? [];
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
@@ -432,7 +451,7 @@ export default function HomeScreen() {
         scrollEventThrottle={64}
       >
         <View style={{ backgroundColor: COLORS.background }}>
-          <TopCategoryTabs active={activeCategory} onSelect={setActiveCategory} />
+          <TopCategoryTabs active={activeCategory} onSelect={setActiveCategory} categories={categories} />
         </View>
 
         <PromoBanner />
@@ -443,17 +462,21 @@ export default function HomeScreen() {
 
         <MasonryFeed items={feed} />
 
-        {products.length === 0 ? (
+        {isLoading ? (
+          <View style={{ paddingVertical: 20, alignItems: "center" }}>
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          </View>
+        ) : products.length === 0 ? (
           <View style={{ alignItems: "center", paddingTop: 40 }}>
             <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.outline }}>
               Aucun produit trouvé.
             </Text>
           </View>
-        ) : (
+        ) : (!isAll && categoryQuery.isFetchingNextPage) ? (
           <View style={{ paddingVertical: 20, alignItems: "center" }}>
             <ActivityIndicator size="small" color={COLORS.primary} />
           </View>
-        )}
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );

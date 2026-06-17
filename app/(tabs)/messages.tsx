@@ -5,18 +5,19 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Image,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../lib/constants";
 import ConversationItem from "../../components/messaging/ConversationItem";
-import { MOCK_CONVERSATIONS } from "../../lib/mock-data";
+import { useConversations } from "../../features/messaging/hooks";
 
 export default function MessagesScreen() {
   const [search, setSearch] = useState("");
 
-  const conversations = MOCK_CONVERSATIONS;
+  const { data, isLoading } = useConversations();
+  const conversations = data ?? [];
   const totalUnread = conversations.reduce((s, c) => s + c.unreadCount, 0);
 
   const filtered = search
@@ -105,7 +106,11 @@ export default function MessagesScreen() {
 
       {/* Conversations */}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-        {filtered.length > 0 ? (
+        {isLoading && conversations.length === 0 ? (
+          <View style={{ alignItems: "center", justifyContent: "center", paddingTop: 100 }}>
+            <ActivityIndicator color={COLORS.secondary} />
+          </View>
+        ) : filtered.length > 0 ? (
           filtered.map((conv, idx) => (
             <View key={conv.id}>
               <ConversationItem conversation={conv} />

@@ -1,19 +1,9 @@
-import { Stack } from "expo-router";
+import { Redirect } from "expo-router";
 
+// Mobile admin screens are deprecated: administration is handled by the
+// separate web admin. Any access to the (admin) route group (e.g. via a
+// deep link) is redirected back into the app so these stub screens are not
+// reachable dead ends.
 export default function AdminLayout() {
-  return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="dashboard" />
-      <Stack.Screen name="products/index" />
-      <Stack.Screen name="products/create" />
-      <Stack.Screen name="products/[id]" />
-      <Stack.Screen name="orders/index" />
-      <Stack.Screen name="orders/[id]" />
-      <Stack.Screen name="quotes/index" />
-      <Stack.Screen name="quotes/[id]" />
-      <Stack.Screen name="messages/index" />
-      <Stack.Screen name="featured" />
-      <Stack.Screen name="campaigns" />
-    </Stack>
-  );
+  return <Redirect href="/(tabs)" />;
 }

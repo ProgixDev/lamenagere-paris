@@ -164,7 +164,6 @@ export default function RootLayout() {
                 options={{ animation: "none" }}
               />
               <Stack.Screen name="(main)" />
-              <Stack.Screen name="(admin)" />
             </Stack>
           </AuthGate>
           {showSplash && <AnimatedSplash onFinish={handleSplashFinish} />}
