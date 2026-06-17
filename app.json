@@ -48,7 +48,14 @@
       "expo-local-authentication",
       "expo-font",
       "expo-video",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.lamenagereparis.app",
+          "enableGooglePay": false
+        }
+      ]
     ],
     "extra": {
       "apiUrl": "https://api.lamenagereparis.fr",

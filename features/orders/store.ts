@@ -1,8 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { persistStorage } from "../../lib/persist-storage";
-import type { Order, OrderStatus, OrderTimelineEntry, ShippingZone } from "../../lib/types";
-import { MOCK_PRODUCTS } from "../../lib/mock-data";
+import type { Order, OrderStatus, OrderTimelineEntry } from "../../lib/types";
 
 const STATUS_FLOW: OrderStatus[] = [
   "commande_confirmee",
@@ -33,71 +32,6 @@ function buildTimeline(currentStatus: OrderStatus, createdAt: string): OrderTime
   }));
 }
 
-function makeMockOrder(opts: {
-  id: string;
-  orderNumber: string;
-  productId: string;
-  quantity: number;
-  status: OrderStatus;
-  createdAt: string;
-  territory?: ShippingZone;
-}): Order | null {
-  const product = MOCK_PRODUCTS.find((p) => p.id === opts.productId);
-  if (!product || !product.price) return null;
-  const subtotal = product.price * opts.quantity;
-  const shippingCost = 0;
-  return {
-    id: opts.id,
-    orderNumber: opts.orderNumber,
-    items: [
-      {
-        id: `${opts.id}-i1`,
-        product,
-        quantity: opts.quantity,
-        price: product.price,
-      },
-    ],
-    status: opts.status,
-    total: subtotal + shippingCost,
-    subtotal,
-    shippingCost,
-    shippingAddress: {
-      id: "addr-mock",
-      firstName: "Jean",
-      lastName: "Laurent",
-      street: "12 rue de Rivoli",
-      postalCode: "75001",
-      city: "Paris",
-      country: "France",
-      territory: opts.territory ?? "metropole",
-    },
-    territory: opts.territory ?? "metropole",
-    shippingMethod: "standard",
-    estimatedDelivery: "2-3 semaines",
-    createdAt: opts.createdAt,
-    timeline: buildTimeline(opts.status, opts.createdAt),
-  };
-}
-
-const SEED_ORDERS: Order[] = [
-  makeMockOrder({
-    id: "ord1",
-    orderNumber: "LMP-2026-001",
-    productId: "s1",
-    quantity: 1,
-    status: "en_preparation",
-    createdAt: "2026-04-02T10:00:00Z",
-  }),
-  makeMockOrder({
-    id: "ord2",
-    orderNumber: "LMP-2026-002",
-    productId: "ch1",
-    quantity: 1,
-    status: "expediee",
-    createdAt: "2026-03-20T14:30:00Z",
-  }),
-].filter((o): o is Order => Boolean(o));
-
 interface OrdersStore {
   orders: Order[];
   addOrder: (order: Order) => void;
@@ -108,7 +42,7 @@ interface OrdersStore {
 export const useOrdersStore = create<OrdersStore>()(
   persist(
     (set, get) => ({
-      orders: SEED_ORDERS,
+      orders: [],
 
       addOrder: (order) =>
         set((state) => ({ orders: [order, ...state.orders] })),

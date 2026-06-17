@@ -14,16 +14,18 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../../lib/constants";
-import { pickVisualSearchImage } from "../../../lib/visual-search";
 import {
-  MOCK_CATEGORIES,
-  MOCK_PRODUCTS,
   PRODUCT_IMAGES,
   getProductImage,
 } from "../../../lib/mock-data";
 import { formatPrice } from "../../../lib/utils";
 import { useSearchStore } from "../../../features/search/store";
-import type { Product } from "../../../lib/types";
+import {
+  useCategories,
+  usePopularProducts,
+  useSearchProducts,
+} from "../../../features/products/hooks";
+import Toast from "../../../components/ui/Toast";
 
 const { width: W } = Dimensions.get("window");
 const PAGE_PAD = 16;
@@ -48,81 +50,37 @@ const POPULAR_QUERIES = [
   "Décoration",
 ];
 
-const TRENDING_PRODUCT_IDS = ["c2", "ch1", "p1", "s1"];
-
-function score(haystack: string, needle: string) {
-  const h = haystack.toLowerCase();
-  const n = needle.toLowerCase();
-  if (h === n) return 100;
-  if (h.startsWith(n)) return 80;
-  if (h.includes(n)) return 50;
-  return 0;
-}
-
 export default function SearchScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ image?: string }>();
   const [query, setQuery] = useState("");
-  const [imageUri, setImageUri] = useState<string | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [visualMatches, setVisualMatches] = useState<Product[]>([]);
+  const [toast, setToast] = useState({ visible: false, message: "" });
   const recent = useSearchStore((s) => s.recent);
   const pushRecent = useSearchStore((s) => s.pushRecent);
   const clearRecent = useSearchStore((s) => s.clearRecent);
 
-  // Pick up image param from SearchBar camera tap
+  const trimmed = query.trim();
+  const searchQuery = useSearchProducts(trimmed);
+  const { data: categories = [] } = useCategories();
+  const { data: popular = [] } = usePopularProducts(8);
+
+  // Visual / image search is not yet available — show a notice instead of
+  // fabricating ML results.
   useEffect(() => {
-    if (params.image && params.image !== imageUri) {
-      runVisualSearch(params.image);
+    if (params.image) {
+      setToast({ visible: true, message: "Recherche par image bientôt disponible" });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.image]);
 
-  const runVisualSearch = (uri: string) => {
-    Keyboard.dismiss();
-    setImageUri(uri);
-    setQuery("");
-    setAnalyzing(true);
-    setVisualMatches([]);
-    // Pseudo-deterministic shuffle from URI hash so matches feel "matched"
-    const seed = Array.from(uri).reduce((acc, c) => acc + c.charCodeAt(0), 0);
-    const shuffled = [...MOCK_PRODUCTS].sort(
-      (a, b) => ((a.id.charCodeAt(0) + seed) % 7) - ((b.id.charCodeAt(0) + seed) % 7),
-    );
-    setTimeout(() => {
-      setVisualMatches(shuffled.slice(0, 8));
-      setAnalyzing(false);
-    }, 1400);
-  };
-
   const launchPicker = async () => {
-    const uri = await pickVisualSearchImage();
-    if (!uri) return;
-    runVisualSearch(uri);
+    setToast({ visible: true, message: "Recherche par image bientôt disponible" });
   };
 
-  const clearVisualSearch = () => {
-    setImageUri(null);
-    setVisualMatches([]);
-    setAnalyzing(false);
-  };
-
-  const results = useMemo(() => {
-    const q = query.trim();
-    if (!q) return [];
-    return MOCK_PRODUCTS
-      .map((p) => ({
-        product: p,
-        s: Math.max(
-          score(p.name, q),
-          score(p.description, q) * 0.6,
-          score(p.category.name, q) * 0.8,
-        ),
-      }))
-      .filter((r) => r.s > 0)
-      .sort((a, b) => b.s - a.s)
-      .map((r) => r.product);
-  }, [query]);
+  const results = useMemo(
+    () => searchQuery.data?.pages.flatMap((p) => p.items) ?? [],
+    [searchQuery.data],
+  );
+  const isSearching = trimmed.length > 2 && searchQuery.isLoading;
 
   const open = (productId: string) => {
     pushRecent(query);
@@ -135,9 +93,7 @@ export default function SearchScreen() {
     router.push(`/(main)/categories/${catId}`);
   };
 
-  const trending = TRENDING_PRODUCT_IDS
-    .map((id) => MOCK_PRODUCTS.find((p) => p.id === id))
-    .filter((p): p is (typeof MOCK_PRODUCTS)[number] => Boolean(p));
+  const trending = popular.slice(0, 4);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
@@ -169,13 +125,10 @@ export default function SearchScreen() {
           <MaterialCommunityIcons name="magnify" size={18} color={COLORS.outline} />
           <TextInput
             value={query}
-            onChangeText={(v) => {
-              setQuery(v);
-              if (v.trim().length > 0) clearVisualSearch();
-            }}
+            onChangeText={setQuery}
             placeholder="Rechercher un produit, une catégorie…"
             placeholderTextColor={COLORS.outline}
-            autoFocus={!imageUri}
+            autoFocus
             returnKeyType="search"
             onSubmitEditing={() => pushRecent(query)}
             style={{
@@ -197,135 +150,7 @@ export default function SearchScreen() {
         </View>
       </View>
 
-      {imageUri ? (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 40 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* ── Visual search header ───────────── */}
-          <View
-            style={{
-              marginHorizontal: PAGE_PAD,
-              marginTop: 6,
-              padding: 12,
-              borderRadius: 14,
-              backgroundColor: "#fff",
-              flexDirection: "row",
-              gap: 12,
-              alignItems: "center",
-            }}
-          >
-            <Image
-              source={{ uri: imageUri }}
-              style={{ width: 64, height: 64, borderRadius: 10, backgroundColor: COLORS.surfaceContainer }}
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>
-                Recherche par image
-              </Text>
-              <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 2 }}>
-                {analyzing ? "Analyse en cours…" : `${visualMatches.length} suggestions visuelles`}
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={clearVisualSearch}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: COLORS.surfaceContainer,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <MaterialCommunityIcons name="close" size={16} color={COLORS.onSurface} />
-            </TouchableOpacity>
-          </View>
-
-          {analyzing ? (
-            <View style={{ paddingTop: 60, alignItems: "center" }}>
-              <ActivityIndicator size="large" color={COLORS.primary} />
-              <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: COLORS.onSurface, marginTop: 12 }}>
-                Identification du produit…
-              </Text>
-              <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 4 }}>
-                Comparaison avec notre catalogue
-              </Text>
-            </View>
-          ) : (
-            <View style={{ paddingHorizontal: PAGE_PAD, marginTop: 18 }}>
-              <SectionHeader title="Suggestions visuelles" />
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-                {visualMatches.map((p, idx) => {
-                  const img = getProductImage(p.images[0]);
-                  const matchPct = 92 - idx * 4;
-                  return (
-                    <TouchableOpacity
-                      key={p.id}
-                      activeOpacity={0.92}
-                      onPress={() => open(p.id)}
-                      style={{
-                        width: (W - PAGE_PAD * 2 - 10) / 2,
-                        backgroundColor: "#fff",
-                        borderRadius: 12,
-                        overflow: "hidden",
-                      }}
-                    >
-                      <View
-                        style={{
-                          width: "100%",
-                          aspectRatio: 1,
-                          backgroundColor: COLORS.surfaceContainer,
-                        }}
-                      >
-                        {img && <Image source={img} style={{ width: "100%", height: "100%" }} resizeMode="cover" />}
-                        <View
-                          style={{
-                            position: "absolute",
-                            top: 6,
-                            left: 6,
-                            backgroundColor: COLORS.primary,
-                            paddingHorizontal: 6,
-                            paddingVertical: 2,
-                            borderRadius: 4,
-                          }}
-                        >
-                          <Text style={{ fontSize: 9, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 0.5 }}>
-                            {matchPct}% MATCH
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={{ padding: 8 }}>
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            fontFamily: "Inter_500Medium",
-                            color: COLORS.onSurface,
-                          }}
-                          numberOfLines={2}
-                        >
-                          {p.name}
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: 13,
-                            fontFamily: "Manrope_700Bold",
-                            color: COLORS.secondary,
-                            marginTop: 2,
-                          }}
-                        >
-                          {p.price ? formatPrice(p.price) : "Sur devis"}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          )}
-        </ScrollView>
-      ) : query.trim() === "" ? (
+      {query.trim() === "" ? (
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 40 }}
@@ -425,9 +250,9 @@ export default function SearchScreen() {
                 gap: CAT_GAP,
               }}
             >
-              {MOCK_CATEGORIES.map((cat) => {
-                const cover = CATEGORY_COVERS[cat.id];
-                const count = MOCK_PRODUCTS.filter((p) => p.category.id === cat.id).length;
+              {categories.map((cat) => {
+                const cover = CATEGORY_COVERS[cat.id] ?? getProductImage(cat.image);
+                const count = cat.productCount ?? 0;
                 return (
                   <TouchableOpacity
                     key={cat.id}
@@ -543,7 +368,11 @@ export default function SearchScreen() {
           contentContainerStyle={{ paddingHorizontal: PAGE_PAD, paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
         >
-          {results.length === 0 ? (
+          {isSearching ? (
+            <View style={{ paddingTop: 60, alignItems: "center" }}>
+              <ActivityIndicator size="large" color={COLORS.primary} />
+            </View>
+          ) : results.length === 0 ? (
             <View style={{ paddingTop: 60, alignItems: "center" }}>
               <View
                 style={{
@@ -608,6 +437,13 @@ export default function SearchScreen() {
           )}
         </ScrollView>
       )}
+
+      <Toast
+        message={toast.message}
+        type="info"
+        visible={toast.visible}
+        onDismiss={() => setToast((p) => ({ ...p, visible: false }))}
+      />
     </SafeAreaView>
   );
 }

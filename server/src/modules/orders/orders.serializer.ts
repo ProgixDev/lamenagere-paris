@@ -40,6 +40,7 @@ export interface OrderRow {
   order_number: string;
   profile_id: string;
   status: OrderStatus;
+  payment_status: 'unpaid' | 'paid' | 'failed' | 'refunded';
   subtotal_cents: number;
   shipping_cost_cents: number;
   total_cents: number;
@@ -85,6 +86,7 @@ export interface OrderDto {
   orderNumber: string;
   items: OrderItemDto[];
   status: OrderStatus;
+  paymentStatus: 'unpaid' | 'paid' | 'failed' | 'refunded';
   total: number;
   subtotal: number;
   shippingCost: number;
@@ -179,6 +181,7 @@ export function toOrderDto(row: OrderRow): OrderDto {
     orderNumber: row.order_number,
     items,
     status: row.status,
+    paymentStatus: row.payment_status ?? 'unpaid',
     total: centsToEuros(row.total_cents),
     subtotal: centsToEuros(row.subtotal_cents),
     shippingCost: centsToEuros(row.shipping_cost_cents),

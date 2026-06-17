@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -9,12 +9,38 @@ import Skeleton from "../../../components/ui/Skeleton";
 import OrderTimeline from "../../../components/order/OrderTimeline";
 import Button from "../../../components/ui/Button";
 import Card from "../../../components/ui/Card";
-import { useOrder } from "../../../features/orders/hooks";
+import { useOrder, useCancelOrder } from "../../../features/orders/hooks";
+
+const CANCELLABLE_STATUSES = ["commande_confirmee", "en_preparation"];
 
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { data: order, isLoading } = useOrder(id);
+  const cancelOrder = useCancelOrder();
+
+  const handleCancel = () => {
+    if (!order) return;
+    Alert.alert(
+      "Annuler la commande",
+      "Voulez-vous vraiment annuler cette commande ?",
+      [
+        { text: "Non", style: "cancel" },
+        {
+          text: "Annuler la commande",
+          style: "destructive",
+          onPress: () =>
+            cancelOrder.mutate(order.id, {
+              onError: (e: any) =>
+                Alert.alert(
+                  "Erreur",
+                  e?.message || "Impossible d'annuler la commande",
+                ),
+            }),
+        },
+      ],
+    );
+  };
 
   if (isLoading || !order) {
     return (
@@ -101,6 +127,16 @@ export default function OrderDetailScreen() {
         </Card>
 
         <Button label="CONTACTER LE VENDEUR" onPress={() => {}} variant="secondary" size="lg" />
+
+        {CANCELLABLE_STATUSES.includes(order.status) && (
+          <Button
+            label="ANNULER LA COMMANDE"
+            onPress={handleCancel}
+            variant="danger"
+            size="lg"
+            loading={cancelOrder.isPending}
+          />
+        )}
       </ScrollView>
     </SafeAreaView>
   );

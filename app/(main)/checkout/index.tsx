@@ -1,49 +1,61 @@
-import React from "react";
-import { View, Text, ScrollView, TouchableOpacity } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { useForm, Controller } from "react-hook-form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { COLORS, TERRITORIES, DELIVERY_ESTIMATES } from "../../../lib/constants";
-import { isValidPostalCode, isOverseas, formatPrice } from "../../../lib/utils";
-import Input from "../../../components/ui/Input";
+import { COLORS, DELIVERY_ESTIMATES } from "../../../lib/constants";
+import { isOverseas, formatPrice } from "../../../lib/utils";
 import Button from "../../../components/ui/Button";
 import CheckoutSteps from "../../../components/cart/CheckoutSteps";
+import AddressFormModal from "../../../components/address/AddressFormModal";
 import { useCart } from "../../../features/cart/hooks";
-
-const addressSchema = z.object({
-  firstName: z.string().min(1, "Prénom requis"),
-  lastName: z.string().min(1, "Nom requis"),
-  street: z.string().min(1, "Adresse requise"),
-  postalCode: z.string().min(1, "Code postal requis").refine(isValidPostalCode, "Code postal invalide"),
-  city: z.string().min(1, "Ville requise"),
-  territory: z.string().min(1, "Territoire requis"),
-});
-
-type AddressForm = z.infer<typeof addressSchema>;
+import {
+  useAddresses,
+  useCreateAddress,
+} from "../../../features/addresses/hooks";
+import type { AddressInput } from "../../../features/addresses/api";
+import { useCheckoutStore } from "../../../features/checkout/store";
 
 export default function CheckoutAddressScreen() {
   const router = useRouter();
   const { items, subtotal } = useCart();
+  const { data: addresses = [], isLoading } = useAddresses();
+  const createAddress = useCreateAddress();
+  const setAddress = useCheckoutStore((s) => s.setAddress);
+  const selectedId = useCheckoutStore((s) => s.shippingAddressId);
 
-  const { control, handleSubmit, watch, formState: { errors } } = useForm<AddressForm>({
-    resolver: zodResolver(addressSchema),
-    defaultValues: {
-      firstName: "",
-      lastName: "",
-      street: "",
-      postalCode: "",
-      city: "",
-      territory: "metropole",
-    },
-  });
+  const [modalVisible, setModalVisible] = useState(false);
 
-  const territory = watch("territory");
-  const overseas = isOverseas(territory);
+  // Default-select the user's default address (or first) once loaded.
+  useEffect(() => {
+    if (!selectedId && addresses.length > 0) {
+      const preferred =
+        addresses.find((a) => a.isDefault) ?? addresses[0];
+      setAddress(preferred.id, preferred.territory);
+    }
+  }, [addresses, selectedId, setAddress]);
 
-  const onSubmit = (data: AddressForm) => {
+  const selected = addresses.find((a) => a.id === selectedId) ?? null;
+  const overseas = selected ? isOverseas(selected.territory) : false;
+
+  const handleCreate = (payload: AddressInput) => {
+    createAddress.mutate(payload, {
+      onSuccess: (created) => {
+        setModalVisible(false);
+        setAddress(created.id, created.territory);
+      },
+    });
+  };
+
+  const onContinue = () => {
+    if (!selected) return;
+    setAddress(selected.id, selected.territory);
     router.push("/(main)/checkout/shipping");
   };
 
@@ -62,76 +74,109 @@ export default function CheckoutAddressScreen() {
         <CheckoutSteps currentStep={1} />
 
         <Text className="text-sm font-semibold mb-6" style={{ color: COLORS.onSurface }}>
-          Informations de livraison
+          Adresse de livraison
         </Text>
 
-        <View className="gap-6">
-          <Controller control={control} name="firstName" render={({ field: { onChange, value } }) => (
-            <Input label="PRÉNOM" value={value} onChangeText={onChange} error={errors.firstName?.message} autoCapitalize="words" />
-          )} />
-          <Controller control={control} name="lastName" render={({ field: { onChange, value } }) => (
-            <Input label="NOM" value={value} onChangeText={onChange} error={errors.lastName?.message} autoCapitalize="words" />
-          )} />
-          <Controller control={control} name="street" render={({ field: { onChange, value } }) => (
-            <Input label="ADRESSE" value={value} onChangeText={onChange} error={errors.street?.message} autoCapitalize="sentences" />
-          )} />
-          <View className="flex-row gap-4">
-            <View className="flex-1">
-              <Controller control={control} name="postalCode" render={({ field: { onChange, value } }) => (
-                <Input label="CODE POSTAL" value={value} onChangeText={onChange} error={errors.postalCode?.message} keyboardType="number-pad" />
-              )} />
-            </View>
-            <View className="flex-1">
-              <Controller control={control} name="city" render={({ field: { onChange, value } }) => (
-                <Input label="VILLE" value={value} onChangeText={onChange} error={errors.city?.message} autoCapitalize="words" />
-              )} />
-            </View>
+        {isLoading ? (
+          <View style={{ alignItems: "center", paddingVertical: 40 }}>
+            <ActivityIndicator color={COLORS.primary} />
           </View>
-
-          {/* Territory selector */}
-          <View>
-            <Text className="text-[10px] uppercase tracking-widest font-semibold mb-2" style={{ color: COLORS.outline }}>
-              PAYS/TERRITOIRE
+        ) : addresses.length === 0 ? (
+          <View style={{ alignItems: "center", paddingVertical: 24, marginBottom: 16 }}>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#f0ebe6", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+              <MaterialCommunityIcons name="map-marker-outline" size={28} color={COLORS.secondary} />
+            </View>
+            <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: COLORS.onSurface, marginBottom: 4 }}>
+              Aucune adresse
             </Text>
-            <Controller control={control} name="territory" render={({ field: { onChange, value } }) => (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                {TERRITORIES.map((t) => (
-                  <TouchableOpacity
-                    key={t.value}
-                    onPress={() => onChange(t.value)}
-                    className="rounded-full px-4 py-2"
-                    style={{
-                      backgroundColor: value === t.value ? COLORS.primary : "transparent",
-                      borderWidth: 1,
-                      borderColor: value === t.value ? COLORS.primary : `${COLORS.outlineVariant}33`,
-                    }}
-                  >
-                    <Text className="text-xs" style={{ color: value === t.value ? COLORS.onPrimary : COLORS.onSurface }}>
-                      {t.label}
+            <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.onSurfaceVariant, textAlign: "center", marginBottom: 16 }}>
+              Ajoutez une adresse pour continuer
+            </Text>
+          </View>
+        ) : (
+          <View style={{ gap: 12, marginBottom: 16 }}>
+            {addresses.map((addr) => {
+              const active = addr.id === selectedId;
+              return (
+                <TouchableOpacity
+                  key={addr.id}
+                  activeOpacity={0.9}
+                  onPress={() => setAddress(addr.id, addr.territory)}
+                  style={{
+                    backgroundColor: "#ffffff",
+                    borderRadius: 14,
+                    padding: 16,
+                    borderWidth: 1.5,
+                    borderColor: active ? COLORS.primary : `${COLORS.outlineVariant}33`,
+                    flexDirection: "row",
+                    gap: 12,
+                  }}
+                >
+                  <MaterialCommunityIcons
+                    name={active ? "radiobox-marked" : "radiobox-blank"}
+                    size={22}
+                    color={active ? COLORS.primary : COLORS.outline}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface, marginBottom: 4 }}>
+                      {addr.firstName} {addr.lastName}
                     </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )} />
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.onSurfaceVariant, lineHeight: 20 }}>
+                      {addr.street}{"\n"}{addr.postalCode} {addr.city}
+                    </Text>
+                    {addr.isDefault && (
+                      <View style={{ marginTop: 8, alignSelf: "flex-start", backgroundColor: `${COLORS.primary}12`, borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 3 }}>
+                        <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: COLORS.primary }}>Par défaut</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-        </View>
+        )}
 
-        {/* Shipping info */}
-        <View className="rounded-xl p-6 mt-6 mb-6" style={{ backgroundColor: COLORS.surfaceContainerLow }}>
-          <Text className="text-[10px] uppercase tracking-widest font-semibold mb-2" style={{ color: COLORS.outline }}>
-            ZONE DE LIVRAISON
+        {/* Add address button */}
+        <TouchableOpacity
+          onPress={() => setModalVisible(true)}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            backgroundColor: "#ffffff",
+            borderRadius: 14,
+            paddingVertical: 16,
+            borderWidth: 1,
+            borderStyle: "dashed",
+            borderColor: `${COLORS.outlineVariant}66`,
+            marginBottom: 16,
+          }}
+        >
+          <MaterialCommunityIcons name="plus" size={20} color={COLORS.secondary} />
+          <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: COLORS.secondary }}>
+            Ajouter une adresse
           </Text>
-          <Text className="text-sm" style={{ color: overseas ? COLORS.onSurfaceVariant : COLORS.onSurface }}>
-            {overseas
-              ? `Livraison par conteneur maritime : ${DELIVERY_ESTIMATES.OUTRE_MER}`
-              : `Livraison en France métropolitaine : ${DELIVERY_ESTIMATES.METROPOLE}`}
-          </Text>
-          {overseas && (
-            <Text className="text-xs mt-1" style={{ color: COLORS.onSurfaceVariant }}>
-              Une équipe dédiée gérera votre expédition.
+        </TouchableOpacity>
+
+        {/* Shipping zone info */}
+        {selected && (
+          <View className="rounded-xl p-6 mb-6" style={{ backgroundColor: COLORS.surfaceContainerLow }}>
+            <Text className="text-[10px] uppercase tracking-widest font-semibold mb-2" style={{ color: COLORS.outline }}>
+              ZONE DE LIVRAISON
             </Text>
-          )}
-        </View>
+            <Text className="text-sm" style={{ color: overseas ? COLORS.onSurfaceVariant : COLORS.onSurface }}>
+              {overseas
+                ? `Livraison par conteneur maritime : ${DELIVERY_ESTIMATES.OUTRE_MER}`
+                : `Livraison en France métropolitaine : ${DELIVERY_ESTIMATES.METROPOLE}`}
+            </Text>
+            {overseas && (
+              <Text className="text-xs mt-1" style={{ color: COLORS.onSurfaceVariant }}>
+                Une équipe dédiée gérera votre expédition.
+              </Text>
+            )}
+          </View>
+        )}
 
         {/* Summary */}
         <View className="rounded-xl p-4 mb-6" style={{ backgroundColor: COLORS.surfaceContainer }}>
@@ -155,8 +200,20 @@ export default function CheckoutAddressScreen() {
           </View>
         </View>
 
-        <Button label="Continuer vers la livraison →" onPress={handleSubmit(onSubmit)} size="lg" />
+        <Button
+          label="Continuer vers la livraison →"
+          onPress={onContinue}
+          size="lg"
+          disabled={!selected}
+        />
       </ScrollView>
+
+      <AddressFormModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onSubmit={handleCreate}
+        loading={createAddress.isPending}
+      />
     </SafeAreaView>
   );
 }

@@ -5,14 +5,18 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../../lib/constants";
 import { formatPrice, formatDate } from "../../../lib/utils";
-import { MOCK_PRODUCTS, getProductImage } from "../../../lib/mock-data";
-import { useOrdersStore, ORDER_STATUS_LABELS } from "../../../features/orders/store";
+import { getProductImage } from "../../../lib/mock-data";
+import { useOrders } from "../../../features/orders/hooks";
+import { ORDER_STATUS_LABELS } from "../../../features/orders/store";
+import { useQuoteRequests } from "../../../features/quotes/hooks";
+import type { QuoteStatus } from "../../../lib/types";
 
 const STATUS_COLORS: Record<string, string> = {
   commande_confirmee: COLORS.primary,
@@ -22,24 +26,27 @@ const STATUS_COLORS: Record<string, string> = {
   livree: COLORS.success,
 };
 
-const MOCK_QUOTES = [
-  {
-    id: "q1",
-    orderNumber: "DEV-2026-001",
-    status: "en_attente_devis" as const,
-    statusLabel: "En attente",
-    statusColor: COLORS.secondary,
-    product: MOCK_PRODUCTS.find((p) => p.id === "c3")!,
-    date: "2026-04-08",
-  },
-];
+const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
+  en_attente_devis: "En attente",
+  devis_envoye: "Devis envoyé",
+  devis_accepte: "Accepté",
+  devis_rejete: "Refusé",
+};
+
+const QUOTE_STATUS_COLORS: Record<QuoteStatus, string> = {
+  en_attente_devis: COLORS.secondary,
+  devis_envoye: COLORS.primary,
+  devis_accepte: COLORS.success,
+  devis_rejete: COLORS.error,
+};
 
 type Tab = "orders" | "quotes";
 
 export default function OrdersScreen() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("orders");
-  const orders = useOrdersStore((s) => s.orders);
+  const { data: orders = [], isLoading: ordersLoading } = useOrders();
+  const { data: quotes = [], isLoading: quotesLoading } = useQuoteRequests();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
@@ -66,7 +73,7 @@ export default function OrdersScreen() {
       <View style={{ flexDirection: "row", paddingHorizontal: 20, gap: 8, marginBottom: 16 }}>
         {([
           { key: "orders" as Tab, label: "Commandes", count: orders.length },
-          { key: "quotes" as Tab, label: "Devis", count: MOCK_QUOTES.length },
+          { key: "quotes" as Tab, label: "Devis", count: quotes.length },
         ]).map((t) => (
           <TouchableOpacity
             key={t.key}
@@ -117,7 +124,9 @@ export default function OrdersScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, gap: 12 }}>
         {tab === "orders" ? (
-          orders.length > 0 ? (
+          ordersLoading ? (
+            <LoadingBlock />
+          ) : orders.length > 0 ? (
             orders.map((order) => {
               const firstItem = order.items[0];
               const img = firstItem ? getProductImage(firstItem.product.images[0]) : null;
@@ -169,52 +178,63 @@ export default function OrdersScreen() {
           ) : (
             <EmptyBlock icon="package-variant-closed" title="Aucune commande" message="Vos commandes apparaîtront ici" />
           )
-        ) : (
-          MOCK_QUOTES.length > 0 ? (
-            MOCK_QUOTES.map((quote) => {
-              const img = getProductImage(quote.product.images[0]);
-              return (
-                <TouchableOpacity
-                  key={quote.id}
-                  activeOpacity={0.9}
-                  style={{
-                    backgroundColor: "#ffffff",
-                    borderRadius: 14,
-                    padding: 14,
-                    flexDirection: "row",
-                    gap: 14,
-                  }}
-                >
-                  {img && (
-                    <Image source={img} style={{ width: 72, height: 72, borderRadius: 10 }} resizeMode="cover" />
-                  )}
-                  <View style={{ flex: 1, justifyContent: "space-between" }}>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                      <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>
-                        {quote.orderNumber}
-                      </Text>
-                      <View style={{ backgroundColor: `${quote.statusColor}18`, borderRadius: 9999, paddingHorizontal: 8, paddingVertical: 2 }}>
-                        <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: quote.statusColor }}>
-                          {quote.statusLabel}
-                        </Text>
-                      </View>
-                    </View>
-                    <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: COLORS.onSurface }} numberOfLines={1}>
+        ) : quotesLoading ? (
+          <LoadingBlock />
+        ) : quotes.length > 0 ? (
+          quotes.map((quote) => {
+            const img = getProductImage(quote.product.images[0]);
+            const statusColor = QUOTE_STATUS_COLORS[quote.status] ?? COLORS.secondary;
+            return (
+              <TouchableOpacity
+                key={quote.id}
+                activeOpacity={0.9}
+                style={{
+                  backgroundColor: "#ffffff",
+                  borderRadius: 14,
+                  padding: 14,
+                  flexDirection: "row",
+                  gap: 14,
+                }}
+              >
+                {img && (
+                  <Image source={img} style={{ width: 72, height: 72, borderRadius: 10 }} resizeMode="cover" />
+                )}
+                <View style={{ flex: 1, justifyContent: "space-between" }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }} numberOfLines={1}>
                       {quote.product.name}
                     </Text>
-                    <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: COLORS.outline }}>
-                      {formatDate(quote.date)}
-                    </Text>
+                    <View style={{ backgroundColor: `${statusColor}18`, borderRadius: 9999, paddingHorizontal: 8, paddingVertical: 2 }}>
+                      <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: statusColor }}>
+                        {QUOTE_STATUS_LABELS[quote.status]}
+                      </Text>
+                    </View>
                   </View>
-                </TouchableOpacity>
-              );
-            })
-          ) : (
-            <EmptyBlock icon="file-document-outline" title="Aucun devis" message="Vos demandes de devis apparaîtront ici" />
-          )
+                  {quote.quotedPrice != null && (
+                    <Text style={{ fontSize: 14, fontFamily: "Manrope_700Bold", color: COLORS.secondary }}>
+                      {formatPrice(quote.quotedPrice)}
+                    </Text>
+                  )}
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: COLORS.outline }}>
+                    {formatDate(quote.createdAt)}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })
+        ) : (
+          <EmptyBlock icon="file-document-outline" title="Aucun devis" message="Vos demandes de devis apparaîtront ici" />
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function LoadingBlock() {
+  return (
+    <View style={{ alignItems: "center", paddingTop: 60 }}>
+      <ActivityIndicator color={COLORS.primary} />
+    </View>
   );
 }
 

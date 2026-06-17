@@ -10,27 +10,18 @@ export type PaymentInput = {
 };
 
 export type PaymentResult =
-  | { ok: true; paymentIntentId: string; orderId: string }
+  | { ok: true; paymentIntentId: string }
   | { ok: false; error: string };
 
-const FAKE_DELAY_MS = 1500;
-
-async function mockProcessPayment(input: PaymentInput): Promise<PaymentResult> {
-  await new Promise((r) => setTimeout(r, FAKE_DELAY_MS));
-  if (input.amountCents <= 0) {
-    return { ok: false, error: "Montant invalide" };
-  }
-  return {
-    ok: true,
-    paymentIntentId: `pi_mock_${Date.now()}`,
-    orderId: `LMP-${Date.now()}`,
-  };
-}
-
-// When backend + @stripe/stripe-react-native are available, swap this for:
-//   1. POST /payments/create-intent → { clientSecret }
+// TODO(stripe): implement real payment here.
+//   1. POST /payments/create-intent -> { clientSecret }
 //   2. presentPaymentSheet({ clientSecret })
-//   3. POST /orders → { orderId }
-export async function processPayment(input: PaymentInput): Promise<PaymentResult> {
-  return mockProcessPayment(input);
+//   3. return the confirmed paymentIntentId
+// The checkout flow currently creates the order directly via createOrderApi
+// (treated as pending payment) and does NOT call this helper. It is kept as the
+// designated insertion point for the Stripe integration.
+export async function processPayment(
+  _input: PaymentInput,
+): Promise<PaymentResult> {
+  throw new Error("Stripe payment not implemented yet");
 }

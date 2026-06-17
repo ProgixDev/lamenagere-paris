@@ -7,11 +7,20 @@ import { COLORS } from "../../../lib/constants";
 import { formatDate } from "../../../lib/utils";
 import Button from "../../../components/ui/Button";
 import Card from "../../../components/ui/Card";
+import { useCheckoutStore } from "../../../features/checkout/store";
 
 export default function CheckoutConfirmationScreen() {
   const router = useRouter();
   const today = new Date();
-  const orderNumber = `#LMP-${today.getFullYear()}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, "0")}`;
+  const lastOrderNumber = useCheckoutStore((s) => s.lastOrderNumber);
+  const reset = useCheckoutStore((s) => s.reset);
+  const orderNumber = lastOrderNumber ? `#${lastOrderNumber}` : "Commande";
+
+  const goTo = (path: "/(main)/orders" | "/(tabs)", replace?: boolean) => {
+    reset();
+    if (replace) router.replace(path);
+    else router.push(path);
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
@@ -47,8 +56,8 @@ export default function CheckoutConfirmationScreen() {
         </Card>
 
         <View className="w-full mt-8 gap-4">
-          <Button label="Suivi de commande" onPress={() => router.push("/(main)/orders")} variant="secondary" size="lg" />
-          <Button label="Continuer le shopping" onPress={() => router.replace("/(tabs)")} size="lg" />
+          <Button label="Suivi de commande" onPress={() => goTo("/(main)/orders")} variant="secondary" size="lg" />
+          <Button label="Continuer le shopping" onPress={() => goTo("/(tabs)", true)} size="lg" />
         </View>
 
         <Text className="text-xs mt-6 text-center" style={{ color: COLORS.onSurfaceVariant }}>

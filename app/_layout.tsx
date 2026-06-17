@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { StripeGate } from "../components/StripeGate";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as SplashScreen from "expo-splash-screen";
@@ -147,26 +148,28 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
-          <AuthGate>
-            <NotificationRouter />
-            <PushRegistrar />
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen
-                name="(onboarding)"
-                options={{ animation: "none" }}
-              />
-              <Stack.Screen
-                name="(auth)"
-                options={{ animation: "none" }}
-              />
-              <Stack.Screen
-                name="(tabs)"
-                options={{ animation: "none" }}
-              />
-              <Stack.Screen name="(main)" />
-            </Stack>
-          </AuthGate>
-          {showSplash && <AnimatedSplash onFinish={handleSplashFinish} />}
+          <StripeGate>
+            <AuthGate>
+              <NotificationRouter />
+              <PushRegistrar />
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen
+                  name="(onboarding)"
+                  options={{ animation: "none" }}
+                />
+                <Stack.Screen
+                  name="(auth)"
+                  options={{ animation: "none" }}
+                />
+                <Stack.Screen
+                  name="(tabs)"
+                  options={{ animation: "none" }}
+                />
+                <Stack.Screen name="(main)" />
+              </Stack>
+              {showSplash && <AnimatedSplash onFinish={handleSplashFinish} />}
+            </AuthGate>
+          </StripeGate>
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

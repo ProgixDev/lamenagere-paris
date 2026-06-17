@@ -1,23 +1,17 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { COLORS, TERRITORIES } from "../../../lib/constants";
-import { formatPrice } from "../../../lib/utils";
+import { COLORS } from "../../../lib/constants";
+import { formatPrice, isOverseas } from "../../../lib/utils";
 import Button from "../../../components/ui/Button";
 import CheckoutSteps from "../../../components/cart/CheckoutSteps";
 import { useCart } from "../../../features/cart/hooks";
-import type { ShippingZone } from "../../../lib/types";
+import { useCheckoutStore } from "../../../features/checkout/store";
 
-type Territory = (typeof TERRITORIES)[number]["value"];
-
-function isOutreMer(t: Territory) {
-  return t !== "metropole";
-}
-
-function shippingMethodsFor(t: Territory) {
-  if (isOutreMer(t)) {
+function shippingMethodsFor(overseas: boolean) {
+  if (overseas) {
     return [
       { id: "maritime", label: "Maritime (8-12 semaines)", price: 0 },
       { id: "aerien", label: "Aérien (2-3 semaines)", price: 350 },
@@ -32,16 +26,26 @@ function shippingMethodsFor(t: Territory) {
 export default function CheckoutShippingScreen() {
   const router = useRouter();
   const { subtotal } = useCart();
-  const [territory, setTerritory] = useState<Territory>("metropole");
-  const methods = useMemo(() => shippingMethodsFor(territory), [territory]);
+  const territory = useCheckoutStore((s) => s.territory);
+  const setShippingMethod = useCheckoutStore((s) => s.setShippingMethod);
+
+  const overseas = isOverseas(territory);
+  const methods = useMemo(() => shippingMethodsFor(overseas), [overseas]);
   const [selectedMethod, setSelectedMethod] = useState(methods[0].id);
 
-  const onTerritory = (t: Territory) => {
-    setTerritory(t);
-    setSelectedMethod(shippingMethodsFor(t)[0].id);
-  };
+  // Keep selection valid when the territory (and thus methods) changes.
+  useEffect(() => {
+    if (!methods.some((m) => m.id === selectedMethod)) {
+      setSelectedMethod(methods[0].id);
+    }
+  }, [methods, selectedMethod]);
 
   const shippingCost = methods.find((m) => m.id === selectedMethod)?.price || 0;
+
+  const onContinue = () => {
+    setShippingMethod(selectedMethod);
+    router.push("/(main)/checkout/payment");
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
@@ -57,41 +61,7 @@ export default function CheckoutShippingScreen() {
       <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40 }}>
         <CheckoutSteps currentStep={2} />
 
-        {/* Territory picker */}
-        <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: COLORS.outline, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 10 }}>
-          Territoire de livraison
-        </Text>
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 24 }}>
-          {TERRITORIES.map((t) => {
-            const active = territory === t.value;
-            return (
-              <TouchableOpacity
-                key={t.value}
-                onPress={() => onTerritory(t.value as Territory)}
-                style={{
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  borderRadius: 9999,
-                  backgroundColor: active ? COLORS.primary : "#fff",
-                  borderWidth: 1,
-                  borderColor: active ? COLORS.primary : `${COLORS.outlineVariant}66`,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontFamily: active ? "Inter_600SemiBold" : "Inter_500Medium",
-                    color: active ? "#fff" : COLORS.onSurface,
-                  }}
-                >
-                  {t.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {isOutreMer(territory) && (
+        {overseas && (
           <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start", marginBottom: 16, padding: 12, borderRadius: 10, backgroundColor: "#FFF7ED" }}>
             <MaterialCommunityIcons name="information-outline" size={16} color={COLORS.warning} />
             <Text style={{ flex: 1, fontSize: 12, color: COLORS.onSurface, fontFamily: "Inter_400Regular", lineHeight: 18 }}>
@@ -144,7 +114,7 @@ export default function CheckoutShippingScreen() {
           </View>
         </View>
 
-        <Button label="Continuer vers le paiement →" onPress={() => router.push("/(main)/checkout/payment")} size="lg" />
+        <Button label="Continuer vers le paiement →" onPress={onContinue} size="lg" />
       </ScrollView>
     </SafeAreaView>
   );

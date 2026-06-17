@@ -3,82 +3,101 @@ import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useQueryClient } from "@tanstack/react-query";
+import { useStripe } from "@stripe/stripe-react-native";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../../lib/constants";
 import { formatPrice } from "../../../lib/utils";
-import Input from "../../../components/ui/Input";
 import Button from "../../../components/ui/Button";
 import CheckoutSteps from "../../../components/cart/CheckoutSteps";
 import { useCart } from "../../../features/cart/hooks";
-import { processPayment } from "../../../features/cart/payment";
-import { useOrdersStore } from "../../../features/orders/store";
-import type { Order } from "../../../lib/types";
+import { createOrderApi } from "../../../features/orders/api";
+import { createPaymentIntentApi } from "../../../features/payments/api";
+import { useCheckoutStore } from "../../../features/checkout/store";
+import { isStripeAvailable } from "../../../components/StripeGate";
 
 export default function CheckoutPaymentScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const { items, subtotal, clearCart } = useCart();
-  const addOrder = useOrdersStore((s) => s.addOrder);
+  const { shippingAddressId, territory, shippingMethod, setLastOrderNumber } =
+    useCheckoutStore();
   const [loading, setLoading] = useState(false);
-  const [cardName, setCardName] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [cvc, setCvc] = useState("");
 
   const handlePayment = async () => {
-    setLoading(true);
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const result = await processPayment({
-      items,
-      amountCents: Math.round(subtotal * 100),
-      currency: "eur",
-    });
-    setLoading(false);
-
-    if (!result.ok) {
-      Alert.alert("Paiement refusé", result.error);
+    if (!shippingAddressId) {
+      Alert.alert(
+        "Adresse manquante",
+        "Veuillez sélectionner une adresse de livraison.",
+      );
       return;
     }
+    if (!isStripeAvailable()) {
+      Alert.alert(
+        "Paiement indisponible",
+        "Le paiement en ligne nécessite la dernière version native de l'application. Mettez à jour l'application (build de développement) et réessayez.",
+      );
+      return;
+    }
+    setLoading(true);
+    try {
+      // 1. Create the order (treated as pending payment) to obtain its id.
+      const order = await createOrderApi({
+        items: items.map((item) => ({
+          productId: item.product.id,
+          quantity: item.quantity,
+          customDimensions: item.customDimensions,
+        })),
+        shippingAddressId,
+        shippingMethod,
+        territory,
+      });
 
-    const now = new Date().toISOString();
-    const order: Order = {
-      id: result.orderId,
-      orderNumber: result.orderId,
-      items: items.map((item) => ({
-        id: item.id,
-        product: item.product,
-        quantity: item.quantity,
-        price: item.calculatedPrice ?? item.product.price ?? 0,
-        customDimensions: item.customDimensions,
-      })),
-      status: "commande_confirmee",
-      total: subtotal,
-      subtotal,
-      shippingCost: 0,
-      shippingAddress: {
-        id: "addr-mock",
-        firstName: "Jean",
-        lastName: "Laurent",
-        street: "12 rue de Rivoli",
-        postalCode: "75001",
-        city: "Paris",
-        country: "France",
-        territory: "metropole",
-      },
-      territory: "metropole",
-      shippingMethod: "standard",
-      estimatedDelivery: "2-3 semaines",
-      createdAt: now,
-      timeline: [
-        { status: "commande_confirmee", label: "Commande confirmée", timestamp: now, completed: false },
-        { status: "en_preparation", label: "En préparation", completed: false },
-        { status: "en_attente_expedition", label: "En attente d'expédition", completed: false },
-        { status: "expediee", label: "Expédiée", completed: false },
-        { status: "livree", label: "Livrée", completed: false },
-      ],
-    };
-    addOrder(order);
-    clearCart();
-    router.replace("/(main)/checkout/confirmation");
+      // 2. Create the Stripe PaymentIntent for that order.
+      const { clientSecret } = await createPaymentIntentApi(order.id);
+
+      // 3. Initialize the Payment Sheet (Stripe collects card details itself).
+      const { error: initError } = await initPaymentSheet({
+        merchantDisplayName: "La Ménagère Paris",
+        paymentIntentClientSecret: clientSecret,
+      });
+      if (initError) {
+        Alert.alert(
+          "Erreur",
+          initError.message || "Le paiement n'a pas pu être initialisé.",
+        );
+        return;
+      }
+
+      // 4. Present the Payment Sheet and let the user pay.
+      const { error: presentError } = await presentPaymentSheet();
+      if (presentError) {
+        // User cancelled or the payment failed. Leave the order unpaid so they
+        // can retry; do NOT clear the cart.
+        if (presentError.code !== "Canceled") {
+          Alert.alert(
+            "Paiement non abouti",
+            presentError.message || "Le paiement a échoué. Réessayez.",
+          );
+        }
+        return;
+      }
+
+      // 5. Payment succeeded.
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      clearCart();
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      setLastOrderNumber(order.orderNumber);
+      router.replace("/(main)/checkout/confirmation");
+    } catch (e: any) {
+      Alert.alert(
+        "Erreur",
+        e?.message || "La commande n'a pas pu être créée. Réessayez.",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -95,17 +114,12 @@ export default function CheckoutPaymentScreen() {
       <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40 }}>
         <CheckoutSteps currentStep={3} />
 
-        <View className="gap-6 mb-8">
-          <Input label="TITULAIRE DE LA CARTE" value={cardName} onChangeText={setCardName} autoCapitalize="words" />
-          <Input label="NUMÉRO DE CARTE" value={cardNumber} onChangeText={setCardNumber} keyboardType="number-pad" placeholder="1234 5678 9012 3456" />
-          <View className="flex-row gap-4">
-            <View className="flex-1">
-              <Input label="EXPIRATION" value={expiry} onChangeText={setExpiry} placeholder="MM/AA" keyboardType="number-pad" />
-            </View>
-            <View className="flex-1">
-              <Input label="CVC" value={cvc} onChangeText={setCvc} placeholder="123" keyboardType="number-pad" secureTextEntry />
-            </View>
-          </View>
+        <View className="rounded-xl p-6 mb-6 flex-row items-center gap-3" style={{ backgroundColor: COLORS.surfaceContainerLow }}>
+          <MaterialCommunityIcons name="credit-card-outline" size={24} color={COLORS.secondary} />
+          <Text className="flex-1 text-sm" style={{ color: COLORS.primary, fontFamily: "Inter_500Medium" }}>
+            Vous renseignerez vos informations de carte en toute sécurité à
+            l'étape suivante.
+          </Text>
         </View>
 
         <View className="rounded-xl p-6 mb-8" style={{ backgroundColor: COLORS.surfaceContainerLow }}>
@@ -117,7 +131,7 @@ export default function CheckoutPaymentScreen() {
           </View>
         </View>
 
-        <Button label="Valider la commande" onPress={handlePayment} loading={loading} size="lg" />
+        <Button label="Payer" onPress={handlePayment} loading={loading} size="lg" />
 
         <Text className="text-[10px] text-center mt-4" style={{ color: COLORS.outline }}>
           Paiement sécurisé par Stripe. Vos données sont chiffrées.
