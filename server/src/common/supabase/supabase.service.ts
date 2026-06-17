@@ -9,7 +9,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
  *    GoTrue admin API. Service-role bypasses RLS, so NestJS guards are the
  *    authorization source of truth.
  *  - `_authClient` (anon key): used ONLY for end-user GoTrue calls
- *    (signInWithPassword, signUp, signInWithIdToken, getUser, password reset).
+ *    (signInWithPassword, signUp, getUser, password reset).
  *
  * The split is critical: calling sign-in methods stores a user session on the
  * client instance and overrides its Authorization header. If those ran on the

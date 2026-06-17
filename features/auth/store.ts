@@ -2,7 +2,8 @@ import { create } from "zustand";
 import * as SecureStore from "expo-secure-store";
 import type { User } from "../../lib/types";
 import type { AuthActions, AuthState, RegisterPayload } from "./types";
-import { googleOAuthApi, loginApi, logoutApi, registerApi } from "./api";
+import { getProfileApi, loginApi, logoutApi, registerApi } from "./api";
+import { signInWithGoogle } from "./oauth";
 import { unregisterDeviceApi } from "../notifications/api";
 import { AUTH_TOKEN_KEY, PUSH_TOKEN_KEY, USER_KEY } from "../../lib/storage";
 
@@ -33,14 +34,19 @@ export const useAuthStore = create<AuthStore>((set) => ({
     }
   },
 
-  loginWithGoogle: async (idToken: string) => {
+  loginWithGoogle: async () => {
     set({ isLoading: true, error: null });
     try {
-      const { user, token } = await googleOAuthApi(idToken);
+      // Supabase-hosted Google OAuth (PKCE) yields a Supabase access token,
+      // which the backend accepts as a bearer token. Store it first so the
+      // profile request below authenticates with it.
+      const token = await signInWithGoogle();
       await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
+      const user = await getProfileApi();
       await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
       set({ user, token, isAuthenticated: true, isLoading: false });
     } catch (e) {
+      await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
       set({ isLoading: false, error: errorMessage(e), isAuthenticated: false });
       throw e;
     }

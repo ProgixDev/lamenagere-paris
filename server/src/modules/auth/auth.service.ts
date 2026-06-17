@@ -14,7 +14,6 @@ import {
 } from './auth.serializer';
 import {
   ForgotPasswordDto,
-  GoogleOAuthDto,
   LoginDto,
   RegisterDto,
   UpdateProfileDto,
@@ -111,19 +110,6 @@ export class AuthService {
     // Do not leak whether the email exists.
     if (error) return { success: true };
     return { success: true };
-  }
-
-  async oauthGoogle(dto: GoogleOAuthDto): Promise<AuthResult> {
-    const { data, error } = await this.supabase.auth.signInWithIdToken({
-      provider: 'google',
-      token: dto.idToken,
-      access_token: dto.accessToken,
-    });
-    if (error || !data.session || !data.user) {
-      throw new UnauthorizedException('Connexion Google échouée');
-    }
-    const user = await this.loadUser(data.user.id);
-    return { user, token: data.session.access_token };
   }
 
   async getProfile(userId: string): Promise<UserDto> {

@@ -13,7 +13,6 @@ import { AuthUser } from '../../common/auth/auth-user';
 import { AuthService } from './auth.service';
 import {
   ForgotPasswordDto,
-  GoogleOAuthDto,
   LoginDto,
   RegisterDto,
   UpdateProfileDto,
@@ -34,13 +33,6 @@ export class AuthController {
   @Post('register')
   register(@Body() dto: RegisterDto) {
     return this.auth.register(dto);
-  }
-
-  @Public()
-  @Post('oauth/google')
-  @HttpCode(200)
-  oauthGoogle(@Body() dto: GoogleOAuthDto) {
-    return this.auth.oauthGoogle(dto);
   }
 
   @Post('logout')

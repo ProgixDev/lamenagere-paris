@@ -75,15 +75,3 @@ export class UpdateProfileDto {
   @IsString()
   siret?: string;
 }
-
-export class GoogleOAuthDto {
-  /** Google-issued ID token from the native mobile sign-in. */
-  @IsString()
-  @MinLength(10)
-  idToken!: string;
-
-  /** Optional opaque access token (some flows require it for nonce checks). */
-  @IsOptional()
-  @IsString()
-  accessToken?: string;
-}

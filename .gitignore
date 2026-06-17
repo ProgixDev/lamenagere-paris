@@ -42,3 +42,5 @@ yarn-error.*
 
 # heavy product videos — manage via CDN/admin instead of git
 *.mp4
+.env
+.env
