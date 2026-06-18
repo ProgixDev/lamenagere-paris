@@ -19,8 +19,8 @@ const SECTIONS = [
     body: "L'accès à certaines fonctionnalités nécessite la création d'un compte utilisateur. L'utilisateur s'engage à fournir des informations exactes et à jour.\n\nDeux types de comptes sont disponibles :\n• Particulier : pour les consommateurs\n• Professionnel : pour les entreprises (numéro SIRET requis)\n\nL'utilisateur est responsable de la confidentialité de ses identifiants de connexion.",
   },
   {
-    title: "4. Commandes et devis",
-    body: "Les produits présentés sur l'application sont vendus en euros (€) toutes taxes comprises. Les prix peuvent être modifiés à tout moment.\n\nCertains produits sont disponibles uniquement sur devis. Les devis sont gratuits et sans engagement, avec une validité de 30 jours.\n\nToute commande validée constitue un contrat de vente entre l'utilisateur et La Ménagère Paris.",
+    title: "4. Commandes",
+    body: "Les produits présentés sur l'application sont vendus en euros (€) toutes taxes comprises. Les prix peuvent être modifiés à tout moment.\n\nCertains produits sont vendus au mètre carré : leur prix est calculé automatiquement à partir des dimensions saisies par le client.\n\nToute commande validée constitue un contrat de vente entre l'utilisateur et La Ménagère Paris.",
   },
   {
     title: "5. Livraison",

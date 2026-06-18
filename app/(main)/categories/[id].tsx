@@ -17,7 +17,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../../lib/constants";
-import { formatPrice } from "../../../lib/utils";
+import { priceTagLabel } from "../../../lib/pricing";
 import type { Product } from "../../../lib/types";
 import EmptyState from "../../../components/ui/EmptyState";
 import {
@@ -109,15 +109,9 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
         >
           par La Ménagère Paris
         </Text>
-        {product.price ? (
-          <Text style={{ fontSize: 14, fontFamily: "Manrope_700Bold", color: COLORS.secondary }}>
-            {formatPrice(product.price)}
-          </Text>
-        ) : (
-          <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.secondary, fontStyle: "italic" }}>
-            Sur devis
-          </Text>
-        )}
+        <Text style={{ fontSize: 14, fontFamily: "Manrope_700Bold", color: COLORS.secondary }}>
+          {priceTagLabel(product)}
+        </Text>
       </View>
     </TouchableOpacity>
   );

@@ -18,7 +18,7 @@ import {
   PRODUCT_IMAGES,
   getProductImage,
 } from "../../../lib/mock-data";
-import { formatPrice } from "../../../lib/utils";
+import { priceTagLabel } from "../../../lib/pricing";
 import { useSearchStore } from "../../../features/search/store";
 import {
   useCategories,
@@ -353,7 +353,7 @@ export default function SearchScreen() {
                           marginTop: 1,
                         }}
                       >
-                        {p.price ? formatPrice(p.price) : "Sur devis"}
+                        {priceTagLabel(p)}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -428,7 +428,7 @@ export default function SearchScreen() {
                       {item.category.name}
                     </Text>
                     <Text style={{ fontSize: 13, fontFamily: "Manrope_700Bold", color: COLORS.secondary, marginTop: 2 }}>
-                      {item.price ? formatPrice(item.price) : "Sur devis"}
+                      {priceTagLabel(item)}
                     </Text>
                   </View>
                 </TouchableOpacity>

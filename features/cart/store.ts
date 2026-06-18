@@ -25,10 +25,16 @@ export const useCartStore = create<CartStore>()(
       lastUpdated: Date.now(),
 
       addItem: (product, quantity = 1, customDimensions, openingType) => {
-        if (product.productType === "quote_only") {
+        // Made-to-measure products (priced per m²) can't be added without
+        // dimensions — there'd be no price. The customer must configure them
+        // on the product page first.
+        const needsDimensions =
+          product.priceMode === "per_sqm" ||
+          product.productType === "configurable";
+        if (needsDimensions && !customDimensions) {
           if (__DEV__) {
             console.warn(
-              `[cart] refused to add quote_only product "${product.name}" — use the quote flow instead`,
+              `[cart] refused to add "${product.name}" without dimensions — configure it on the product page`,
             );
           }
           return;

@@ -1,8 +1,24 @@
 import type { Product } from "./types";
+import { formatPrice } from "./utils";
 
 export interface Dimensions {
   width: number;
   height: number;
+}
+
+/**
+ * Short price label for cards / lists, where the customer hasn't entered
+ * dimensions yet. Per-m² products advertise their €/m² rate; everything else
+ * shows its (starting) price. Never returns "Sur devis" — quote products no
+ * longer exist.
+ */
+export function priceTagLabel(product: Product): string {
+  if (product.priceMode === "per_sqm" && product.pricePerSqm != null) {
+    return `${formatPrice(product.pricePerSqm)}/m²`;
+  }
+  if (product.price != null) return formatPrice(product.price);
+  if (product.pricePerSqm != null) return `${formatPrice(product.pricePerSqm)}/m²`;
+  return formatPrice(0);
 }
 
 /** Clamp a dimension to [min, max] when bounds are provided. */

@@ -6,7 +6,6 @@ export default function MainLayout() {
       <Stack.Screen name="categories/[id]" />
       <Stack.Screen name="products/[id]" />
       <Stack.Screen name="search/index" />
-      <Stack.Screen name="quote-request/[productId]" />
       <Stack.Screen name="checkout/index" />
       <Stack.Screen name="checkout/shipping" />
       <Stack.Screen name="checkout/payment" />

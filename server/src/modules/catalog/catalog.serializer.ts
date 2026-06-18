@@ -5,7 +5,7 @@ import {
 } from '../../common/serialization/money.util';
 
 export type ProductType = 'standard' | 'quote_only' | 'configurable';
-export type PriceMode = 'fixed' | 'calculated' | 'quote';
+export type PriceMode = 'fixed' | 'calculated' | 'per_sqm' | 'quote';
 export type ProductStatus = 'publie' | 'brouillon' | 'archive';
 export type StockLabel = 'en_stock' | 'stock_faible' | 'rupture' | null;
 
@@ -217,8 +217,12 @@ export function deriveStock(
 }
 
 export function priceLabel(row: ProductRow): string {
-  if (row.price_mode === 'quote') return 'Sur devis';
-  if (row.base_price_cents == null) return 'Sur devis';
+  if (row.price_mode === 'per_sqm') {
+    return row.price_per_sqm_cents != null
+      ? `${formatEURFromCents(row.price_per_sqm_cents)}/m²`
+      : 'Prix au m²';
+  }
+  if (row.base_price_cents == null) return '—';
   if (row.price_mode === 'calculated') {
     return `À partir de ${formatEURFromCents(row.base_price_cents)}`;
   }

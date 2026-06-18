@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../lib/constants";
-import { formatPrice } from "../../lib/utils";
+import { priceTagLabel } from "../../lib/pricing";
 import { useFavoritesStore } from "../../features/favorites/store";
 import { useProductsByIds } from "../../features/products/hooks";
 import { getProductImage, CATEGORY_BG } from "../../lib/mock-data";
@@ -76,11 +76,7 @@ export default function FavoritesScreen() {
                   <View style={{ padding: 10 }}>
                     <Text style={{ fontSize: 13, fontFamily: "Manrope_700Bold", color: COLORS.onSurface, marginBottom: 2 }} numberOfLines={1}>{product.name}</Text>
                     <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: COLORS.onSurfaceVariant, marginBottom: 4 }}>par La Ménagère Paris</Text>
-                    {product.price ? (
-                      <Text style={{ fontSize: 14, fontFamily: "Manrope_700Bold", color: COLORS.secondary }}>{formatPrice(product.price)}</Text>
-                    ) : (
-                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.secondary, fontStyle: "italic" }}>Sur devis</Text>
-                    )}
+                    <Text style={{ fontSize: 14, fontFamily: "Manrope_700Bold", color: COLORS.secondary }}>{priceTagLabel(product)}</Text>
                   </View>
                 </TouchableOpacity>
               );

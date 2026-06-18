@@ -18,8 +18,8 @@ export interface SeedProduct {
   name: string;
   description: string;
   categorySlug: string;
-  productType: 'standard' | 'quote_only' | 'configurable';
-  priceMode: 'fixed' | 'calculated' | 'per_sqm' | 'quote';
+  productType: 'standard' | 'configurable';
+  priceMode: 'fixed' | 'per_sqm';
   price?: number; // euros
   pricePerSqm?: number; // euros per m² (per_sqm mode)
   minDimensions?: { width: number; height: number };
@@ -134,11 +134,11 @@ export const SEED_PRODUCTS: SeedProduct[] = [
     description:
       "Porte d'entrée blindée en bois de noyer avec motifs géométriques élégants. Double vantail, serrure multipoints haute sécurité.",
     categorySlug: 'portes',
-    productType: 'configurable',
-    priceMode: 'calculated',
+    productType: 'standard',
+    priceMode: 'fixed',
     price: 3850,
     imageKeys: ['porteGeometrique'],
-    customizable: true,
+    customizable: false,
     dimensions: { width: 170, height: 210, unit: 'cm' },
     deliveryEstimates: { metropole: '2-3 semaines', outreMer: '8-12 semaines' },
     createdAt: '2026-03-01',
@@ -150,8 +150,16 @@ export const SEED_PRODUCTS: SeedProduct[] = [
     description:
       'Porte pivotante premium avec relief 3D sculptural. Système pivot invisible, finition bois naturel sur cadre aluminium noir.',
     categorySlug: 'portes',
-    productType: 'quote_only',
-    priceMode: 'quote',
+    productType: 'configurable',
+    priceMode: 'per_sqm',
+    pricePerSqm: 720, // 720 €/m²
+    minDimensions: { width: 80, height: 200 },
+    maxDimensions: { width: 220, height: 280 },
+    openingTypes: [
+      { type: 'pivotante', surcharge: 0 },
+      { type: 'battante', surcharge: -200 },
+      { type: 'double_battant', surcharge: 350 },
+    ],
     imageKeys: ['portePivotante'],
     customizable: true,
     dimensions: { width: 120, height: 260, unit: 'cm' },
@@ -165,8 +173,16 @@ export const SEED_PRODUCTS: SeedProduct[] = [
     description:
       "Porte d'entrée noire avec bande LED intégrée. Design ultra-moderne, système pivot, ouverture à 180°.",
     categorySlug: 'portes',
-    productType: 'quote_only',
-    priceMode: 'quote',
+    productType: 'configurable',
+    priceMode: 'per_sqm',
+    pricePerSqm: 680, // 680 €/m²
+    minDimensions: { width: 80, height: 200 },
+    maxDimensions: { width: 200, height: 270 },
+    openingTypes: [
+      { type: 'pivotante', surcharge: 0 },
+      { type: 'battante', surcharge: -200 },
+      { type: 'coulissante', surcharge: 250 },
+    ],
     imageKeys: ['porteLED'],
     customizable: true,
     deliveryEstimates: { metropole: '3-4 semaines', outreMer: '10-14 semaines' },
@@ -179,11 +195,11 @@ export const SEED_PRODUCTS: SeedProduct[] = [
     description:
       "Porte d'entrée en bois noyer massif avec motifs géométriques noirs. Installation sur façade pierre.",
     categorySlug: 'portes',
-    productType: 'configurable',
-    priceMode: 'calculated',
+    productType: 'standard',
+    priceMode: 'fixed',
     price: 4200,
     imageKeys: ['portePrestige'],
-    customizable: true,
+    customizable: false,
     dimensions: { width: 100, height: 220, unit: 'cm' },
     deliveryEstimates: { metropole: '2-3 semaines', outreMer: '8-12 semaines' },
     createdAt: '2026-03-10',
@@ -195,10 +211,11 @@ export const SEED_PRODUCTS: SeedProduct[] = [
     description:
       'Cuisine moderne en L avec îlot central en chêne clair. Plan de travail marbre, hotte intégrée, rangements optimisés.',
     categorySlug: 'cuisines',
-    productType: 'quote_only',
-    priceMode: 'quote',
+    productType: 'standard',
+    priceMode: 'fixed',
+    price: 8900,
     imageKeys: ['cuisineIlotChene'],
-    customizable: true,
+    customizable: false,
     deliveryEstimates: { metropole: '4-6 semaines', outreMer: '12-16 semaines' },
     createdAt: '2026-03-05',
     featured: true,
@@ -209,10 +226,11 @@ export const SEED_PRODUCTS: SeedProduct[] = [
     description:
       'Cuisine de prestige avec îlot arrondi, vitrine noire intégrée, sol marbre et lustre design. Finition laquée blanche.',
     categorySlug: 'cuisines',
-    productType: 'quote_only',
-    priceMode: 'quote',
+    productType: 'standard',
+    priceMode: 'fixed',
+    price: 12500,
     imageKeys: ['cuisineLuxeIlot'],
-    customizable: true,
+    customizable: false,
     deliveryEstimates: { metropole: '6-8 semaines', outreMer: '14-18 semaines' },
     createdAt: '2026-03-18',
     featured: true,
@@ -223,10 +241,11 @@ export const SEED_PRODUCTS: SeedProduct[] = [
     description:
       'Cuisine haut de gamme noire avec accents dorés et bois. Îlot bar avec tabourets crème, four et frigo encastrés.',
     categorySlug: 'cuisines',
-    productType: 'quote_only',
-    priceMode: 'quote',
+    productType: 'standard',
+    priceMode: 'fixed',
+    price: 10900,
     imageKeys: ['cuisineNoireOr'],
-    customizable: true,
+    customizable: false,
     deliveryEstimates: { metropole: '4-6 semaines', outreMer: '12-16 semaines' },
     createdAt: '2026-04-08',
   },
@@ -236,10 +255,11 @@ export const SEED_PRODUCTS: SeedProduct[] = [
     description:
       'Cuisine grise laquée avec armoires vitrées en bois, four encastré et sol marbre. Élégance et fonctionnalité.',
     categorySlug: 'cuisines',
-    productType: 'quote_only',
-    priceMode: 'quote',
+    productType: 'standard',
+    priceMode: 'fixed',
+    price: 7900,
     imageKeys: ['cuisineGriseLaquee'],
-    customizable: true,
+    customizable: false,
     deliveryEstimates: { metropole: '4-6 semaines', outreMer: '12-16 semaines' },
     createdAt: '2026-03-19',
   },
@@ -293,10 +313,11 @@ export const SEED_PRODUCTS: SeedProduct[] = [
     description:
       'Dressing walk-in luxe en bois foncé avec îlot central, rangements ouverts et éclairage plafond intégré.',
     categorySlug: 'chambres',
-    productType: 'quote_only',
-    priceMode: 'quote',
+    productType: 'standard',
+    priceMode: 'fixed',
+    price: 4500,
     imageKeys: ['dressingWalkIn'],
-    customizable: true,
+    customizable: false,
     deliveryEstimates: { metropole: '4-6 semaines', outreMer: '12-16 semaines' },
     createdAt: '2026-01-10',
   },

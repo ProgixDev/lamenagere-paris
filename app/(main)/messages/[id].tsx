@@ -14,7 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../../lib/constants";
-import { formatPrice } from "../../../lib/utils";
+import { priceTagLabel } from "../../../lib/pricing";
 import MessageBubble from "../../../components/messaging/MessageBubble";
 import MessageInput from "../../../components/messaging/MessageInput";
 import { getProductImage } from "../../../lib/mock-data";
@@ -180,9 +180,7 @@ export default function ConversationScreen() {
                   {conversation.product.name}
                 </Text>
                 <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: COLORS.secondary }}>
-                  {conversation.product.price
-                    ? formatPrice(conversation.product.price)
-                    : "Sur devis"}
+                  {priceTagLabel(conversation.product)}
                 </Text>
               </View>
               <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.outline} />

@@ -21,7 +21,7 @@ import {
   useCategories,
   usePopularProducts,
 } from "../../features/products/hooks";
-import { formatPrice } from "../../lib/utils";
+import { priceTagLabel } from "../../lib/pricing";
 import type { Product, Category } from "../../lib/types";
 import SearchBar from "../../components/SearchBar";
 import PromoBanner from "../../components/PromoBanner";
@@ -419,7 +419,6 @@ function CategoryBentoCard({
 
 function EditorialCard({ product, onPress }: { product: Product; onPress: () => void }) {
   const img = getProductImage(product.images[0]);
-  const isQuoteOnly = product.productType === "quote_only";
   return (
     <TouchableOpacity activeOpacity={0.92} onPress={onPress} style={{ width: 168 }}>
       <View
@@ -445,28 +444,15 @@ function EditorialCard({ product, onPress }: { product: Product; onPress: () => 
       >
         {product.name}
       </Text>
-      {isQuoteOnly ? (
-        <Text
-          style={{
-            fontSize: 13,
-            fontFamily: "Manrope_700Bold",
-            color: COLORS.secondary,
-            fontStyle: "italic",
-          }}
-        >
-          Sur devis
-        </Text>
-      ) : (
-        <Text
-          style={{
-            fontSize: 14,
-            fontFamily: "Manrope_800ExtraBold",
-            color: COLORS.secondary,
-          }}
-        >
-          {formatPrice(product.price ?? 0)}
-        </Text>
-      )}
+      <Text
+        style={{
+          fontSize: 14,
+          fontFamily: "Manrope_800ExtraBold",
+          color: COLORS.secondary,
+        }}
+      >
+        {priceTagLabel(product)}
+      </Text>
     </TouchableOpacity>
   );
 }

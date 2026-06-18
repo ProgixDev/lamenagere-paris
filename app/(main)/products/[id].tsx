@@ -17,7 +17,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { COLORS, PRODUCT_TYPES, PRICE_MODES, TERRITORIES } from "../../../lib/constants";
 import { formatPrice } from "../../../lib/utils";
-import { computeConfiguredPrice } from "../../../lib/pricing";
+import { computeConfiguredPrice, priceTagLabel } from "../../../lib/pricing";
 import { openingTypeLabel, diagramForTypes } from "../../../lib/opening-types";
 import Button from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
@@ -80,7 +80,6 @@ export default function ProductDetailScreen() {
     );
   }
 
-  const isQuoteOnly = product.productType === PRODUCT_TYPES.QUOTE_ONLY;
   const isPerSqm = product.priceMode === PRICE_MODES.PER_SQM;
   // Made-to-measure: needs width/height before it can be priced/ordered.
   const needsDimensions =
@@ -288,32 +287,7 @@ export default function ProductDetailScreen() {
 
           {/* Price */}
           <View style={{ marginTop: 16, marginBottom: 4 }}>
-            {isQuoteOnly ? (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Text
-                  style={{
-                    fontSize: 22,
-                    fontFamily: "Manrope_800ExtraBold",
-                    color: COLORS.secondary,
-                    fontStyle: "italic",
-                  }}
-                >
-                  Sur devis
-                </Text>
-                <View
-                  style={{
-                    backgroundColor: `${COLORS.secondary}1A`,
-                    paddingHorizontal: 8,
-                    paddingVertical: 3,
-                    borderRadius: 4,
-                  }}
-                >
-                  <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: COLORS.secondary, letterSpacing: 0.5 }}>
-                    SUR MESURE
-                  </Text>
-                </View>
-              </View>
-            ) : isPerSqm ? (
+            {isPerSqm ? (
               <View>
                 <Text
                   style={{
@@ -560,7 +534,7 @@ export default function ProductDetailScreen() {
               />
             )}
             <SpecRow label="Sur mesure" value={product.customizable ? "Oui" : "Non"} />
-            <SpecRow label="Type de produit" value={isQuoteOnly ? "Devis personnalisé" : needsDimensions ? "Sur mesure" : "Standard"} />
+            <SpecRow label="Type de produit" value={needsDimensions ? "Sur mesure" : "Standard"} />
             <SpecRow label="Métropole" value={product.deliveryEstimates.metropole} />
             <SpecRow label="Outre-mer" value={product.deliveryEstimates.outreMer} />
             <SpecRow label="Référence" value={product.id.toUpperCase()} last />
@@ -599,7 +573,7 @@ export default function ProductDetailScreen() {
                         {p.name}
                       </Text>
                       <Text style={{ fontSize: 13, fontFamily: "Manrope_700Bold", color: COLORS.secondary }}>
-                        {p.price ? formatPrice(p.price) : "Sur devis"}
+                        {priceTagLabel(p)}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -639,19 +613,9 @@ export default function ProductDetailScreen() {
           label="Contact"
           onPress={() => router.push("/(tabs)/messages")}
         />
-        {isQuoteOnly ? (
-          <View style={{ flex: 1 }}>
-            <Button
-              label="Demander un devis"
-              onPress={() => router.push(`/(main)/quote-request/${product.id}`)}
-              size="md"
-            />
-          </View>
-        ) : (
-          <View style={{ flex: 1 }}>
-            <Button label="Ajouter au panier" onPress={handleAddToCart} size="md" />
-          </View>
-        )}
+        <View style={{ flex: 1 }}>
+          <Button label="Ajouter au panier" onPress={handleAddToCart} size="md" />
+        </View>
       </View>
 
       <Toast

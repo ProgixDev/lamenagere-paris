@@ -12,7 +12,7 @@ const SECTIONS = [
   },
   {
     title: "2. Produits",
-    body: "Les produits proposés sont décrits avec la plus grande exactitude possible. Les photographies sont non contractuelles.\n\nTrois types de produits sont disponibles :\n• Produits standard : prix fixe, achat direct\n• Produits configurables : prix calculé selon les dimensions\n• Produits sur devis : prix établi après étude personnalisée",
+    body: "Les produits proposés sont décrits avec la plus grande exactitude possible. Les photographies sont non contractuelles.\n\nDeux types de produits sont disponibles :\n• Produits à prix fixe : achat direct au prix affiché\n• Produits au m² : prix calculé automatiquement selon les dimensions saisies (prix au m² × surface)",
   },
   {
     title: "3. Prix",

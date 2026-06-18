@@ -5,7 +5,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../lib/constants";
-import { formatPrice } from "../../lib/utils";
+import { priceTagLabel } from "../../lib/pricing";
 import type { Product } from "../../lib/types";
 import { useFavoritesStore } from "../../features/favorites/store";
 import { useCartStore } from "../../features/cart/store";
@@ -72,17 +72,15 @@ export default function ProductCard({
         >
           {product.name}
         </Text>
-        {product.price && (
-          <Text
-            className="font-bold text-sm"
-            style={{
-              color: COLORS.secondary,
-              fontFamily: "Manrope_700Bold",
-            }}
-          >
-            {formatPrice(product.price)}
-          </Text>
-        )}
+        <Text
+          className="font-bold text-sm"
+          style={{
+            color: COLORS.secondary,
+            fontFamily: "Manrope_700Bold",
+          }}
+        >
+          {priceTagLabel(product)}
+        </Text>
       </TouchableOpacity>
     );
   }
@@ -136,24 +134,15 @@ export default function ProductCard({
           {product.name}
         </Text>
         <View className="flex-row items-center justify-between">
-          {product.price ? (
-            <Text
-              className="font-bold"
-              style={{
-                color: COLORS.secondary,
-                fontFamily: "Manrope_700Bold",
-              }}
-            >
-              {formatPrice(product.price)}
-            </Text>
-          ) : (
-            <Text
-              className="text-sm italic"
-              style={{ color: COLORS.secondary }}
-            >
-              Sur devis
-            </Text>
-          )}
+          <Text
+            className="font-bold"
+            style={{
+              color: COLORS.secondary,
+              fontFamily: "Manrope_700Bold",
+            }}
+          >
+            {priceTagLabel(product)}
+          </Text>
           {product.productType === "standard" && (
             <TouchableOpacity onPress={handleAdd}>
               <Text

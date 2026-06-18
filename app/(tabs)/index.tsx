@@ -17,7 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../lib/constants";
 import { getProductImage } from "../../lib/mock-data";
-import { formatPrice } from "../../lib/utils";
+import { priceTagLabel } from "../../lib/pricing";
 import type { Product } from "../../lib/types";
 import { useFavoritesStore } from "../../features/favorites/store";
 import { useCartStore } from "../../features/cart/store";
@@ -166,16 +166,19 @@ function ProductCardTemu({ product, imgHeight }: { product: Product; imgHeight: 
   const addItem = useCartStore((s) => s.addItem);
   const imgSource = getProductImage(product.images[0]);
 
-  const isQuoteOnly = product.productType === "quote_only";
-
   const handleFav = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     toggleFav(product.id);
   };
 
+  // Per-m² products need dimensions before they can be priced/ordered, so the
+  // quick-add button sends the customer to the product page instead.
+  const needsDimensions =
+    product.priceMode === "per_sqm" || product.productType === "configurable";
+
   const handleAdd = async () => {
-    if (isQuoteOnly) {
-      router.push(`/(main)/quote-request/${product.id}`);
+    if (needsDimensions) {
+      router.push(`/(main)/products/${product.id}`);
       return;
     }
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -243,28 +246,15 @@ function ProductCardTemu({ product, imgHeight }: { product: Product; imgHeight: 
         {/* Price + add */}
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <View>
-            {isQuoteOnly ? (
-              <Text
-                style={{
-                  fontSize: 14,
-                  fontFamily: "Manrope_700Bold",
-                  color: COLORS.secondary,
-                  fontStyle: "italic",
-                }}
-              >
-                Sur devis
-              </Text>
-            ) : (
-              <Text
-                style={{
-                  fontSize: 17,
-                  fontFamily: "Manrope_800ExtraBold",
-                  color: COLORS.secondary,
-                }}
-              >
-                {formatPrice(product.price ?? 0)}
-              </Text>
-            )}
+            <Text
+              style={{
+                fontSize: 17,
+                fontFamily: "Manrope_800ExtraBold",
+                color: COLORS.secondary,
+              }}
+            >
+              {priceTagLabel(product)}
+            </Text>
           </View>
 
           <TouchableOpacity
@@ -282,7 +272,7 @@ function ProductCardTemu({ product, imgHeight }: { product: Product; imgHeight: 
             }}
           >
             <MaterialCommunityIcons
-              name={isQuoteOnly ? "file-document-edit-outline" : "cart-plus"}
+              name={needsDimensions ? "ruler-square" : "cart-plus"}
               size={16}
               color={COLORS.onSurface}
             />
