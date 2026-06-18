@@ -12,6 +12,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../lib/constants";
 import ConversationItem from "../../components/messaging/ConversationItem";
 import { useConversations } from "../../features/messaging/hooks";
+import LogoHeader from "../../components/layout/LogoHeader";
 
 export default function MessagesScreen() {
   const [search, setSearch] = useState("");
@@ -31,6 +32,7 @@ export default function MessagesScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
+      <LogoHeader />
       {/* Header */}
       <View
         style={{

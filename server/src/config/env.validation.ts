@@ -25,6 +25,12 @@ const envSchema = z.object({
   APNS_KEY_ID: z.string().optional().default(''),
   APNS_TEAM_ID: z.string().optional().default(''),
   APNS_BUNDLE_ID: z.string().optional().default('fr.lamenagereparis.app'),
+
+  // Stripe (online payments). Secret key is required because PaymentsService
+  // initializes the Stripe client at boot. Webhook secret is optional until
+  // the webhook endpoint is registered in the Stripe dashboard.
+  STRIPE_SECRET_KEY: z.string().min(1),
+  STRIPE_WEBHOOK_SECRET: z.string().optional().default(''),
 });
 
 export type Env = z.infer<typeof envSchema>;

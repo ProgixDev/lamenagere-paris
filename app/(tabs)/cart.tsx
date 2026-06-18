@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Image,
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -15,6 +14,7 @@ import { useCart } from "../../features/cart/hooks";
 import CartItemComponent from "../../components/cart/CartItem";
 import CartSummary from "../../components/cart/CartSummary";
 import Button from "../../components/ui/Button";
+import LogoHeader from "../../components/layout/LogoHeader";
 
 export default function CartScreen() {
   const router = useRouter();
@@ -35,13 +35,7 @@ export default function CartScreen() {
   if (items.length === 0) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
-        {/* Header */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 }}>
-          <Image
-            source={require("../../assets/images/logo.png")}
-            style={{ width: 90, height: 32, resizeMode: "contain" }}
-          />
-        </View>
+        <LogoHeader />
 
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 40 }}>
           <View
@@ -93,6 +87,7 @@ export default function CartScreen() {
   // ── Cart with items ──
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
+      <LogoHeader />
       {/* Header */}
       <View
         style={{

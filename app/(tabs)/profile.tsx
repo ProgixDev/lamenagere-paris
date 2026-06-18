@@ -14,6 +14,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { COLORS } from "../../lib/constants";
 import { useAuthStore } from "../../features/auth/store";
 import { getInitials } from "../../lib/utils";
+import LogoHeader from "../../components/layout/LogoHeader";
 
 const MENU_SECTIONS = [
   {
@@ -62,6 +63,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
+      <LogoHeader />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Profile header card */}
         <View style={{ paddingHorizontal: 20, paddingTop: 16, marginBottom: 24 }}>

@@ -30,6 +30,7 @@ import {
 import HeroCarousel from "../../components/HeroCarousel";
 import SearchBar from "../../components/SearchBar";
 import PromoBanner from "../../components/PromoBanner";
+import LogoHeader from "../../components/layout/LogoHeader";
 
 const { width: W } = Dimensions.get("window");
 const GUTTER = 8;
@@ -440,6 +441,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
+      <LogoHeader />
       <SearchBar />
 
       <ScrollView

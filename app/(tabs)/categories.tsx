@@ -25,6 +25,7 @@ import { formatPrice } from "../../lib/utils";
 import type { Product, Category } from "../../lib/types";
 import SearchBar from "../../components/SearchBar";
 import PromoBanner from "../../components/PromoBanner";
+import LogoHeader from "../../components/layout/LogoHeader";
 
 const { width: W } = Dimensions.get("window");
 const PAGE_PAD = 16;
@@ -66,6 +67,7 @@ export default function CategoriesScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
+      <LogoHeader />
       <SearchBar placeholder="Rechercher une collection..." />
 
       <ScrollView

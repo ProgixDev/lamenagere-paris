@@ -56,8 +56,13 @@ export default function OnboardingIntro() {
   const router = useRouter();
   const markSeen = useOnboardingStore((s) => s.markSeen);
   const [active, setActive] = useState(0);
+  // `displayed` lags `active` so the old text can fade out before the new
+  // text fades in (the background images crossfade on `active` directly).
+  const [displayed, setDisplayed] = useState(0);
 
   const opacities = useRef(SLIDES.map((_, i) => new Animated.Value(i === 0 ? 1 : 0))).current;
+  const contentOpacity = useRef(new Animated.Value(1)).current;
+  const contentShift = useRef(new Animated.Value(0)).current;
 
   // Animate to active slide
   useEffect(() => {
@@ -71,6 +76,39 @@ export default function OnboardingIntro() {
       ),
     ).start();
   }, [active, opacities]);
+
+  // Crossfade the text block: fade/slide out the old slide, swap content,
+  // then fade/slide the new slide in.
+  useEffect(() => {
+    if (displayed === active) return;
+    Animated.parallel([
+      Animated.timing(contentOpacity, {
+        toValue: 0,
+        duration: 280,
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentShift, {
+        toValue: 14,
+        duration: 280,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setDisplayed(active);
+      contentShift.setValue(-10);
+      Animated.parallel([
+        Animated.timing(contentOpacity, {
+          toValue: 1,
+          duration: 380,
+          useNativeDriver: true,
+        }),
+        Animated.timing(contentShift, {
+          toValue: 0,
+          duration: 380,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+  }, [active, displayed, contentOpacity, contentShift]);
 
   // Auto-advance
   useEffect(() => {
@@ -96,7 +134,7 @@ export default function OnboardingIntro() {
   };
 
   const isLast = active === SLIDES.length - 1;
-  const slide = SLIDES[active];
+  const slide = SLIDES[displayed];
 
   return (
     <View style={{ flex: 1, backgroundColor: "#000" }}>
@@ -149,7 +187,7 @@ export default function OnboardingIntro() {
           <View style={{ width: 64 }} />
           <Image
             source={require("../../assets/images/logo.png")}
-            style={{ width: 132, height: 40, resizeMode: "contain" }}
+            style={{ width: 188, height: 57, resizeMode: "contain" }}
           />
           {!isLast ? (
             <TouchableOpacity
@@ -178,8 +216,13 @@ export default function OnboardingIntro() {
 
         {/* Bottom content */}
         <View style={{ flex: 1, justifyContent: "flex-end", paddingHorizontal: 24, paddingBottom: 16 }}>
-          {/* Animated text block (fades along with image) */}
-          <Animated.View>
+          {/* Animated text block (fades + slides between slides) */}
+          <Animated.View
+            style={{
+              opacity: contentOpacity,
+              transform: [{ translateY: contentShift }],
+            }}
+          >
             <Text
               style={{
                 fontSize: 11,
@@ -257,19 +300,17 @@ export default function OnboardingIntro() {
             </Text>
           </TouchableOpacity>
 
-          {!isLast && (
-            <TouchableOpacity onPress={finish} style={{ alignItems: "center", marginTop: 14 }}>
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontFamily: "Inter_500Medium",
-                  color: "rgba(255,255,255,0.65)",
-                }}
-              >
-                J'ai déjà un compte
-              </Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity onPress={finish} style={{ alignItems: "center", marginTop: 14 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                fontFamily: "Inter_500Medium",
+                color: "rgba(255,255,255,0.65)",
+              }}
+            >
+              J'ai déjà un compte
+            </Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     </View>
