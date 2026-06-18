@@ -34,16 +34,18 @@ interface AddressRowFull {
 interface ProductForOrder {
   id: string;
   name: string;
-  price_mode: 'fixed' | 'calculated' | 'quote';
+  price_mode: 'fixed' | 'calculated' | 'per_sqm' | 'quote';
   base_price_cents: number | null;
   width_coef_cents: number | null;
   height_coef_cents: number | null;
+  price_per_sqm_cents: number | null;
   ref_width: number | null;
   ref_height: number | null;
   min_width: number | null;
   min_height: number | null;
   max_width: number | null;
   max_height: number | null;
+  opening_types: { type: string; surcharge_cents: number }[] | null;
   delivery_metropole: string;
   delivery_outremer: string;
   media: { url: string; type: string; is_primary: boolean }[];
@@ -109,7 +111,7 @@ export class OrdersService {
     const { data: products } = await this.supabase.client
       .from('products')
       .select(
-        'id, name, price_mode, base_price_cents, width_coef_cents, height_coef_cents, ref_width, ref_height, min_width, min_height, max_width, max_height, delivery_metropole, delivery_outremer, media:product_media(url,type,is_primary)',
+        'id, name, price_mode, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, ref_width, ref_height, min_width, min_height, max_width, max_height, opening_types, delivery_metropole, delivery_outremer, media:product_media(url,type,is_primary)',
       )
       .in('id', productIds)
       .returns<ProductForOrder[]>();
@@ -124,6 +126,7 @@ export class OrdersService {
       const unit = this.pricing.resolveUnitPriceCents(
         product,
         item.customDimensions,
+        item.openingType,
       );
       subtotal += unit * item.quantity;
       const primary =
@@ -137,6 +140,7 @@ export class OrdersService {
         unit_price_cents: unit,
         custom_width: item.customDimensions?.width ?? null,
         custom_height: item.customDimensions?.height ?? null,
+        opening_type: item.openingType ?? null,
       };
     });
 

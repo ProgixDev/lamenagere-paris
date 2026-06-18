@@ -95,6 +95,18 @@ export const useAuthStore = create<AuthStore>((set) => ({
     }
   },
 
+  updateProfile: async (data: Partial<User>) => {
+    set({ isLoading: true, error: null });
+    try {
+      const user = await updateProfileApi(data);
+      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
+      set({ user, isLoading: false });
+    } catch (e) {
+      set({ isLoading: false, error: errorMessage(e) });
+      throw e;
+    }
+  },
+
   logout: async () => {
     try {
       const pushToken = await SecureStore.getItemAsync(PUSH_TOKEN_KEY);

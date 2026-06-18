@@ -14,8 +14,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { COLORS, PRODUCT_TYPES, TERRITORIES } from "../../../lib/constants";
+import { COLORS, PRODUCT_TYPES, PRICE_MODES, TERRITORIES } from "../../../lib/constants";
 import { formatPrice } from "../../../lib/utils";
+import { computeConfiguredPrice } from "../../../lib/pricing";
+import { openingTypeLabel, diagramForTypes } from "../../../lib/opening-types";
 import Button from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
 import Toast from "../../../components/ui/Toast";
@@ -67,9 +69,14 @@ export default function ProductDetailScreen() {
   const [quantity, setQuantity] = useState(1);
   const [customWidth, setCustomWidth] = useState("");
   const [customHeight, setCustomHeight] = useState("");
+  const [openingType, setOpeningType] = useState<string | null>(null);
   const [territory, setTerritory] = useState<Territory>("metropole");
   const [activeTab, setActiveTab] = useState<"overview" | "specs" | "reviews">("overview");
-  const [toast, setToast] = useState({ visible: false, message: "", type: "success" as const });
+  const [toast, setToast] = useState({
+    visible: false,
+    message: "",
+    type: "success" as "success" | "error",
+  });
   const galleryRef = useRef<ScrollView>(null);
 
   const rating = useMemo(() => (product ? deriveRating(product) : 0), [product]);
@@ -100,15 +107,35 @@ export default function ProductDetailScreen() {
   }
 
   const isQuoteOnly = product.productType === PRODUCT_TYPES.QUOTE_ONLY;
-  const isConfigurable = product.productType === PRODUCT_TYPES.CONFIGURABLE;
+  const isPerSqm = product.priceMode === PRICE_MODES.PER_SQM;
+  // Made-to-measure: needs width/height before it can be priced/ordered.
+  const needsDimensions =
+    product.productType === PRODUCT_TYPES.CONFIGURABLE || isPerSqm;
+  const openingTypes = product.openingTypes ?? [];
+  const hasOpeningTypes = openingTypes.length > 0;
   const galleryImages = product.images.length > 0 ? product.images : ["__placeholder__"];
 
-  const handleAddToCart = async () => {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const dims = isConfigurable && customWidth && customHeight
+  const dims =
+    needsDimensions && customWidth && customHeight
       ? { width: parseFloat(customWidth), height: parseFloat(customHeight) }
       : undefined;
-    addItem(product, quantity, dims);
+
+  // Live, display-only price (server re-validates at checkout).
+  const livePrice = computeConfiguredPrice(product, dims, openingType ?? undefined);
+
+  const handleAddToCart = async () => {
+    if (needsDimensions && !dims) {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setToast({ visible: true, message: "Renseignez vos dimensions", type: "error" });
+      return;
+    }
+    if (hasOpeningTypes && !openingType) {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setToast({ visible: true, message: "Choisissez un type d'ouverture", type: "error" });
+      return;
+    }
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    addItem(product, quantity, dims, openingType ?? undefined);
     setToast({ visible: true, message: "Ajouté au panier", type: "success" });
   };
 
@@ -327,6 +354,29 @@ export default function ProductDetailScreen() {
                   </Text>
                 </View>
               </View>
+            ) : isPerSqm ? (
+              <View>
+                <Text
+                  style={{
+                    fontSize: 28,
+                    fontFamily: "Manrope_800ExtraBold",
+                    color: COLORS.secondary,
+                  }}
+                >
+                  {livePrice != null
+                    ? formatPrice(livePrice)
+                    : product.pricePerSqm != null
+                      ? `${formatPrice(product.pricePerSqm)}/m²`
+                      : "Sur mesure"}
+                </Text>
+                <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 2 }}>
+                  {livePrice != null
+                    ? `Prix pour ${customWidth}×${customHeight} cm${
+                        hasOpeningTypes && openingType ? ` · ${openingTypeLabel(openingType)}` : ""
+                      }`
+                    : "Indiquez vos dimensions pour voir le prix"}
+                </Text>
+              </View>
             ) : product.price ? (
               <View>
                 <Text
@@ -336,10 +386,10 @@ export default function ProductDetailScreen() {
                     color: COLORS.secondary,
                   }}
                 >
-                  {formatPrice(product.price)}
+                  {formatPrice(livePrice ?? product.price)}
                 </Text>
                 <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 2 }}>
-                  Dès {formatPrice(Math.round(product.price / 4))}/mois en 4× sans frais
+                  Dès {formatPrice(Math.round((livePrice ?? product.price) / 4))}/mois en 4× sans frais
                 </Text>
               </View>
             ) : null}
@@ -362,8 +412,8 @@ export default function ProductDetailScreen() {
               </Text>
             </Section>
 
-            {/* Configurable dimensions */}
-            {isConfigurable && (
+            {/* Made-to-measure dimensions */}
+            {needsDimensions && (
               <Section title="Vos dimensions souhaitées">
                 <View style={{ flexDirection: "row", gap: 12 }}>
                   <View style={{ flex: 1 }}>
@@ -385,7 +435,22 @@ export default function ProductDetailScreen() {
                     />
                   </View>
                 </View>
-                {product.dimensions && (
+                {isPerSqm && product.pricePerSqm != null && (
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontFamily: "Inter_500Medium",
+                      color: COLORS.secondary,
+                      marginTop: 8,
+                    }}
+                  >
+                    {formatPrice(product.pricePerSqm)}/m²
+                    {product.minDimensions && product.maxDimensions
+                      ? ` · de ${product.minDimensions.width}×${product.minDimensions.height} à ${product.maxDimensions.width}×${product.maxDimensions.height} cm`
+                      : ""}
+                  </Text>
+                )}
+                {!isPerSqm && product.dimensions && (
                   <Text
                     style={{
                       fontSize: 11,
@@ -398,6 +463,61 @@ export default function ProductDetailScreen() {
                     {product.dimensions.unit}
                   </Text>
                 )}
+              </Section>
+            )}
+
+            {/* Opening type selector */}
+            {hasOpeningTypes && (
+              <Section title="Type d'ouverture">
+                {(() => {
+                  const diagram = diagramForTypes(openingTypes.map((o) => o.type));
+                  return diagram ? (
+                    <Image
+                      source={diagram}
+                      style={{
+                        width: "100%",
+                        height: 150,
+                        borderRadius: 12,
+                        marginBottom: 12,
+                        backgroundColor: COLORS.surfaceContainer,
+                      }}
+                      resizeMode="contain"
+                    />
+                  ) : null;
+                })()}
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                  {openingTypes.map((opt) => {
+                    const active = openingType === opt.type;
+                    return (
+                      <TouchableOpacity
+                        key={opt.type}
+                        onPress={() => {
+                          Haptics.selectionAsync();
+                          setOpeningType(opt.type);
+                        }}
+                        style={{
+                          paddingHorizontal: 14,
+                          paddingVertical: 9,
+                          borderRadius: 9999,
+                          backgroundColor: active ? COLORS.primary : "transparent",
+                          borderWidth: 1,
+                          borderColor: active ? COLORS.primary : COLORS.outlineVariant,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontFamily: active ? "Inter_600SemiBold" : "Inter_500Medium",
+                            color: active ? COLORS.onPrimary : COLORS.onSurface,
+                          }}
+                        >
+                          {openingTypeLabel(opt.type)}
+                          {opt.surcharge > 0 ? ` +${formatPrice(opt.surcharge)}` : ""}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </Section>
             )}
 
@@ -481,7 +601,7 @@ export default function ProductDetailScreen() {
               />
             )}
             <SpecRow label="Sur mesure" value={product.customizable ? "Oui" : "Non"} />
-            <SpecRow label="Type de produit" value={isQuoteOnly ? "Devis personnalisé" : isConfigurable ? "Configurable" : "Standard"} />
+            <SpecRow label="Type de produit" value={isQuoteOnly ? "Devis personnalisé" : needsDimensions ? "Sur mesure" : "Standard"} />
             <SpecRow label="Métropole" value={product.deliveryEstimates.metropole} />
             <SpecRow label="Outre-mer" value={product.deliveryEstimates.outreMer} />
             <SpecRow label="Référence" value={product.id.toUpperCase()} last />

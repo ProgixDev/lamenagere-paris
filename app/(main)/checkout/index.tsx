@@ -9,8 +9,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { COLORS, DELIVERY_ESTIMATES } from "../../../lib/constants";
-import { isOverseas, formatPrice } from "../../../lib/utils";
+import { COLORS, DELIVERY_ESTIMATES, TVA_RATE } from "../../../lib/constants";
+import { isOverseas, formatPrice, formatPrice2, splitTtc } from "../../../lib/utils";
+import { useAuthStore } from "../../../features/auth/store";
 import Button from "../../../components/ui/Button";
 import CheckoutSteps from "../../../components/cart/CheckoutSteps";
 import AddressFormModal from "../../../components/address/AddressFormModal";
@@ -25,6 +26,7 @@ import { useCheckoutStore } from "../../../features/checkout/store";
 export default function CheckoutAddressScreen() {
   const router = useRouter();
   const { items, subtotal } = useCart();
+  const isB2b = useAuthStore((s) => s.user?.accountType === "professionnel");
   const { data: addresses = [], isLoading } = useAddresses();
   const createAddress = useCreateAddress();
   const setAddress = useCheckoutStore((s) => s.setAddress);
@@ -190,6 +192,26 @@ export default function CheckoutAddressScreen() {
               </Text>
             </View>
           ))}
+          {isB2b && (
+            <View className="mt-2 pt-2" style={{ borderTopWidth: 1, borderTopColor: COLORS.surfaceContainerLow }}>
+              <View className="flex-row justify-between mb-1">
+                <Text className="text-xs" style={{ color: COLORS.onSurfaceVariant }}>
+                  Sous-total HT
+                </Text>
+                <Text className="text-xs" style={{ color: COLORS.onSurface }}>
+                  {formatPrice2(splitTtc(subtotal, TVA_RATE).ht)}
+                </Text>
+              </View>
+              <View className="flex-row justify-between">
+                <Text className="text-xs" style={{ color: COLORS.onSurfaceVariant }}>
+                  TVA ({Math.round(TVA_RATE * 100)}%)
+                </Text>
+                <Text className="text-xs" style={{ color: COLORS.onSurface }}>
+                  {formatPrice2(splitTtc(subtotal, TVA_RATE).tva)}
+                </Text>
+              </View>
+            </View>
+          )}
           <View className="flex-row justify-between mt-2 pt-2" style={{ borderTopWidth: 1, borderTopColor: COLORS.surfaceContainerLow }}>
             <Text className="font-bold" style={{ color: COLORS.secondary, fontFamily: "Manrope_700Bold" }}>
               Total TTC

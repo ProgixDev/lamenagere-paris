@@ -38,6 +38,7 @@ export interface QuoteRow {
   req_height: number | null;
   req_depth: number | null;
   notes: string | null;
+  opening_type: string | null;
   status: QuoteStatus;
   quoted_price_cents: number | null;
   shipping_cents: number | null;
@@ -59,6 +60,7 @@ export interface QuoteRequestDto {
   product: ProductDto;
   dimensions?: { width: number; height: number };
   notes?: string;
+  openingType?: string;
   images?: string[];
   status: QuoteStatus;
   quotedPrice?: number;
@@ -93,6 +95,7 @@ export function toQuoteRequestDto(row: QuoteRow): QuoteRequestDto {
         ? { width: Number(row.req_width), height: Number(row.req_height) }
         : undefined,
     notes: row.notes ?? undefined,
+    openingType: row.opening_type ?? undefined,
     images: (row.attachments ?? []).map((a) => a.url),
     status: row.status,
     quotedPrice:

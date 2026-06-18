@@ -42,6 +42,7 @@ export interface AuthActions {
   loginWithGoogle: () => Promise<void>;
   register: (data: RegisterPayload) => Promise<void>;
   completeProfile: (data: CompleteProfilePayload) => Promise<void>;
+  updateProfile: (data: Partial<User>) => Promise<void>;
   logout: () => Promise<void>;
   loadSession: () => Promise<void>;
   setUser: (user: User) => void;

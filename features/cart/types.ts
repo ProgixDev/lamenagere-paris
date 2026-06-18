@@ -6,7 +6,12 @@ export interface CartState {
 }
 
 export interface CartActions {
-  addItem: (product: Product, quantity?: number, customDimensions?: { width: number; height: number }) => void;
+  addItem: (
+    product: Product,
+    quantity?: number,
+    customDimensions?: { width: number; height: number },
+    openingType?: string,
+  ) => void;
   removeItem: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;

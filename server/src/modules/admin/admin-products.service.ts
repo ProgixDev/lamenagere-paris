@@ -145,6 +145,12 @@ export class AdminProductsService {
       width_coef_cents: dto.widthCoef != null ? eurosToCents(dto.widthCoef) : null,
       height_coef_cents:
         dto.heightCoef != null ? eurosToCents(dto.heightCoef) : null,
+      price_per_sqm_cents:
+        dto.pricePerSqm != null ? eurosToCents(dto.pricePerSqm) : null,
+      opening_types: (dto.openingTypes ?? []).map((o) => ({
+        type: o.type,
+        surcharge_cents: eurosToCents(o.surcharge ?? 0),
+      })),
       dim_width: dto.dimWidth,
       dim_height: dto.dimHeight,
       dim_depth: dto.dimDepth,

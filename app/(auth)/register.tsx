@@ -16,9 +16,11 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../lib/constants";
 import Input from "../../components/ui/Input";
+import PhoneInput from "../../components/ui/PhoneInput";
 import Button from "../../components/ui/Button";
 import Toast from "../../components/ui/Toast";
 import { useAuthStore } from "../../features/auth/store";
+import { combinePhone, DEFAULT_PHONE_COUNTRY } from "../../lib/phone";
 import type { AccountType } from "../../lib/types";
 
 const registerSchema = z
@@ -26,7 +28,11 @@ const registerSchema = z
     accountType: z.enum(["particulier", "professionnel"]),
     fullName: z.string().min(1, "Nom complet requis"),
     email: z.string().min(1, "Email requis").email("Email invalide"),
-    phone: z.string().optional(),
+    phoneCountry: z.enum(["FR", "SN"]),
+    phone: z
+      .string()
+      .min(1, "Téléphone requis")
+      .refine((v) => v.replace(/\D/g, "").length >= 6, "Numéro invalide"),
     password: z
       .string()
       .min(8, "Minimum 8 caractères")
@@ -62,7 +68,7 @@ type RegisterForm = z.infer<typeof registerSchema>;
 // Fields validated before advancing past each step.
 const STEP_FIELDS: (keyof RegisterForm)[][] = [
   ["accountType", "fullName", "company", "siret"],
-  ["email", "phone"],
+  ["email", "phoneCountry", "phone"],
   ["password", "confirmPassword", "acceptTerms"],
 ];
 
@@ -92,6 +98,7 @@ export default function RegisterScreen() {
       accountType: "particulier",
       fullName: "",
       email: "",
+      phoneCountry: DEFAULT_PHONE_COUNTRY,
       phone: "",
       password: "",
       confirmPassword: "",
@@ -135,7 +142,7 @@ export default function RegisterScreen() {
       await registerUser({
         fullName: data.fullName,
         email: data.email,
-        phone: data.phone,
+        phone: combinePhone(data.phoneCountry, data.phone),
         password: data.password,
         accountType: data.accountType,
         company: data.company,
@@ -313,14 +320,21 @@ export default function RegisterScreen() {
               />
               <Controller
                 control={control}
-                name="phone"
-                render={({ field: { onChange, value } }) => (
-                  <Input
-                    label="TÉLÉPHONE (OPTIONNEL)"
-                    placeholder="+33 6 00 00 00 00"
-                    value={value ?? ""}
-                    onChangeText={onChange}
-                    keyboardType="phone-pad"
+                name="phoneCountry"
+                render={({ field: { onChange: onCountryChange, value: countryValue } }) => (
+                  <Controller
+                    control={control}
+                    name="phone"
+                    render={({ field: { onChange, value } }) => (
+                      <PhoneInput
+                        label="TÉLÉPHONE"
+                        countryCode={countryValue}
+                        onCountryChange={onCountryChange}
+                        value={value ?? ""}
+                        onChangeText={onChange}
+                        error={errors.phone?.message}
+                      />
+                    )}
                   />
                 )}
               />

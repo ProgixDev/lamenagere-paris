@@ -6,6 +6,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../../lib/constants";
+import { openingTypeLabel, diagramForTypes } from "../../../lib/opening-types";
 import Input from "../../../components/ui/Input";
 import Button from "../../../components/ui/Button";
 import { useProduct } from "../../../features/products/hooks";
@@ -20,8 +21,11 @@ export default function QuoteRequestScreen() {
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
   const [notes, setNotes] = useState("");
+  const [openingType, setOpeningType] = useState<string | null>(null);
   const [images, setImages] = useState<string[]>([]);
   const [sent, setSent] = useState(false);
+
+  const openingTypes = product?.openingTypes ?? [];
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -42,6 +46,7 @@ export default function QuoteRequestScreen() {
         productId,
         dimensions: width && height ? { width: parseFloat(width), height: parseFloat(height) } : undefined,
         notes: notes || undefined,
+        openingType: openingType || undefined,
         images: images.length > 0 ? images : undefined,
       });
       setSent(true);
@@ -112,6 +117,51 @@ export default function QuoteRequestScreen() {
             </View>
           </View>
         </View>
+
+        {/* Opening type */}
+        {openingTypes.length > 0 && (
+          <View>
+            <Text className="text-[10px] uppercase tracking-widest font-semibold mb-3" style={{ color: COLORS.outline }}>
+              TYPE D'OUVERTURE
+            </Text>
+            {(() => {
+              const diagram = diagramForTypes(openingTypes.map((o) => o.type));
+              return diagram ? (
+                <RNImage
+                  source={diagram}
+                  style={{ width: "100%", height: 140, borderRadius: 12, marginBottom: 12, backgroundColor: COLORS.surfaceContainer }}
+                  resizeMode="contain"
+                />
+              ) : null;
+            })()}
+            <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+              {openingTypes.map((opt) => {
+                const active = openingType === opt.type;
+                return (
+                  <TouchableOpacity
+                    key={opt.type}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setOpeningType(opt.type);
+                    }}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 9,
+                      borderRadius: 9999,
+                      backgroundColor: active ? COLORS.primary : "transparent",
+                      borderWidth: 1,
+                      borderColor: active ? COLORS.primary : COLORS.outlineVariant,
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, fontFamily: active ? "Inter_600SemiBold" : "Inter_500Medium", color: active ? COLORS.onPrimary : COLORS.onSurface }}>
+                      {openingTypeLabel(opt.type)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         {/* Notes */}
         <Input

@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
@@ -7,11 +8,18 @@ import {
   IsOptional,
   IsString,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
 
 export type ProductType = 'standard' | 'quote_only' | 'configurable';
-export type PriceMode = 'fixed' | 'calculated' | 'quote';
+export type PriceMode = 'fixed' | 'calculated' | 'per_sqm' | 'quote';
 export type ProductStatus = 'publie' | 'brouillon' | 'archive';
+
+/** One allowed opening type for a product, with its surcharge (in euros). */
+export class OpeningTypeDto {
+  @IsString() type!: string;
+  @IsNumber() surcharge!: number;
+}
 
 export class UpsertProductDto {
   @IsString() @MinLength(1) name!: string;
@@ -21,7 +29,7 @@ export class UpsertProductDto {
   @IsOptional() @IsString() shortDescription?: string;
   @IsString() categoryId!: string;
   @IsEnum(['standard', 'quote_only', 'configurable']) productType!: ProductType;
-  @IsEnum(['fixed', 'calculated', 'quote']) priceMode!: PriceMode;
+  @IsEnum(['fixed', 'calculated', 'per_sqm', 'quote']) priceMode!: PriceMode;
   @IsOptional() @IsEnum(['publie', 'brouillon', 'archive']) status?: ProductStatus;
 
   // Pricing in euros (converted to cents on write).
@@ -29,6 +37,14 @@ export class UpsertProductDto {
   @IsOptional() @IsNumber() purchaseCost?: number;
   @IsOptional() @IsNumber() widthCoef?: number; // €/cm
   @IsOptional() @IsNumber() heightCoef?: number; // €/cm
+  @IsOptional() @IsNumber() pricePerSqm?: number; // €/m²
+
+  // Allowed opening types + per-type surcharge (euros).
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OpeningTypeDto)
+  openingTypes?: OpeningTypeDto[];
 
   // Dimensions (cm).
   @IsOptional() @IsNumber() dimWidth?: number;

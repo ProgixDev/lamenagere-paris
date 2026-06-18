@@ -13,7 +13,12 @@ export const getOrderByIdApi = async (orderId: string): Promise<Order> => {
 };
 
 export const createOrderApi = async (payload: {
-  items: { productId: string; quantity: number; customDimensions?: { width: number; height: number } }[];
+  items: {
+    productId: string;
+    quantity: number;
+    customDimensions?: { width: number; height: number };
+    openingType?: string;
+  }[];
   shippingAddressId: string;
   shippingMethod: string;
   territory: string;

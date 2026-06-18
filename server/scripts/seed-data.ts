@@ -19,8 +19,12 @@ export interface SeedProduct {
   description: string;
   categorySlug: string;
   productType: 'standard' | 'quote_only' | 'configurable';
-  priceMode: 'fixed' | 'calculated' | 'quote';
+  priceMode: 'fixed' | 'calculated' | 'per_sqm' | 'quote';
   price?: number; // euros
+  pricePerSqm?: number; // euros per m² (per_sqm mode)
+  minDimensions?: { width: number; height: number };
+  maxDimensions?: { width: number; height: number };
+  openingTypes?: { type: string; surcharge: number }[]; // surcharge in euros
   imageKeys: string[];
   customizable: boolean;
   dimensions?: { width: number; height: number; depth?: number; unit: string };
@@ -75,6 +79,55 @@ export const SEED_CATEGORIES: SeedCategory[] = [
 ];
 
 export const SEED_PRODUCTS: SeedProduct[] = [
+  {
+    slug: 'fenetre-aluminium-sur-mesure',
+    name: 'Fenêtre Aluminium Sur Mesure',
+    description:
+      "Fenêtre aluminium sur mesure à double vitrage. Indiquez vos dimensions : le prix se calcule automatiquement au m². Choisissez votre type d'ouverture.",
+    categorySlug: 'baies-vitrees',
+    productType: 'configurable',
+    priceMode: 'per_sqm',
+    pricePerSqm: 450, // 450 €/m²
+    minDimensions: { width: 40, height: 40 },
+    maxDimensions: { width: 300, height: 300 },
+    openingTypes: [
+      { type: 'fixe', surcharge: 0 },
+      { type: 'battante', surcharge: 80 },
+      { type: 'oscillo_battante', surcharge: 150 },
+      { type: 'soufflet', surcharge: 120 },
+      { type: 'coulissante', surcharge: 220 },
+    ],
+    imageKeys: ['baieCoulissante'],
+    customizable: true,
+    dimensions: { width: 120, height: 150, unit: 'cm' },
+    deliveryEstimates: { metropole: '3-4 semaines', outreMer: '8-12 semaines' },
+    createdAt: '2026-05-01',
+    featured: true,
+  },
+  {
+    slug: 'porte-entree-sur-mesure',
+    name: "Porte d'Entrée Sur Mesure",
+    description:
+      "Porte d'entrée aluminium sur mesure. Prix calculé au m² selon vos dimensions, avec choix du type d'ouverture.",
+    categorySlug: 'portes',
+    productType: 'configurable',
+    priceMode: 'per_sqm',
+    pricePerSqm: 600, // 600 €/m²
+    minDimensions: { width: 70, height: 180 },
+    maxDimensions: { width: 200, height: 260 },
+    openingTypes: [
+      { type: 'battante', surcharge: 0 },
+      { type: 'pivotante', surcharge: 300 },
+      { type: 'coulissante', surcharge: 250 },
+      { type: 'double_battant', surcharge: 400 },
+    ],
+    imageKeys: ['porteContemporaine'],
+    customizable: true,
+    dimensions: { width: 90, height: 215, unit: 'cm' },
+    deliveryEstimates: { metropole: '4-5 semaines', outreMer: '10-14 semaines' },
+    createdAt: '2026-05-01',
+    featured: true,
+  },
   {
     slug: 'porte-geometrique-noyer',
     name: 'Porte Géométrique Noyer',

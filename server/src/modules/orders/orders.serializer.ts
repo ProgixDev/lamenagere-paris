@@ -19,6 +19,7 @@ export interface OrderItemRow {
   unit_price_cents: number;
   custom_width: number | null;
   custom_height: number | null;
+  opening_type: string | null;
 }
 
 export interface OrderTimelineRow {
@@ -70,6 +71,7 @@ export interface OrderItemDto {
   quantity: number;
   price: number;
   customDimensions?: { width: number; height: number };
+  openingType?: string;
 }
 
 export interface OrderTimelineEntryDto {
@@ -173,6 +175,7 @@ export function toOrderDto(row: OrderRow): OrderDto {
       it.custom_width != null && it.custom_height != null
         ? { width: Number(it.custom_width), height: Number(it.custom_height) }
         : undefined,
+    openingType: it.opening_type ?? undefined,
   }));
 
   return {

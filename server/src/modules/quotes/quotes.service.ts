@@ -68,6 +68,7 @@ export class QuotesService {
         req_width: dto.dimensions?.width ?? null,
         req_height: dto.dimensions?.height ?? null,
         notes: dto.notes,
+        opening_type: dto.openingType ?? null,
         status: 'en_attente_devis',
         is_b2b: isB2b,
       })

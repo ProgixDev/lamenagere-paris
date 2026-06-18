@@ -32,6 +32,7 @@ export class OrderItemInputDto {
   @ValidateNested()
   @Type(() => CustomDimensionsDto)
   customDimensions?: CustomDimensionsDto;
+  @IsOptional() @IsString() openingType?: string;
 }
 
 export class CreateOrderDto {

@@ -47,6 +47,7 @@ export const PRODUCT_TYPES = {
 export const PRICE_MODES = {
   FIXED: "fixed",
   CALCULATED: "calculated",
+  PER_SQM: "per_sqm",
   QUOTE: "quote",
 } as const;
 
@@ -69,6 +70,10 @@ export const ACCOUNT_TYPES = {
   PARTICULIER: "particulier",
   PROFESSIONNEL: "professionnel",
 } as const;
+
+// Standard French VAT rate. Catalog prices are stored/displayed TTC (VAT
+// included); professional (B2B) accounts see the HT / TVA breakdown.
+export const TVA_RATE = 0.2;
 
 export const CATEGORIES = [
   { id: "1", name: "Portes", icon: "door", slug: "portes", description: "Portes d'entrée, intérieures et vitrées" },

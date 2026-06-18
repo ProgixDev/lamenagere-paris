@@ -2,11 +2,17 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { persistStorage } from "../../lib/persist-storage";
 import type { Product, CartItem } from "../../lib/types";
+import { computeConfiguredPrice } from "../../lib/pricing";
 
 interface CartStore {
   items: CartItem[];
   lastUpdated: number;
-  addItem: (product: Product, quantity?: number, customDimensions?: { width: number; height: number }) => void;
+  addItem: (
+    product: Product,
+    quantity?: number,
+    customDimensions?: { width: number; height: number },
+    openingType?: string,
+  ) => void;
   removeItem: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
@@ -18,7 +24,7 @@ export const useCartStore = create<CartStore>()(
       items: [],
       lastUpdated: Date.now(),
 
-      addItem: (product, quantity = 1, customDimensions) => {
+      addItem: (product, quantity = 1, customDimensions, openingType) => {
         if (product.productType === "quote_only") {
           if (__DEV__) {
             console.warn(
@@ -28,9 +34,16 @@ export const useCartStore = create<CartStore>()(
           return;
         }
         const { items } = get();
-        const existingIndex = items.findIndex(
-          (item) => item.product.id === product.id,
-        );
+        // A made-to-measure line (custom dimensions or chosen opening type) is
+        // unique — never merge it into another line. Plain products still merge.
+        const isConfigured = !!customDimensions || !!openingType;
+        const existingIndex = isConfigured
+          ? -1
+          : items.findIndex((item) => item.product.id === product.id);
+
+        const calculatedPrice =
+          computeConfiguredPrice(product, customDimensions, openingType) ??
+          product.price;
 
         if (existingIndex >= 0) {
           const updated = [...items];
@@ -45,7 +58,8 @@ export const useCartStore = create<CartStore>()(
             product,
             quantity,
             customDimensions,
-            calculatedPrice: product.price,
+            openingType,
+            calculatedPrice,
           };
           set({ items: [...items, newItem], lastUpdated: Date.now() });
         }

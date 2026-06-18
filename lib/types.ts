@@ -1,6 +1,12 @@
 export type AccountType = "particulier" | "professionnel";
 export type ProductType = "standard" | "quote_only" | "configurable";
-export type PriceMode = "fixed" | "calculated" | "quote";
+export type PriceMode = "fixed" | "calculated" | "per_sqm" | "quote";
+
+export interface OpeningTypeOption {
+  type: string;
+  /** Surcharge added to the dimension price when this type is chosen (euros). */
+  surcharge: number;
+}
 export type ShippingZone = "metropole" | "reunion" | "guadeloupe" | "martinique" | "guyane" | "mayotte";
 
 export type OrderStatus =
@@ -61,6 +67,8 @@ export interface Product {
   productType: ProductType;
   priceMode: PriceMode;
   price?: number;
+  /** €/m² for per_sqm products (drives the live price preview). */
+  pricePerSqm?: number;
   images: string[];
   videos?: string[];
   dimensions?: {
@@ -75,10 +83,16 @@ export interface Product {
     unit: string;
   };
   customizable: boolean;
+  minDimensions?: {
+    width: number;
+    height: number;
+  };
   maxDimensions?: {
     width: number;
     height: number;
   };
+  /** Allowed opening types + per-type surcharge (euros). */
+  openingTypes?: OpeningTypeOption[];
   deliveryEstimates: {
     metropole: string;
     outreMer: string;
@@ -95,6 +109,8 @@ export interface CartItem {
     width: number;
     height: number;
   };
+  /** Chosen opening type key (e.g. "coulissante"), when the product offers them. */
+  openingType?: string;
   calculatedPrice?: number;
 }
 
@@ -123,6 +139,7 @@ export interface OrderItem {
     width: number;
     height: number;
   };
+  openingType?: string;
 }
 
 export interface OrderTimelineEntry {
@@ -141,6 +158,7 @@ export interface QuoteRequest {
     height: number;
   };
   notes?: string;
+  openingType?: string;
   images?: string[];
   status: QuoteStatus;
   quotedPrice?: number;

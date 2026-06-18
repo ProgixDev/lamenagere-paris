@@ -13,9 +13,15 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../lib/constants";
 import Input from "../../components/ui/Input";
+import PhoneInput from "../../components/ui/PhoneInput";
 import Button from "../../components/ui/Button";
 import Toast from "../../components/ui/Toast";
 import { useAuthStore } from "../../features/auth/store";
+import {
+  combinePhone,
+  isValidLocalNumber,
+  DEFAULT_PHONE_COUNTRY,
+} from "../../lib/phone";
 import type { AccountType } from "../../lib/types";
 
 /**
@@ -35,6 +41,7 @@ export default function CompleteProfileScreen() {
   const [company, setCompany] = useState(user?.company ?? "");
   const [siret, setSiret] = useState(user?.siret ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
+  const [phoneCountry, setPhoneCountry] = useState<string>(DEFAULT_PHONE_COUNTRY);
   const [fieldError, setFieldError] = useState<Record<string, string>>({});
   const [toast, setToast] = useState({ visible: false, message: "", type: "error" as const });
 
@@ -60,12 +67,17 @@ export default function CompleteProfileScreen() {
   };
 
   const finish = async () => {
+    if (!isValidLocalNumber(phone)) {
+      setFieldError({ phone: "Téléphone requis" });
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await completeProfile({
         fullName: fullName.trim(),
         accountType,
-        phone: phone.trim() || undefined,
+        phone: combinePhone(phoneCountry, phone),
         company: isPro ? company.trim() : undefined,
         siret: isPro ? siret.replace(/\s/g, "") : undefined,
       });
@@ -136,7 +148,7 @@ export default function CompleteProfileScreen() {
             <Text className="text-sm" style={{ color: COLORS.outline }}>
               {step === 0
                 ? "Quelques informations pour personnaliser votre expérience."
-                : "Un numéro pour le suivi de vos commandes (optionnel)."}
+                : "Un numéro pour le suivi de vos commandes."}
             </Text>
           </View>
 
@@ -211,12 +223,16 @@ export default function CompleteProfileScreen() {
             </View>
           ) : (
             <View className="px-6 gap-6">
-              <Input
-                label="TÉLÉPHONE (OPTIONNEL)"
-                placeholder="+33 6 00 00 00 00"
+              <PhoneInput
+                label="TÉLÉPHONE"
+                countryCode={phoneCountry}
+                onCountryChange={setPhoneCountry}
                 value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
+                onChangeText={(t) => {
+                  setPhone(t);
+                  if (fieldError.phone) setFieldError({});
+                }}
+                error={fieldError.phone}
               />
             </View>
           )}

@@ -22,6 +22,8 @@ export class CreateQuoteDto {
 
   @IsOptional() @IsString() notes?: string;
 
+  @IsOptional() @IsString() openingType?: string;
+
   /** URLs already uploaded via /admin/media or a customer upload endpoint. */
   @IsOptional() @IsArray() images?: string[];
 }

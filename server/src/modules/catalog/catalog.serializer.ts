@@ -48,6 +48,8 @@ export interface ProductRow {
   base_price_cents: number | null;
   width_coef_cents: number | null;
   height_coef_cents: number | null;
+  price_per_sqm_cents: number | null;
+  opening_types: { type: string; surcharge_cents: number }[] | null;
   dim_width: number | null;
   dim_height: number | null;
   dim_depth: number | null;
@@ -89,12 +91,17 @@ export interface ProductDto {
   productType: ProductType;
   priceMode: PriceMode;
   price?: number;
+  /** €/m² for per_sqm products, so the client can show a live price. */
+  pricePerSqm?: number;
   images: string[];
   videos?: string[];
   dimensions?: { width: number; height: number; depth?: number; unit: string };
   referenceDimensions?: { width: number; height: number; unit: string };
   customizable: boolean;
+  minDimensions?: { width: number; height: number };
   maxDimensions?: { width: number; height: number };
+  /** Allowed opening types + per-type surcharge (in euros). */
+  openingTypes?: { type: string; surcharge: number }[];
   deliveryEstimates: { metropole: string; outreMer: string };
   media: { type: 'image' | 'video'; url: string }[];
   createdAt: string;
@@ -151,6 +158,10 @@ export function toProductDto(row: ProductRow): ProductDto {
     productType: row.product_type,
     priceMode: row.price_mode,
     price: row.base_price_cents != null ? centsToEuros(row.base_price_cents) : undefined,
+    pricePerSqm:
+      row.price_per_sqm_cents != null
+        ? centsToEuros(row.price_per_sqm_cents)
+        : undefined,
     images,
     videos: videos.length ? videos : undefined,
     dimensions:
@@ -171,9 +182,20 @@ export function toProductDto(row: ProductRow): ProductDto {
           }
         : undefined,
     customizable: row.customizable,
+    minDimensions:
+      row.min_width != null && row.min_height != null
+        ? { width: Number(row.min_width), height: Number(row.min_height) }
+        : undefined,
     maxDimensions:
       row.max_width != null && row.max_height != null
         ? { width: Number(row.max_width), height: Number(row.max_height) }
+        : undefined,
+    openingTypes:
+      row.opening_types && row.opening_types.length
+        ? row.opening_types.map((o) => ({
+            type: o.type,
+            surcharge: centsToEuros(o.surcharge_cents ?? 0),
+          }))
         : undefined,
     deliveryEstimates: {
       metropole: row.delivery_metropole,
@@ -249,7 +271,7 @@ export function toAdminCategoryDto(
 }
 
 export const PRODUCT_SELECT =
-  'id, sku, name, slug, description, short_description, category_id, product_type, price_mode, status, base_price_cents, width_coef_cents, height_coef_cents, dim_width, dim_height, dim_depth, dim_unit, ref_width, ref_height, ref_unit, min_width, min_height, max_width, max_height, customizable, delivery_metropole, delivery_outremer, stock_qty, low_stock_threshold, created_at, category:categories(*), media:product_media(*)';
+  'id, sku, name, slug, description, short_description, category_id, product_type, price_mode, status, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, opening_types, dim_width, dim_height, dim_depth, dim_unit, ref_width, ref_height, ref_unit, min_width, min_height, max_width, max_height, customizable, delivery_metropole, delivery_outremer, stock_qty, low_stock_threshold, created_at, category:categories(*), media:product_media(*)';
 
 export const CATEGORY_SELECT =
   'id, name, slug, icon, image_url, description, accent_color, parent_id, sort_order, is_visible, is_featured_home, b2b_only, delivery_override';

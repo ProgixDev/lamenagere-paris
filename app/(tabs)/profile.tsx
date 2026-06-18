@@ -121,7 +121,7 @@ export default function ProfileScreen() {
 
             {/* Quick edit */}
             <TouchableOpacity
-              onPress={() => router.push("/(main)/settings")}
+              onPress={() => router.push("/(main)/edit-profile")}
               style={{
                 marginTop: 14,
                 flexDirection: "row",

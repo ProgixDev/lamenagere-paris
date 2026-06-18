@@ -15,10 +15,12 @@ import CartItemComponent from "../../components/cart/CartItem";
 import CartSummary from "../../components/cart/CartSummary";
 import Button from "../../components/ui/Button";
 import LogoHeader from "../../components/layout/LogoHeader";
+import { useAuthStore } from "../../features/auth/store";
 
 export default function CartScreen() {
   const router = useRouter();
   const { items, itemCount, subtotal, removeItem, updateQuantity, clearCart } = useCart();
+  const isB2b = useAuthStore((s) => s.user?.accountType === "professionnel");
 
   const handleClear = () => {
     Alert.alert(
@@ -135,7 +137,7 @@ export default function CartScreen() {
         ))}
 
         <View style={{ marginTop: 8 }}>
-          <CartSummary subtotal={subtotal} total={subtotal} />
+          <CartSummary subtotal={subtotal} total={subtotal} isB2b={isB2b} />
         </View>
       </ScrollView>
 
