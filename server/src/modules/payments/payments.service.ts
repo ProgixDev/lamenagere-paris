@@ -80,6 +80,46 @@ export class PaymentsService implements OnModuleInit {
   }
 
   /**
+   * Server-side reconciliation right after the client's Payment Sheet reports
+   * success. We never trust the client: the PaymentIntent is re-fetched from
+   * Stripe and the order is only marked paid when Stripe itself says
+   * `succeeded`. Idempotent and safe to call alongside the webhook backstop.
+   */
+  async confirmPayment(
+    userId: string,
+    orderId: string,
+  ): Promise<{ status: 'paid' | 'pending' | 'failed' }> {
+    const { data: order } = await this.supabase.client
+      .from('orders')
+      .select('id, total_cents, payment_status, stripe_payment_intent_id')
+      .eq('id', orderId)
+      .eq('profile_id', userId)
+      .maybeSingle<OrderPaymentRow>();
+
+    if (!order) throw new NotFoundException('Commande introuvable');
+    if (order.payment_status === 'paid') return { status: 'paid' };
+    if (!order.stripe_payment_intent_id) {
+      throw new BadRequestException('Aucun paiement à confirmer');
+    }
+
+    const intent = await this.stripe.paymentIntents.retrieve(
+      order.stripe_payment_intent_id,
+    );
+
+    if (intent.status === 'succeeded') {
+      await this.supabase.client
+        .from('orders')
+        .update({ payment_status: 'paid' })
+        .eq('id', order.id);
+      return { status: 'paid' };
+    }
+
+    // Anything else (processing, requires_action, canceled…) leaves the order
+    // pending; the webhook will reconcile the final state.
+    return { status: 'pending' };
+  }
+
+  /**
    * Verifies the Stripe webhook signature and reconciles order payment status.
    */
   async handleWebhook(

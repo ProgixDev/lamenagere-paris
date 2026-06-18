@@ -11,9 +11,15 @@ import {
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import Animated, {
+  FadeInDown,
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Icon from "../../components/ui/Icon";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../lib/constants";
 import { getProductImage } from "../../lib/mock-data";
@@ -123,7 +129,7 @@ function FilterChips({
             style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
           >
             {chip.icon && (
-              <MaterialCommunityIcons
+              <Icon
                 name={chip.icon}
                 size={14}
                 color={isActive ? COLORS.onSurface : COLORS.outline}
@@ -159,12 +165,25 @@ function FilterChips({
 }
 
 // ─── Product card (Temu-style) ────────────────────────────
-function ProductCardTemu({ product, imgHeight }: { product: Product; imgHeight: number }) {
+function ProductCardTemu({
+  product,
+  imgHeight,
+  index,
+}: {
+  product: Product;
+  imgHeight: number;
+  index: number;
+}) {
   const router = useRouter();
   const isFav = useFavoritesStore((s) => s.favorites.includes(product.id));
   const toggleFav = useFavoritesStore((s) => s.toggleFavorite);
   const addItem = useCartStore((s) => s.addItem);
   const imgSource = getProductImage(product.images[0]);
+
+  const scale = useSharedValue(1);
+  const cardStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
 
   const handleFav = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -186,15 +205,26 @@ function ProductCardTemu({ product, imgHeight }: { product: Product; imgHeight: 
   };
 
   return (
+    <Animated.View
+      entering={FadeInDown.delay(Math.min(index, 12) * 45)
+        .springify()
+        .damping(18)}
+      style={[{ marginBottom: GUTTER }, cardStyle]}
+    >
     <TouchableOpacity
       activeOpacity={0.92}
       onPress={() => router.push(`/(main)/products/${product.id}`)}
+      onPressIn={() => {
+        scale.value = withTiming(0.97, { duration: 90 });
+      }}
+      onPressOut={() => {
+        scale.value = withTiming(1, { duration: 150 });
+      }}
       style={{
         width: COL_W,
         backgroundColor: "#fff",
         borderRadius: 12,
         overflow: "hidden",
-        marginBottom: GUTTER,
       }}
     >
       {/* Image */}
@@ -221,7 +251,7 @@ function ProductCardTemu({ product, imgHeight }: { product: Product; imgHeight: 
             justifyContent: "center",
           }}
         >
-          <MaterialCommunityIcons
+          <Icon
             name={isFav ? "heart" : "heart-outline"}
             size={14}
             color={isFav ? "#E74040" : COLORS.onSurface}
@@ -271,7 +301,7 @@ function ProductCardTemu({ product, imgHeight }: { product: Product; imgHeight: 
               backgroundColor: "#fff",
             }}
           >
-            <MaterialCommunityIcons
+            <Icon
               name={needsDimensions ? "ruler-square" : "cart-plus"}
               size={16}
               color={COLORS.onSurface}
@@ -280,6 +310,7 @@ function ProductCardTemu({ product, imgHeight }: { product: Product; imgHeight: 
         </View>
       </View>
     </TouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -287,22 +318,22 @@ function ProductCardTemu({ product, imgHeight }: { product: Product; imgHeight: 
 type FeedItem = { key: string; product: Product; imgHeight: number };
 
 function MasonryFeed({ items }: { items: FeedItem[] }) {
-  const left: FeedItem[] = [];
-  const right: FeedItem[] = [];
+  const left: { it: FeedItem; index: number }[] = [];
+  const right: { it: FeedItem; index: number }[] = [];
   items.forEach((it, i) => {
-    (i % 2 === 0 ? left : right).push(it);
+    (i % 2 === 0 ? left : right).push({ it, index: i });
   });
 
   return (
     <View style={{ flexDirection: "row", paddingHorizontal: 12, gap: GUTTER }}>
       <View style={{ flex: 1 }}>
-        {left.map((it) => (
-          <ProductCardTemu key={it.key} product={it.product} imgHeight={it.imgHeight} />
+        {left.map(({ it, index }) => (
+          <ProductCardTemu key={it.key} product={it.product} imgHeight={it.imgHeight} index={index} />
         ))}
       </View>
       <View style={{ flex: 1 }}>
-        {right.map((it) => (
-          <ProductCardTemu key={it.key} product={it.product} imgHeight={it.imgHeight + 30} />
+        {right.map(({ it, index }) => (
+          <ProductCardTemu key={it.key} product={it.product} imgHeight={it.imgHeight + 30} index={index} />
         ))}
       </View>
     </View>

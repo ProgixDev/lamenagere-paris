@@ -12,6 +12,7 @@ import { Public } from '../../common/auth/public.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { AuthUser } from '../../common/auth/auth-user';
 import { CreateIntentDto } from './dto/create-intent.dto';
+import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 import { PaymentsService } from './payments.service';
 
 @Controller('payments')
@@ -24,6 +25,14 @@ export class PaymentsController {
     @Body() dto: CreateIntentDto,
   ): Promise<{ clientSecret: string | null }> {
     return this.payments.createIntent(user.id, dto.orderId);
+  }
+
+  @Post('confirm')
+  confirm(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: ConfirmPaymentDto,
+  ): Promise<{ status: 'paid' | 'pending' | 'failed' }> {
+    return this.payments.confirmPayment(user.id, dto.orderId);
   }
 
   @Public()

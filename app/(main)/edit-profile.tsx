@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import Icon from "../../components/ui/Icon";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../lib/constants";
 import Input from "../../components/ui/Input";
@@ -20,7 +20,7 @@ import type { AccountType } from "../../lib/types";
 
 export default function EditProfileScreen() {
   const router = useRouter();
-  const { user, updateProfile, isLoading, error, clearError } = useAuthStore();
+  const { user, updateProfile, isLoading, clearError } = useAuthStore();
 
   const [fullName, setFullName] = useState(user?.fullName ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
@@ -65,12 +65,12 @@ export default function EditProfileScreen() {
       });
       setToast({ visible: true, message: "Profil mis à jour", type: "success" });
       setTimeout(() => router.back(), 600);
-    } catch {
-      setToast({
-        visible: true,
-        message: error || "Mise à jour impossible",
-        type: "error",
-      });
+    } catch (e) {
+      // Read the message off the thrown error — the `error` value captured from
+      // the store at render time is stale here and would mask the real cause.
+      const msg =
+        (e as { message?: string })?.message || "Mise à jour impossible";
+      setToast({ visible: true, message: msg, type: "error" });
     }
   };
 
@@ -92,7 +92,7 @@ export default function EditProfileScreen() {
           }}
         >
           <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
-            <MaterialCommunityIcons
+            <Icon
               name="chevron-left"
               size={26}
               color={COLORS.onSurface}

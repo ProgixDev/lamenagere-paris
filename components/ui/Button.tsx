@@ -6,6 +6,11 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../lib/constants";
@@ -44,6 +49,17 @@ export default function Button({
   icon,
 }: ButtonProps) {
   const isDisabled = disabled || loading;
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+  const onPressIn = () => {
+    if (isDisabled) return;
+    scale.value = withTiming(0.96, { duration: 90 });
+  };
+  const onPressOut = () => {
+    scale.value = withTiming(1, { duration: 150 });
+  };
 
   const handlePress = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -52,8 +68,11 @@ export default function Button({
 
   if (variant === "primary") {
     return (
+      <Animated.View style={[fullWidth ? { width: "100%" } : undefined, animatedStyle]}>
       <TouchableOpacity
         onPress={handlePress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
         disabled={isDisabled}
         activeOpacity={0.9}
         style={[
@@ -101,6 +120,7 @@ export default function Button({
           )}
         </LinearGradient>
       </TouchableOpacity>
+      </Animated.View>
     );
   }
 
@@ -108,8 +128,11 @@ export default function Button({
   const isDanger = variant === "danger";
 
   return (
+    <Animated.View style={[fullWidth ? { width: "100%" } : undefined, animatedStyle]}>
     <TouchableOpacity
       onPress={handlePress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       disabled={isDisabled}
       activeOpacity={0.8}
       style={[
@@ -150,5 +173,6 @@ export default function Button({
         </View>
       )}
     </TouchableOpacity>
+    </Animated.View>
   );
 }

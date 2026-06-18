@@ -10,7 +10,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import Animated, { FadeInDown } from "react-native-reanimated";
+import Icon from "../../components/ui/Icon";
+import PressableScale from "../../components/ui/PressableScale";
 import { COLORS } from "../../lib/constants";
 import {
   PRODUCT_IMAGES,
@@ -207,7 +209,7 @@ export default function CategoriesScreen() {
                 >
                   Découvrir
                 </Text>
-                <MaterialCommunityIcons name="arrow-right" size={14} color={COLORS.primary} />
+                <Icon name="arrow-right" size={14} color={COLORS.primary} />
               </View>
             </LinearGradient>
           </TouchableOpacity>
@@ -269,6 +271,7 @@ export default function CategoriesScreen() {
               category={cat}
               tall={idx % 3 === 0}
               count={productCount(cat)}
+              index={idx}
               onPress={() => router.push(`/(main)/categories/${cat.id}`)}
             />
           ))}
@@ -322,19 +325,21 @@ function CategoryBentoCard({
   category,
   tall,
   count,
+  index,
   onPress,
 }: {
   category: Category;
   tall: boolean;
   count: number;
+  index: number;
   onPress: () => void;
 }) {
   const cover = CATEGORY_COVERS[category.id];
   const tagline = CATEGORY_TAGLINES[category.id] ?? "";
   const height = tall ? COL_W * 1.4 : COL_W * 1.1;
   return (
-    <TouchableOpacity
-      activeOpacity={0.92}
+    <Animated.View entering={FadeInDown.delay(Math.min(index, 10) * 60).springify().damping(18)}>
+    <PressableScale
       onPress={onPress}
       style={{
         width: COL_W,
@@ -399,7 +404,7 @@ function CategoryBentoCard({
               justifyContent: "center",
             }}
           >
-            <MaterialCommunityIcons name="arrow-right" size={12} color="#fff" />
+            <Icon name="arrow-right" size={12} color="#fff" />
           </View>
         </View>
         <Text
@@ -413,14 +418,15 @@ function CategoryBentoCard({
           {count} article{count > 1 ? "s" : ""}
         </Text>
       </LinearGradient>
-    </TouchableOpacity>
+    </PressableScale>
+    </Animated.View>
   );
 }
 
 function EditorialCard({ product, onPress }: { product: Product; onPress: () => void }) {
   const img = getProductImage(product.images[0]);
   return (
-    <TouchableOpacity activeOpacity={0.92} onPress={onPress} style={{ width: 168 }}>
+    <PressableScale onPress={onPress} style={{ width: 168 }}>
       <View
         style={{
           width: 168,
@@ -453,6 +459,6 @@ function EditorialCard({ product, onPress }: { product: Product; onPress: () => 
       >
         {priceTagLabel(product)}
       </Text>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }

@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import Icon from "./Icon";
 import { COLORS } from "../../lib/constants";
 import Button from "./Button";
 
@@ -19,7 +19,7 @@ export default function EmptyState({
 }: EmptyStateProps) {
   return (
     <View className="flex-1 items-center justify-center py-16 px-6">
-      <MaterialCommunityIcons
+      <Icon
         name={icon as any}
         size={48}
         color={COLORS.surfaceDim}

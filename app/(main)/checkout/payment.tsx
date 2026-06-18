@@ -12,7 +12,10 @@ import Button from "../../../components/ui/Button";
 import CheckoutSteps from "../../../components/cart/CheckoutSteps";
 import { useCart } from "../../../features/cart/hooks";
 import { createOrderApi } from "../../../features/orders/api";
-import { createPaymentIntentApi } from "../../../features/payments/api";
+import {
+  createPaymentIntentApi,
+  confirmPaymentApi,
+} from "../../../features/payments/api";
 import { useCheckoutStore } from "../../../features/checkout/store";
 import { isStripeAvailable } from "../../../components/StripeGate";
 
@@ -85,7 +88,15 @@ export default function CheckoutPaymentScreen() {
         return;
       }
 
-      // 5. Payment succeeded.
+      // 5. Payment succeeded. Ask the server to re-verify the PaymentIntent and
+      // mark the order paid immediately. Best-effort: the charge already went
+      // through, and the webhook reconciles if this call fails, so a failure
+      // here must not block the success screen.
+      try {
+        await confirmPaymentApi(order.id);
+      } catch {
+        // ignore — webhook backstop will reconcile the order status
+      }
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       clearCart();
       queryClient.invalidateQueries({ queryKey: ["orders"] });

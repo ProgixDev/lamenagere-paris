@@ -2,14 +2,23 @@ import { Stack } from "expo-router";
 
 export default function MainLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        // Smooth horizontal push for detail screens, with edge-swipe back.
+        animation: "slide_from_right",
+        animationDuration: 280,
+        gestureEnabled: true,
+      }}
+    >
       <Stack.Screen name="categories/[id]" />
       <Stack.Screen name="products/[id]" />
-      <Stack.Screen name="search/index" />
-      <Stack.Screen name="checkout/index" />
+      {/* Search and checkout feel more like overlays → present from the bottom. */}
+      <Stack.Screen name="search/index" options={{ animation: "slide_from_bottom" }} />
+      <Stack.Screen name="checkout/index" options={{ animation: "slide_from_bottom" }} />
       <Stack.Screen name="checkout/shipping" />
       <Stack.Screen name="checkout/payment" />
-      <Stack.Screen name="checkout/confirmation" />
+      <Stack.Screen name="checkout/confirmation" options={{ animation: "fade", gestureEnabled: false }} />
       <Stack.Screen name="orders/index" />
       <Stack.Screen name="orders/[id]" />
       <Stack.Screen name="messages/[id]" />

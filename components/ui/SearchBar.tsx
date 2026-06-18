@@ -1,6 +1,6 @@
 import React from "react";
 import { View, TextInput, TouchableOpacity } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import Icon from "./Icon";
 import { COLORS } from "../../lib/constants";
 
 interface SearchBarProps {
@@ -19,7 +19,7 @@ export default function SearchBar({
       className="flex-row items-center rounded-lg py-2 px-4"
       style={{ backgroundColor: COLORS.surfaceContainerLow }}
     >
-      <MaterialCommunityIcons
+      <Icon
         name="magnify"
         size={20}
         color={COLORS.outline}
@@ -37,7 +37,7 @@ export default function SearchBar({
       />
       {value.length > 0 && (
         <TouchableOpacity onPress={() => onChangeText("")}>
-          <MaterialCommunityIcons
+          <Icon
             name="close"
             size={18}
             color={COLORS.outline}

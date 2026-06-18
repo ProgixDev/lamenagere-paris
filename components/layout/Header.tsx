@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { BlurView } from "expo-blur";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import Icon from "../ui/Icon";
 import { useRouter } from "expo-router";
 import { COLORS } from "../../lib/constants";
 
@@ -34,7 +34,7 @@ export default function Header({
     >
       {showBack && (
         <TouchableOpacity onPress={() => router.back()} className="mr-3">
-          <MaterialCommunityIcons
+          <Icon
             name="arrow-left"
             size={24}
             color={COLORS.primary}
@@ -44,7 +44,7 @@ export default function Header({
 
       {showMenu && (
         <TouchableOpacity className="mr-3">
-          <MaterialCommunityIcons
+          <Icon
             name="menu"
             size={24}
             color={COLORS.primary}
@@ -67,7 +67,7 @@ export default function Header({
       <View className="flex-row items-center gap-4 ml-auto">
         {showSearch && (
           <TouchableOpacity>
-            <MaterialCommunityIcons
+            <Icon
               name="magnify"
               size={24}
               color={COLORS.primary}

@@ -13,13 +13,19 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import Icon from "../../../components/ui/Icon";
+import Animated, {
+  FadeInUp,
+  FadeOut,
+  FadeInDown,
+} from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { COLORS, PRODUCT_TYPES, PRICE_MODES, TERRITORIES } from "../../../lib/constants";
 import { formatPrice } from "../../../lib/utils";
 import { computeConfiguredPrice, priceTagLabel } from "../../../lib/pricing";
 import { openingTypeLabel, diagramForTypes } from "../../../lib/opening-types";
 import Button from "../../../components/ui/Button";
+import PressableScale from "../../../components/ui/PressableScale";
 import Input from "../../../components/ui/Input";
 import Toast from "../../../components/ui/Toast";
 import { getProductImage } from "../../../lib/mock-data";
@@ -50,6 +56,7 @@ export default function ProductDetailScreen() {
   const [openingType, setOpeningType] = useState<string | null>(null);
   const [territory, setTerritory] = useState<Territory>("metropole");
   const [activeTab, setActiveTab] = useState<"overview" | "specs">("overview");
+  const [justAdded, setJustAdded] = useState(false);
   const [toast, setToast] = useState({
     visible: false,
     message: "",
@@ -96,6 +103,16 @@ export default function ProductDetailScreen() {
   // Live, display-only price (server re-validates at checkout).
   const livePrice = computeConfiguredPrice(product, dims, openingType ?? undefined);
 
+  // The cart button stays disabled until every required choice is made, so the
+  // user can never tap it into an error state.
+  const canAddToCart =
+    (!needsDimensions || !!dims) && (!hasOpeningTypes || !!openingType);
+  const missingHint = needsDimensions && !dims
+    ? "Renseignez vos dimensions pour continuer"
+    : hasOpeningTypes && !openingType
+      ? "Choisissez un type d'ouverture"
+      : null;
+
   const handleAddToCart = async () => {
     if (needsDimensions && !dims) {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -109,6 +126,8 @@ export default function ProductDetailScreen() {
     }
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     addItem(product, quantity, dims, openingType ?? undefined);
+    setJustAdded(true);
+    setTimeout(() => setJustAdded(false), 1500);
     setToast({ visible: true, message: "Ajouté au panier", type: "success" });
   };
 
@@ -151,7 +170,7 @@ export default function ProductDetailScreen() {
                   {src ? (
                     <Image source={src} style={{ width: W, height: GALLERY_H }} resizeMode="cover" />
                   ) : (
-                    <MaterialCommunityIcons name="image-off-outline" size={48} color={COLORS.outline} />
+                    <Icon name="image-off-outline" size={48} color={COLORS.outline} />
                   )}
                 </View>
               );
@@ -505,7 +524,7 @@ export default function ProductDetailScreen() {
                     justifyContent: "center",
                   }}
                 >
-                  <MaterialCommunityIcons
+                  <Icon
                     name={territory === "metropole" ? "truck-outline" : "ferry"}
                     size={20}
                     color={COLORS.primary}
@@ -551,10 +570,9 @@ export default function ProductDetailScreen() {
                 .map((p) => {
                   const img = getProductImage(p.images[0]);
                   return (
-                    <TouchableOpacity
+                    <PressableScale
                       key={p.id}
                       onPress={() => router.push(`/(main)/products/${p.id}`)}
-                      activeOpacity={0.92}
                       style={{ width: 130 }}
                     >
                       <View
@@ -575,7 +593,7 @@ export default function ProductDetailScreen() {
                       <Text style={{ fontSize: 13, fontFamily: "Manrope_700Bold", color: COLORS.secondary }}>
                         {priceTagLabel(p)}
                       </Text>
-                    </TouchableOpacity>
+                    </PressableScale>
                   );
                 })}
             </ScrollView>
@@ -594,27 +612,73 @@ export default function ProductDetailScreen() {
           paddingHorizontal: 12,
           paddingTop: 8,
           paddingBottom: 28,
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 8,
           borderTopWidth: 1,
           borderTopColor: `${COLORS.outlineVariant}80`,
         }}
       >
-        <FooterIconButton
-          icon={isFavorited ? "heart" : "heart-outline"}
-          color={isFavorited ? "#E74040" : COLORS.onSurface}
-          label="Favoris"
-          onPress={handleFavorite}
-        />
-        <FooterIconButton
-          icon="message-outline"
-          color={COLORS.onSurface}
-          label="Contact"
-          onPress={() => router.push("/(tabs)/messages")}
-        />
-        <View style={{ flex: 1 }}>
-          <Button label="Ajouter au panier" onPress={handleAddToCart} size="md" />
+        {/* Floating "+1 panier" confirmation that rises on a successful add. */}
+        {justAdded && (
+          <Animated.View
+            entering={FadeInUp.springify().damping(16)}
+            exiting={FadeOut.duration(200)}
+            style={{
+              position: "absolute",
+              top: -34,
+              alignSelf: "center",
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
+              paddingHorizontal: 14,
+              paddingVertical: 7,
+              borderRadius: 9999,
+              backgroundColor: COLORS.success,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 3 },
+              shadowOpacity: 0.18,
+              shadowRadius: 6,
+              elevation: 5,
+            }}
+          >
+            <Icon name="cart-check" size={15} color="#fff" />
+            <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: "#fff" }}>
+              +1 dans le panier
+            </Text>
+          </Animated.View>
+        )}
+
+        {/* Inline hint explaining why the button is disabled. */}
+        {missingHint && (
+          <Animated.View entering={FadeInDown.duration(220)} style={{ marginBottom: 8, paddingHorizontal: 4 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Icon name="information-outline" size={14} color={COLORS.outline} />
+              <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.outline }}>
+                {missingHint}
+              </Text>
+            </View>
+          </Animated.View>
+        )}
+
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <FooterIconButton
+            icon={isFavorited ? "heart" : "heart-outline"}
+            color={isFavorited ? "#E74040" : COLORS.onSurface}
+            label="Favoris"
+            onPress={handleFavorite}
+          />
+          <FooterIconButton
+            icon="message-outline"
+            color={COLORS.onSurface}
+            label="Contact"
+            onPress={() => router.push("/(tabs)/messages")}
+          />
+          <View style={{ flex: 1 }}>
+            <Button
+              label={justAdded ? "Ajouté ✓" : "Ajouter au panier"}
+              onPress={handleAddToCart}
+              size="md"
+              disabled={!canAddToCart}
+            />
+          </View>
         </View>
       </View>
 
@@ -643,7 +707,7 @@ function CircleButton({ icon, onPress }: { icon: any; onPress: () => void }) {
         justifyContent: "center",
       }}
     >
-      <MaterialCommunityIcons name={icon} size={20} color={COLORS.onSurface} />
+      <Icon name={icon} size={20} color={COLORS.onSurface} />
     </TouchableOpacity>
   );
 }
@@ -651,7 +715,7 @@ function CircleButton({ icon, onPress }: { icon: any; onPress: () => void }) {
 function TrustItem({ icon, label }: { icon: any; label: string }) {
   return (
     <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6 }}>
-      <MaterialCommunityIcons name={icon} size={16} color={COLORS.success} />
+      <Icon name={icon} size={16} color={COLORS.success} />
       <Text style={{ flex: 1, fontSize: 11, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }} numberOfLines={1}>
         {label}
       </Text>
@@ -734,7 +798,7 @@ function FooterIconButton({
       activeOpacity={0.85}
       style={{ width: 56, alignItems: "center", justifyContent: "center", paddingVertical: 6 }}
     >
-      <MaterialCommunityIcons name={icon} size={22} color={color} />
+      <Icon name={icon} size={22} color={color} />
       <Text style={{ fontSize: 9, fontFamily: "Inter_500Medium", color: COLORS.outline, marginTop: 2 }}>
         {label}
       </Text>

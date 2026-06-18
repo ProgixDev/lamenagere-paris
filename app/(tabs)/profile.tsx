@@ -8,7 +8,7 @@ import {
   Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import Icon from "../../components/ui/Icon";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { COLORS } from "../../lib/constants";
@@ -129,7 +129,7 @@ export default function ProfileScreen() {
                 gap: 4,
               }}
             >
-              <MaterialCommunityIcons name="pencil-outline" size={14} color={COLORS.secondary} />
+              <Icon name="pencil-outline" size={14} color={COLORS.secondary} />
               <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.secondary }}>
                 Modifier le profil
               </Text>
@@ -186,7 +186,7 @@ export default function ProfileScreen() {
                       justifyContent: "center",
                     }}
                   >
-                    <MaterialCommunityIcons
+                    <Icon
                       name={item.icon as any}
                       size={20}
                       color={COLORS.primary}
@@ -202,7 +202,7 @@ export default function ProfileScreen() {
                   >
                     {item.label}
                   </Text>
-                  <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.surfaceDim} />
+                  <Icon name="chevron-right" size={18} color={COLORS.surfaceDim} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -224,7 +224,7 @@ export default function ProfileScreen() {
               borderRadius: 14,
             }}
           >
-            <MaterialCommunityIcons name="logout" size={20} color="#dc3545" />
+            <Icon name="logout" size={20} color="#dc3545" />
             <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: "#dc3545" }}>
               Se déconnecter
             </Text>

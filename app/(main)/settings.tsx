@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import Icon from "../../components/ui/Icon";
 import * as SecureStore from "expo-secure-store";
 import { COLORS } from "../../lib/constants";
 import { PUSH_TOKEN_KEY } from "../../lib/storage";
@@ -76,7 +76,7 @@ export default function SettingsScreen() {
       {/* Header */}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 }}>
         <TouchableOpacity onPress={() => router.back()}>
-          <MaterialCommunityIcons name="chevron-left" size={26} color={COLORS.onSurface} />
+          <Icon name="chevron-left" size={26} color={COLORS.onSurface} />
         </TouchableOpacity>
         <Text style={{ fontSize: 18, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}>
           Paramètres
@@ -120,7 +120,7 @@ export default function SettingsScreen() {
               borderRadius: 14,
             }}
           >
-            <MaterialCommunityIcons name="account-remove-outline" size={20} color="#dc3545" />
+            <Icon name="account-remove-outline" size={20} color="#dc3545" />
             <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: "#dc3545" }}>
               Supprimer mon compte
             </Text>
@@ -162,7 +162,7 @@ function SettingsRow({ icon, label, value, onPress, rightComponent, last = false
         borderBottomColor: "#f5f5f5",
       }}
     >
-      <MaterialCommunityIcons name={icon as any} size={20} color={COLORS.primary} />
+      <Icon name={icon as any} size={20} color={COLORS.primary} />
       <Text style={{ flex: 1, fontSize: 14, fontFamily: "Inter_500Medium", color: COLORS.onSurface }}>
         {label}
       </Text>
@@ -171,7 +171,7 @@ function SettingsRow({ icon, label, value, onPress, rightComponent, last = false
           {value}
         </Text>
       )}
-      {rightComponent || (onPress && <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.surfaceDim} />)}
+      {rightComponent || (onPress && <Icon name="chevron-right" size={18} color={COLORS.surfaceDim} />)}
     </TouchableOpacity>
   );
 }
