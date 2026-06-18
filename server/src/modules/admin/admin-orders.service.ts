@@ -85,9 +85,7 @@ export class AdminOrdersService {
       client: row.profile
         ? {
             id: row.profile_id,
-            name: [row.profile.first_name, row.profile.last_name]
-              .filter(Boolean)
-              .join(' '),
+            name: row.profile.full_name ?? '',
             accountType: row.profile.account_type,
           }
         : null,

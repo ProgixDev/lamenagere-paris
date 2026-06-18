@@ -9,11 +9,7 @@ export class CreateAdminUserDto {
 
   @IsString()
   @IsNotEmpty()
-  firstName: string;
-
-  @IsString()
-  @IsNotEmpty()
-  lastName: string;
+  fullName: string;
 
   @IsString()
   @MinLength(8)
@@ -31,8 +27,7 @@ export class UpdateAdminRoleDto {
 export interface AdminUserDto {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  fullName: string;
   role: UserRole;
   lastActivityAt: string | null;
   createdAt: string;

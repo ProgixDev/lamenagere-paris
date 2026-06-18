@@ -37,6 +37,15 @@ export const getInitials = (firstName: string, lastName: string): string => {
   return (firstName.charAt(0) + lastName.charAt(0)).toUpperCase();
 };
 
+/** Initials from a single full-name string ("Marie Curie" → "MC"). */
+export const getNameInitials = (fullName: string): string => {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  const first = parts[0].charAt(0);
+  const last = parts.length > 1 ? parts[parts.length - 1].charAt(0) : "";
+  return (first + last).toUpperCase();
+};
+
 export const formatDimensions = (
   width: number,
   height: number,

@@ -4,12 +4,12 @@ import { AccountType, ShippingZone } from '../../common/serialization/status-lab
 export interface ProfileRow {
   id: string;
   email: string;
-  first_name: string;
-  last_name: string;
+  full_name: string;
   phone: string | null;
   account_type: AccountType;
   company: string | null;
   siret: string | null;
+  onboarded: boolean;
   created_at: string;
 }
 
@@ -42,12 +42,12 @@ export interface AddressDto {
 export interface UserDto {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  fullName: string;
   phone?: string;
   accountType: AccountType;
   company?: string;
   siret?: string;
+  onboarded: boolean;
   addresses: AddressDto[];
   createdAt: string;
 }
@@ -73,12 +73,12 @@ export function toUserDto(
   return {
     id: profile.id,
     email: profile.email,
-    firstName: profile.first_name,
-    lastName: profile.last_name,
+    fullName: profile.full_name,
     phone: profile.phone ?? undefined,
     accountType: profile.account_type,
     company: profile.company ?? undefined,
     siret: profile.siret ?? undefined,
+    onboarded: profile.onboarded,
     addresses: addresses.map(toAddressDto),
     createdAt: profile.created_at,
   };

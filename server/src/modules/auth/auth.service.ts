@@ -70,12 +70,13 @@ export class AuthService {
       password: dto.password,
       email_confirm: true,
       user_metadata: {
-        first_name: dto.firstName,
-        last_name: dto.lastName,
+        full_name: dto.fullName,
         phone: dto.phone,
         account_type: dto.accountType,
         company: dto.company,
         siret: dto.siret,
+        // Registering through the app means the profile is already complete.
+        onboarded: true,
       },
     });
     if (error || !data.user) {
@@ -121,11 +122,12 @@ export class AuthService {
     dto: UpdateProfileDto,
   ): Promise<UserDto> {
     const patch: Record<string, unknown> = {};
-    if (dto.firstName !== undefined) patch.first_name = dto.firstName;
-    if (dto.lastName !== undefined) patch.last_name = dto.lastName;
+    if (dto.fullName !== undefined) patch.full_name = dto.fullName;
+    if (dto.accountType !== undefined) patch.account_type = dto.accountType;
     if (dto.phone !== undefined) patch.phone = dto.phone;
     if (dto.company !== undefined) patch.company = dto.company;
     if (dto.siret !== undefined) patch.siret = dto.siret;
+    if (dto.onboarded !== undefined) patch.onboarded = dto.onboarded;
 
     if (Object.keys(patch).length > 0) {
       const { error } = await this.supabase.client
@@ -144,7 +146,7 @@ export class AuthService {
     const { data: profile, error } = await this.supabase.client
       .from('profiles')
       .select(
-        'id, email, first_name, last_name, phone, account_type, company, siret, created_at',
+        'id, email, full_name, phone, account_type, company, siret, onboarded, created_at',
       )
       .eq('id', userId)
       .single<ProfileRow>();

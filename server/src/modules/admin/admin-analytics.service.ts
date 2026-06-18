@@ -14,7 +14,7 @@ interface AnalyticsOrderRow {
   status: OrderStatus;
   created_at: string;
   profile_id: string;
-  profile: { first_name: string; last_name: string } | null;
+  profile: { full_name: string } | null;
   items: {
     quantity: number;
     unit_price_cents: number;
@@ -26,7 +26,7 @@ interface AnalyticsOrderRow {
 }
 
 const ANALYTICS_SELECT =
-  'total_cents, territory, status, created_at, profile_id, profile:profiles(first_name,last_name), items:order_items(quantity, unit_price_cents, product_id, product_name, product_image, product:products(category:categories(name)))';
+  'total_cents, territory, status, created_at, profile_id, profile:profiles(full_name), items:order_items(quantity, unit_price_cents, product_id, product_name, product_image, product:products(category:categories(name)))';
 
 interface Totals {
   revenueCents: number;
@@ -146,8 +146,7 @@ export class AdminAnalyticsService {
       terr.orders += 1;
       byTerritory.set(o.territory, terr);
 
-      const name =
-        [o.profile?.first_name, o.profile?.last_name].filter(Boolean).join(' ') || 'Client';
+      const name = o.profile?.full_name || 'Client';
       const cust = byCustomer.get(o.profile_id) ?? { name, spentCents: 0, orders: 0 };
       cust.spentCents += o.total_cents;
       cust.orders += 1;

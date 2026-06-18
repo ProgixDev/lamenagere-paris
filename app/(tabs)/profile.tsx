@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { COLORS } from "../../lib/constants";
 import { useAuthStore } from "../../features/auth/store";
-import { getInitials } from "../../lib/utils";
+import { getNameInitials } from "../../lib/utils";
 import LogoHeader from "../../components/layout/LogoHeader";
 
 const MENU_SECTIONS = [
@@ -46,9 +46,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
 
-  const initials = user
-    ? getInitials(user.firstName, user.lastName)
-    : "?";
+  const initials = user ? getNameInitials(user.fullName) : "?";
 
   const handleLogout = () => {
     Alert.alert(
@@ -100,7 +98,7 @@ export default function ProfileScreen() {
             </LinearGradient>
 
             <Text style={{ fontSize: 18, fontFamily: "Manrope_700Bold", color: COLORS.onSurface, marginBottom: 2 }}>
-              {user ? `${user.firstName} ${user.lastName}` : "Utilisateur"}
+              {user?.fullName?.trim() ? user.fullName : "Utilisateur"}
             </Text>
             <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.outline, marginBottom: 8 }}>
               {user?.email || ""}

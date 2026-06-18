@@ -1,5 +1,5 @@
 import { centsToEuros, formatEURFromCents } from '../../common/serialization/money.util';
-import { initials } from '../../common/serialization/initials.util';
+import { initialsFromName } from '../../common/serialization/initials.util';
 import {
   QuoteStatus,
   quoteStatusLabel,
@@ -21,8 +21,7 @@ export interface QuoteItemRow {
 }
 
 export interface QuoteProfileRow {
-  first_name: string;
-  last_name: string;
+  full_name: string;
   account_type: 'particulier' | 'professionnel';
   company: string | null;
   siret: string | null;
@@ -120,10 +119,7 @@ export interface AdminQuoteDto {
 }
 
 export function toAdminQuoteDto(row: QuoteRow): AdminQuoteDto {
-  const clientName = [row.profile?.first_name, row.profile?.last_name]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
+  const clientName = (row.profile?.full_name ?? '').trim();
   const dims =
     row.req_width != null && row.req_height != null
       ? `${row.req_width} × ${row.req_height} cm`
@@ -132,7 +128,7 @@ export function toAdminQuoteDto(row: QuoteRow): AdminQuoteDto {
     id: row.quote_number ?? row.id,
     product: row.product_name ?? '',
     productImage: row.product_image ?? '',
-    client: clientName || initials(row.profile?.first_name, row.profile?.last_name),
+    client: clientName || initialsFromName(row.profile?.full_name),
     b2b: row.is_b2b || undefined,
     dimensions: dims,
     status: row.status,
@@ -147,4 +143,4 @@ export function toAdminQuoteDto(row: QuoteRow): AdminQuoteDto {
 }
 
 export const QUOTE_SELECT =
-  '*, attachments:quote_attachments(*), items:quote_items(*), profile:profiles(first_name,last_name,account_type,company,siret)';
+  '*, attachments:quote_attachments(*), items:quote_items(*), profile:profiles(full_name,account_type,company,siret)';

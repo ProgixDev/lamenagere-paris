@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsOptional,
@@ -20,11 +21,7 @@ export class LoginDto {
 export class RegisterDto {
   @IsString()
   @MinLength(1)
-  firstName!: string;
-
-  @IsString()
-  @MinLength(1)
-  lastName!: string;
+  fullName!: string;
 
   @IsEmail()
   email!: string;
@@ -57,11 +54,11 @@ export class ForgotPasswordDto {
 export class UpdateProfileDto {
   @IsOptional()
   @IsString()
-  firstName?: string;
+  fullName?: string;
 
   @IsOptional()
-  @IsString()
-  lastName?: string;
+  @IsEnum(['particulier', 'professionnel'])
+  accountType?: AccountType;
 
   @IsOptional()
   @IsString()
@@ -74,4 +71,8 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   siret?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  onboarded?: boolean;
 }

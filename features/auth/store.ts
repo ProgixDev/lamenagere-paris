@@ -1,8 +1,19 @@
 import { create } from "zustand";
 import * as SecureStore from "expo-secure-store";
 import type { User } from "../../lib/types";
-import type { AuthActions, AuthState, RegisterPayload } from "./types";
-import { getProfileApi, loginApi, logoutApi, registerApi } from "./api";
+import type {
+  AuthActions,
+  AuthState,
+  CompleteProfilePayload,
+  RegisterPayload,
+} from "./types";
+import {
+  getProfileApi,
+  loginApi,
+  logoutApi,
+  registerApi,
+  updateProfileApi,
+} from "./api";
 import { signInWithGoogle } from "./oauth";
 import { unregisterDeviceApi } from "../notifications/api";
 import { AUTH_TOKEN_KEY, PUSH_TOKEN_KEY, USER_KEY } from "../../lib/storage";
@@ -61,6 +72,25 @@ export const useAuthStore = create<AuthStore>((set) => ({
       set({ user, token, isAuthenticated: true, isLoading: false });
     } catch (e) {
       set({ isLoading: false, error: errorMessage(e), isAuthenticated: false });
+      throw e;
+    }
+  },
+
+  completeProfile: async (data: CompleteProfilePayload) => {
+    set({ isLoading: true, error: null });
+    try {
+      const user = await updateProfileApi({
+        fullName: data.fullName,
+        accountType: data.accountType,
+        phone: data.phone,
+        company: data.company,
+        siret: data.siret,
+        onboarded: true,
+      });
+      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
+      set({ user, isAuthenticated: true, isLoading: false });
+    } catch (e) {
+      set({ isLoading: false, error: errorMessage(e) });
       throw e;
     }
   },

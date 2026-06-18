@@ -23,11 +23,11 @@ interface ConvoWithProfile {
   unread_admin: number;
   unread_customer: number;
   created_at: string;
-  profile?: { first_name: string; last_name: string } | null;
+  profile?: { full_name: string } | null;
 }
 
 const ADMIN_CONVO_SELECT =
-  '*, profile:profiles(first_name,last_name)';
+  '*, profile:profiles(full_name)';
 
 @Injectable()
 export class AdminConversationsService {
@@ -42,7 +42,7 @@ export class AdminConversationsService {
     return (data ?? []).map((c) =>
       toAdminConversationDto(
         c as never,
-        [c.profile?.first_name, c.profile?.last_name].filter(Boolean).join(' '),
+        c.profile?.full_name ?? '',
       ),
     );
   }

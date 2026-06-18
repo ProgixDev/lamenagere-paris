@@ -1,5 +1,5 @@
 import { centsToEuros, formatEURFromCents } from '../../common/serialization/money.util';
-import { initials } from '../../common/serialization/initials.util';
+import { initialsFromName } from '../../common/serialization/initials.util';
 import {
   OrderStatus,
   ORDER_STATUS_FLOW,
@@ -30,8 +30,7 @@ export interface OrderTimelineRow {
 }
 
 export interface OrderProfileRow {
-  first_name: string;
-  last_name: string;
+  full_name: string;
   account_type: 'particulier' | 'professionnel';
 }
 
@@ -214,19 +213,13 @@ export function toTracking(row: OrderRow): TrackingInfo {
 
 export function toAdminOrderDto(row: OrderRow): AdminOrderDto {
   const itemCount = (row.items ?? []).reduce((n, it) => n + it.quantity, 0);
-  const clientName = [row.profile?.first_name, row.profile?.last_name]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
+  const clientName = (row.profile?.full_name ?? '').trim();
   const firstImage = (row.items ?? []).find((it) => it.product_image)
     ?.product_image;
   return {
     id: row.order_number,
     client: clientName,
-    clientInitials: initials(
-      row.profile?.first_name,
-      row.profile?.last_name,
-    ),
+    clientInitials: initialsFromName(row.profile?.full_name),
     b2b: row.is_b2b || undefined,
     items: `${itemCount} article${itemCount > 1 ? 's' : ''}`,
     total: formatEURFromCents(row.total_cents),
@@ -239,4 +232,4 @@ export function toAdminOrderDto(row: OrderRow): AdminOrderDto {
 }
 
 export const ORDER_SELECT =
-  '*, items:order_items(*), timeline:order_timeline(*), profile:profiles(first_name,last_name,account_type)';
+  '*, items:order_items(*), timeline:order_timeline(*), profile:profiles(full_name,account_type)';

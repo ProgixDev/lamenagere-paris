@@ -19,12 +19,13 @@ export type QuoteStatus =
 export interface User {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  fullName: string;
   phone?: string;
   accountType: AccountType;
   company?: string;
   siret?: string;
+  /** False until the user completes the onboarding flow (mainly OAuth sign-ups). */
+  onboarded: boolean;
   addresses: Address[];
   createdAt: string;
 }

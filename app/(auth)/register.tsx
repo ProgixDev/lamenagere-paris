@@ -14,18 +14,17 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { COLORS, ACCOUNT_TYPES } from "../../lib/constants";
+import { COLORS } from "../../lib/constants";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import Toast from "../../components/ui/Toast";
 import { useAuthStore } from "../../features/auth/store";
 import type { AccountType } from "../../lib/types";
 
-const baseSchema = z
+const registerSchema = z
   .object({
     accountType: z.enum(["particulier", "professionnel"]),
-    firstName: z.string().min(1, "Prénom requis"),
-    lastName: z.string().min(1, "Nom requis"),
+    fullName: z.string().min(1, "Nom complet requis"),
     email: z.string().min(1, "Email requis").email("Email invalide"),
     phone: z.string().optional(),
     password: z
@@ -53,30 +52,45 @@ const baseSchema = z
   )
   .refine(
     (data) =>
-      data.accountType !== "professionnel" || /^\d{14}$/.test((data.siret ?? "").replace(/\s/g, "")),
+      data.accountType !== "professionnel" ||
+      /^\d{14}$/.test((data.siret ?? "").replace(/\s/g, "")),
     { message: "SIRET invalide (14 chiffres)", path: ["siret"] },
   );
 
-const registerSchema = baseSchema;
 type RegisterForm = z.infer<typeof registerSchema>;
+
+// Fields validated before advancing past each step.
+const STEP_FIELDS: (keyof RegisterForm)[][] = [
+  ["accountType", "fullName", "company", "siret"],
+  ["email", "phone"],
+  ["password", "confirmPassword", "acceptTerms"],
+];
+
+const STEP_META = [
+  { eyebrow: "ÉTAPE 1 / 3", title: "Votre identité", subtitle: "Dites-nous qui vous êtes." },
+  { eyebrow: "ÉTAPE 2 / 3", title: "Vos coordonnées", subtitle: "Pour vous joindre et sécuriser votre compte." },
+  { eyebrow: "ÉTAPE 3 / 3", title: "Votre mot de passe", subtitle: "Choisissez un mot de passe robuste." },
+];
 
 export default function RegisterScreen() {
   const router = useRouter();
   const { register: registerUser, isLoading, error, clearError } = useAuthStore();
+  const [step, setStep] = useState(0);
   const [toast, setToast] = useState({ visible: false, message: "", type: "error" as const });
 
   const {
     control,
     handleSubmit,
     setValue,
+    trigger,
     watch,
     formState: { errors },
   } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
+    mode: "onChange",
     defaultValues: {
       accountType: "particulier",
-      firstName: "",
-      lastName: "",
+      fullName: "",
       email: "",
       phone: "",
       password: "",
@@ -88,18 +102,42 @@ export default function RegisterScreen() {
   });
 
   const accountType = watch("accountType");
-  const setAccountType = (type: AccountType) => setValue("accountType", type, { shouldValidate: false });
+  const setAccountType = (type: AccountType) =>
+    setValue("accountType", type, { shouldValidate: false });
+
+  const isLastStep = step === STEP_META.length - 1;
+
+  const goNext = async () => {
+    const valid = await trigger(STEP_FIELDS[step]);
+    if (!valid) {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (isLastStep) {
+      handleSubmit(onSubmit)();
+    } else {
+      setStep((s) => s + 1);
+    }
+  };
+
+  const goBack = () => {
+    if (step === 0) {
+      router.back();
+      return;
+    }
+    setStep((s) => s - 1);
+  };
 
   const onSubmit = async (data: RegisterForm) => {
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await registerUser({
-        firstName: data.firstName,
-        lastName: data.lastName,
+        fullName: data.fullName,
         email: data.email,
         phone: data.phone,
         password: data.password,
-        accountType,
+        accountType: data.accountType,
         company: data.company,
         siret: data.siret,
       });
@@ -112,6 +150,8 @@ export default function RegisterScreen() {
     }
   };
 
+  const meta = STEP_META[step];
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
       <KeyboardAvoidingView
@@ -120,8 +160,12 @@ export default function RegisterScreen() {
       >
         {/* Header */}
         <View className="flex-row items-center justify-between px-6 py-4">
-          <TouchableOpacity onPress={() => router.back()}>
-            <MaterialCommunityIcons name="close" size={24} color={COLORS.primary} />
+          <TouchableOpacity onPress={goBack} hitSlop={8}>
+            <MaterialCommunityIcons
+              name={step === 0 ? "close" : "arrow-left"}
+              size={24}
+              color={COLORS.primary}
+            />
           </TouchableOpacity>
           <Text
             className="text-xs uppercase tracking-widest"
@@ -129,186 +173,248 @@ export default function RegisterScreen() {
           >
             CRÉER UN COMPTE
           </Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        {/* Progress bar */}
+        <View className="flex-row gap-2 px-6 mb-6">
+          {STEP_META.map((_, i) => (
+            <View
+              key={i}
+              style={{
+                flex: 1,
+                height: 4,
+                borderRadius: 2,
+                backgroundColor: i <= step ? COLORS.primary : COLORS.outlineVariant,
+              }}
+            />
+          ))}
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingBottom: 40 }}
+          contentContainerStyle={{ paddingBottom: 24 }}
           keyboardShouldPersistTaps="handled"
         >
           {/* Heading */}
-          <View className="px-6 mb-2">
+          <View className="px-6 mb-1">
+            <Text
+              className="text-xs uppercase tracking-widest"
+              style={{ color: COLORS.secondary, fontFamily: "Inter_600SemiBold" }}
+            >
+              {meta.eyebrow}
+            </Text>
+          </View>
+          <View className="px-6 mb-1">
             <Text
               className="text-3xl"
               style={{ color: COLORS.primaryContainer, fontFamily: "Manrope_700Bold" }}
             >
-              Créer un compte
+              {meta.title}
             </Text>
           </View>
           <View className="px-6 mb-8">
-            <Text
-              className="text-xs uppercase tracking-widest"
-              style={{ color: COLORS.outline }}
-            >
-              L'EXCELLENCE DU MOBILIER PARISIEN
+            <Text className="text-sm" style={{ color: COLORS.outline }}>
+              {meta.subtitle}
             </Text>
           </View>
 
-          {/* Account type toggle */}
-          <View className="flex-row gap-4 px-6 mb-8">
-            {(["particulier", "professionnel"] as AccountType[]).map((type) => (
-              <TouchableOpacity
-                key={type}
-                onPress={() => setAccountType(type)}
-                className="flex-1 py-3 rounded-full items-center"
-                style={{
-                  backgroundColor: accountType === type ? COLORS.primary : "transparent",
-                  borderWidth: accountType === type ? 0 : 1,
-                  borderColor: `${COLORS.outlineVariant}33`,
-                }}
-              >
-                <Text
-                  className="text-sm font-semibold uppercase"
-                  style={{
-                    color: accountType === type ? COLORS.onPrimary : COLORS.onSurface,
-                  }}
-                >
-                  {type === "particulier" ? "PARTICULIER" : "PROFESSIONNEL"}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Form fields */}
-          <View className="px-6 gap-6">
-            <Controller
-              control={control}
-              name="lastName"
-              render={({ field: { onChange, value } }) => (
-                <Input label="NOM" value={value} onChangeText={onChange} error={errors.lastName?.message} autoCapitalize="words" />
-              )}
-            />
-            <Controller
-              control={control}
-              name="firstName"
-              render={({ field: { onChange, value } }) => (
-                <Input label="PRÉNOM" value={value} onChangeText={onChange} error={errors.firstName?.message} autoCapitalize="words" />
-              )}
-            />
-            <Controller
-              control={control}
-              name="email"
-              render={({ field: { onChange, value } }) => (
-                <Input label="EMAIL" placeholder="nom@example.com" value={value} onChangeText={onChange} error={errors.email?.message} keyboardType="email-address" />
-              )}
-            />
-            <Controller
-              control={control}
-              name="phone"
-              render={({ field: { onChange, value } }) => (
-                <Input label="TÉLÉPHONE" placeholder="+33 6 00 00 00 00" value={value ?? ""} onChangeText={onChange} keyboardType="phone-pad" />
-              )}
-            />
-
-            {accountType === "professionnel" && (
-              <>
-                <Controller
-                  control={control}
-                  name="company"
-                  render={({ field: { onChange, value } }) => (
-                    <Input
-                      label="NOM DE L'ENTREPRISE"
-                      value={value ?? ""}
-                      onChangeText={onChange}
-                      error={errors.company?.message}
-                      autoCapitalize="words"
-                    />
-                  )}
-                />
-                <Controller
-                  control={control}
-                  name="siret"
-                  render={({ field: { onChange, value } }) => (
-                    <Input
-                      label="SIRET"
-                      placeholder="14 chiffres"
-                      value={value ?? ""}
-                      onChangeText={onChange}
-                      error={errors.siret?.message}
-                      keyboardType="number-pad"
-                    />
-                  )}
-                />
-              </>
-            )}
-
-            <Controller
-              control={control}
-              name="password"
-              render={({ field: { onChange, value } }) => (
-                <Input label="MOT DE PASSE" value={value} onChangeText={onChange} error={errors.password?.message} secureTextEntry />
-              )}
-            />
-            <Controller
-              control={control}
-              name="confirmPassword"
-              render={({ field: { onChange, value } }) => (
-                <Input label="CONFIRMER MOT DE PASSE" value={value} onChangeText={onChange} error={errors.confirmPassword?.message} secureTextEntry />
-              )}
-            />
-
-            {/* Terms checkbox */}
-            <Controller
-              control={control}
-              name="acceptTerms"
-              render={({ field: { onChange, value } }) => (
-                <TouchableOpacity
-                  onPress={() => onChange(!value)}
-                  className="flex-row gap-3"
-                >
-                  <View
-                    className="w-5 h-5 rounded items-center justify-center mt-0.5"
+          {/* ── Step 1: identity ───────────────────────────── */}
+          {step === 0 && (
+            <View className="px-6 gap-6">
+              <View className="flex-row gap-4">
+                {(["particulier", "professionnel"] as AccountType[]).map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    onPress={() => setAccountType(type)}
+                    className="flex-1 py-3 rounded-full items-center"
                     style={{
-                      backgroundColor: value ? COLORS.primary : "transparent",
-                      borderWidth: value ? 0 : 1.5,
-                      borderColor: COLORS.outlineVariant,
+                      backgroundColor: accountType === type ? COLORS.primary : "transparent",
+                      borderWidth: accountType === type ? 0 : 1,
+                      borderColor: `${COLORS.outlineVariant}33`,
                     }}
                   >
-                    {value && (
-                      <MaterialCommunityIcons name="check" size={14} color="#fff" />
+                    <Text
+                      className="text-sm font-semibold uppercase"
+                      style={{
+                        color: accountType === type ? COLORS.onPrimary : COLORS.onSurface,
+                      }}
+                    >
+                      {type === "particulier" ? "PARTICULIER" : "PROFESSIONNEL"}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Controller
+                control={control}
+                name="fullName"
+                render={({ field: { onChange, value } }) => (
+                  <Input
+                    label="NOM COMPLET"
+                    placeholder="Marie Dupont"
+                    value={value}
+                    onChangeText={onChange}
+                    error={errors.fullName?.message}
+                    autoCapitalize="words"
+                  />
+                )}
+              />
+
+              {accountType === "professionnel" && (
+                <>
+                  <Controller
+                    control={control}
+                    name="company"
+                    render={({ field: { onChange, value } }) => (
+                      <Input
+                        label="NOM DE L'ENTREPRISE"
+                        value={value ?? ""}
+                        onChangeText={onChange}
+                        error={errors.company?.message}
+                        autoCapitalize="words"
+                      />
                     )}
-                  </View>
-                  <Text className="flex-1 text-sm" style={{ color: COLORS.onSurface }}>
-                    J'accepte les conditions générales et la politique de confidentialité de La Ménagère Paris
-                  </Text>
-                </TouchableOpacity>
+                  />
+                  <Controller
+                    control={control}
+                    name="siret"
+                    render={({ field: { onChange, value } }) => (
+                      <Input
+                        label="SIRET"
+                        placeholder="14 chiffres"
+                        value={value ?? ""}
+                        onChangeText={onChange}
+                        error={errors.siret?.message}
+                        keyboardType="number-pad"
+                      />
+                    )}
+                  />
+                </>
               )}
-            />
-            {errors.acceptTerms && (
-              <Text className="text-xs" style={{ color: COLORS.error }}>
-                {errors.acceptTerms.message}
-              </Text>
-            )}
+            </View>
+          )}
 
-            <Button
-              label="CRÉER MON COMPTE"
-              onPress={handleSubmit(onSubmit)}
-              loading={isLoading}
-              size="lg"
-            />
-          </View>
+          {/* ── Step 2: contact ────────────────────────────── */}
+          {step === 1 && (
+            <View className="px-6 gap-6">
+              <Controller
+                control={control}
+                name="email"
+                render={({ field: { onChange, value } }) => (
+                  <Input
+                    label="EMAIL"
+                    placeholder="nom@example.com"
+                    value={value}
+                    onChangeText={onChange}
+                    error={errors.email?.message}
+                    keyboardType="email-address"
+                  />
+                )}
+              />
+              <Controller
+                control={control}
+                name="phone"
+                render={({ field: { onChange, value } }) => (
+                  <Input
+                    label="TÉLÉPHONE (OPTIONNEL)"
+                    placeholder="+33 6 00 00 00 00"
+                    value={value ?? ""}
+                    onChangeText={onChange}
+                    keyboardType="phone-pad"
+                  />
+                )}
+              />
+            </View>
+          )}
 
-          {/* Footer */}
-          <View className="flex-row items-center justify-center mt-8 mb-12">
-            <Text className="text-sm" style={{ color: COLORS.outline }}>
-              Déjà un compte ?{" "}
-            </Text>
-            <TouchableOpacity onPress={() => router.push("/(auth)/login")}>
-              <Text className="text-sm font-bold" style={{ color: COLORS.primary }}>
-                Se connecter
-              </Text>
-            </TouchableOpacity>
-          </View>
+          {/* ── Step 3: security ───────────────────────────── */}
+          {step === 2 && (
+            <View className="px-6 gap-6">
+              <Controller
+                control={control}
+                name="password"
+                render={({ field: { onChange, value } }) => (
+                  <Input
+                    label="MOT DE PASSE"
+                    value={value}
+                    onChangeText={onChange}
+                    error={errors.password?.message}
+                    secureTextEntry
+                  />
+                )}
+              />
+              <Controller
+                control={control}
+                name="confirmPassword"
+                render={({ field: { onChange, value } }) => (
+                  <Input
+                    label="CONFIRMER MOT DE PASSE"
+                    value={value}
+                    onChangeText={onChange}
+                    error={errors.confirmPassword?.message}
+                    secureTextEntry
+                  />
+                )}
+              />
+
+              <Controller
+                control={control}
+                name="acceptTerms"
+                render={({ field: { onChange, value } }) => (
+                  <TouchableOpacity
+                    onPress={() => onChange(!value)}
+                    className="flex-row gap-3"
+                  >
+                    <View
+                      className="w-5 h-5 rounded items-center justify-center mt-0.5"
+                      style={{
+                        backgroundColor: value ? COLORS.primary : "transparent",
+                        borderWidth: value ? 0 : 1.5,
+                        borderColor: COLORS.outlineVariant,
+                      }}
+                    >
+                      {value && (
+                        <MaterialCommunityIcons name="check" size={14} color="#fff" />
+                      )}
+                    </View>
+                    <Text className="flex-1 text-sm" style={{ color: COLORS.onSurface }}>
+                      J'accepte les conditions générales et la politique de
+                      confidentialité de La Ménagère Paris
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              />
+              {errors.acceptTerms && (
+                <Text className="text-xs" style={{ color: COLORS.error }}>
+                  {errors.acceptTerms.message}
+                </Text>
+              )}
+            </View>
+          )}
         </ScrollView>
+
+        {/* Footer CTA */}
+        <View className="px-6 pb-2 pt-2">
+          <Button
+            label={isLastStep ? "CRÉER MON COMPTE" : "CONTINUER"}
+            onPress={goNext}
+            loading={isLoading}
+            size="lg"
+          />
+
+          {step === 0 && (
+            <View className="flex-row items-center justify-center mt-5">
+              <Text className="text-sm" style={{ color: COLORS.outline }}>
+                Déjà un compte ?{" "}
+              </Text>
+              <TouchableOpacity onPress={() => router.push("/(auth)/login")}>
+                <Text className="text-sm font-bold" style={{ color: COLORS.primary }}>
+                  Se connecter
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </KeyboardAvoidingView>
 
       <Toast

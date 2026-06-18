@@ -1,15 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { formatEURFromCents } from '../../common/serialization/money.util';
-import { initials } from '../../common/serialization/initials.util';
+import { initialsFromName } from '../../common/serialization/initials.util';
 import { AccountType, ShippingZone } from '../../common/serialization/status-labels';
 import { toAddressDto, AddressRow } from '../auth/auth.serializer';
 
 interface CustomerProfileRow {
   id: string;
   email: string;
-  first_name: string;
-  last_name: string;
+  full_name: string;
   phone: string | null;
   account_type: AccountType;
   company: string | null;
@@ -22,8 +21,7 @@ interface CustomerProfileRow {
 
 export interface AdminCustomerDto {
   id: string;
-  firstName: string;
-  lastName: string;
+  fullName: string;
   email: string;
   phone: string;
   type: AccountType;
@@ -38,7 +36,7 @@ export interface AdminCustomerDto {
 }
 
 const PROFILE_COLS =
-  'id, email, first_name, last_name, phone, account_type, company, siret, orders_count, total_spent_cents, last_activity_at, created_at';
+  'id, email, full_name, phone, account_type, company, siret, orders_count, total_spent_cents, last_activity_at, created_at';
 
 @Injectable()
 export class AdminCustomersService {
@@ -56,7 +54,7 @@ export class AdminCustomersService {
     if (opts.q && opts.q.trim()) {
       const term = `%${opts.q.trim()}%`;
       query = query.or(
-        `first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term}`,
+        `full_name.ilike.${term},email.ilike.${term}`,
       );
     }
     const { data } = await query
@@ -167,8 +165,7 @@ export class AdminCustomersService {
   ): AdminCustomerDto {
     return {
       id: r.id,
-      firstName: r.first_name,
-      lastName: r.last_name,
+      fullName: r.full_name,
       email: r.email,
       phone: r.phone ?? '',
       type: r.account_type,
@@ -179,7 +176,7 @@ export class AdminCustomersService {
       totalSpent: formatEURFromCents(r.total_spent_cents),
       lastActivity: r.last_activity_at ?? r.created_at,
       createdAt: r.created_at,
-      avatarInitials: initials(r.first_name, r.last_name),
+      avatarInitials: initialsFromName(r.full_name),
     };
   }
 }

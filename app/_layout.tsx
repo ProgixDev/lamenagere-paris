@@ -80,7 +80,7 @@ function PushRegistrar() {
 }
 
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, loadSession } = useAuthStore();
+  const { isAuthenticated, isLoading, loadSession, user } = useAuthStore();
   const hasSeenOnboarding = useOnboardingStore((s) => s.hasSeen);
   const onboardingHydrated = useOnboardingStore((s) => s.hydrated);
   const segments = useSegments();
@@ -93,12 +93,22 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoading || !onboardingHydrated) return;
 
-    const inAuthGroup = segments[0] === "(auth)";
-    const inOnboarding = segments[0] === "(onboarding)";
+    const seg = segments as string[];
+    const inAuthGroup = seg[0] === "(auth)";
+    const inOnboarding = seg[0] === "(onboarding)";
+    const onCompleteProfile =
+      inOnboarding && seg[1] === "complete-profile";
 
-    // Onboarding wins over auth state: until it's marked seen, always show it.
-    if (!hasSeenOnboarding) {
-      if (!inOnboarding) router.replace("/(onboarding)");
+    // Signed in but profile not completed yet (mainly Google OAuth sign-ups):
+    // force the interactive onboarding flow before anything else.
+    if (isAuthenticated && user && !user.onboarded) {
+      if (!onCompleteProfile) router.replace("/(onboarding)/complete-profile");
+      return;
+    }
+
+    // First-launch marketing intro — only for visitors who aren't signed in.
+    if (!hasSeenOnboarding && !isAuthenticated) {
+      if (!inOnboarding || onCompleteProfile) router.replace("/(onboarding)");
       return;
     }
 
@@ -112,7 +122,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (!inAuthGroup) {
       router.replace("/(auth)/login");
     }
-  }, [isAuthenticated, isLoading, segments, router, hasSeenOnboarding, onboardingHydrated]);
+  }, [
+    isAuthenticated,
+    isLoading,
+    segments,
+    router,
+    hasSeenOnboarding,
+    onboardingHydrated,
+    user,
+  ]);
 
   return <>{children}</>;
 }

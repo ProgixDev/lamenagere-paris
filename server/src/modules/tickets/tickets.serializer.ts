@@ -1,4 +1,4 @@
-import { initials } from '../../common/serialization/initials.util';
+import { initialsFromName } from '../../common/serialization/initials.util';
 
 export type TicketStatus = 'ouvert' | 'en_cours' | 'resolu' | 'ferme';
 export type TicketPriority = 'basse' | 'normale' | 'haute' | 'urgente';
@@ -46,7 +46,7 @@ export interface TicketRow {
   unread_customer: number;
   created_at: string;
   updated_at: string;
-  profile?: { first_name: string; last_name: string; email: string; account_type: string } | null;
+  profile?: { full_name: string; email: string; account_type: string } | null;
   messages?: TicketMessageRow[];
 }
 
@@ -104,9 +104,9 @@ export function toTicketDto(row: TicketRow, opts: { admin?: boolean } = {}): Tic
       : undefined,
   };
   if (opts.admin) {
-    const name = [row.profile?.first_name, row.profile?.last_name].filter(Boolean).join(' ');
+    const name = row.profile?.full_name ?? '';
     dto.client = name;
-    dto.clientInitials = initials(row.profile?.first_name, row.profile?.last_name);
+    dto.clientInitials = initialsFromName(row.profile?.full_name);
     dto.clientEmail = row.profile?.email;
     dto.b2b = row.profile?.account_type === 'professionnel' || undefined;
     dto.unread = row.unread_admin;
@@ -115,4 +115,4 @@ export function toTicketDto(row: TicketRow, opts: { admin?: boolean } = {}): Tic
 }
 
 export const TICKET_SELECT =
-  '*, messages:ticket_messages(*), profile:profiles(first_name,last_name,email,account_type)';
+  '*, messages:ticket_messages(*), profile:profiles(full_name,email,account_type)';
