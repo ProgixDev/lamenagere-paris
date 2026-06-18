@@ -45,3 +45,14 @@ export const getPopularProductsApi = async (
   });
   return data;
 };
+
+/** Batch fetch published products by id, in the requested order. */
+export const getProductsByIdsApi = async (
+  ids: string[],
+): Promise<Product[]> => {
+  if (ids.length === 0) return [];
+  const { data } = await apiClient.get<Product[]>("/products/by-ids", {
+    params: { ids: ids.join(",") },
+  });
+  return data;
+};

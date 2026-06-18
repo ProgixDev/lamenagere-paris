@@ -41,3 +41,19 @@ export const updateProfileApi = async (
   const { data } = await apiClient.put<User>("/auth/profile", payload);
   return data;
 };
+
+export const changePasswordApi = async (
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ success: boolean }> => {
+  const { data } = await apiClient.post<{ success: boolean }>(
+    "/auth/change-password",
+    { currentPassword, newPassword },
+  );
+  return data;
+};
+
+export const deleteAccountApi = async (): Promise<{ success: boolean }> => {
+  const { data } = await apiClient.delete<{ success: boolean }>("/auth/account");
+  return data;
+};

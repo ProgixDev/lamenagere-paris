@@ -228,47 +228,17 @@ function ProductCardTemu({ product, imgHeight }: { product: Product; imgHeight: 
 
       {/* Content */}
       <View style={{ padding: 8 }}>
-        {/* Savings badge row */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
-          <View
-            style={{
-              backgroundColor: COLORS.secondary,
-              borderRadius: 4,
-              paddingHorizontal: 5,
-              paddingVertical: 1,
-            }}
-          >
-            <Text style={{ fontSize: 9, fontFamily: "Inter_700Bold", color: "#fff" }}>
-              ÉCO
-            </Text>
-          </View>
-          <Text
-            style={{
-              flex: 1,
-              fontSize: 12,
-              fontFamily: "Inter_500Medium",
-              color: COLORS.onSurface,
-            }}
-            numberOfLines={2}
-          >
-            {product.name}
-          </Text>
-        </View>
-
-        {/* Rating + sold (mocked from id) */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
-          {[0, 1, 2, 3, 4].map((i) => (
-            <MaterialCommunityIcons
-              key={i}
-              name="star"
-              size={10}
-              color={i < 4 ? COLORS.onSurface : COLORS.outlineVariant}
-            />
-          ))}
-          <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: COLORS.outline, marginLeft: 2 }}>
-            {(product.id.charCodeAt(0) % 5) + 1}K+ vendus
-          </Text>
-        </View>
+        <Text
+          style={{
+            fontSize: 12,
+            fontFamily: "Inter_500Medium",
+            color: COLORS.onSurface,
+            marginBottom: 4,
+          }}
+          numberOfLines={2}
+        >
+          {product.name}
+        </Text>
 
         {/* Price + add */}
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
@@ -285,27 +255,15 @@ function ProductCardTemu({ product, imgHeight }: { product: Product; imgHeight: 
                 Sur devis
               </Text>
             ) : (
-              <View>
-                <Text
-                  style={{
-                    fontSize: 9,
-                    fontFamily: "Inter_500Medium",
-                    color: COLORS.secondary,
-                    marginBottom: -2,
-                  }}
-                >
-                  Dernier jour
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 17,
-                    fontFamily: "Manrope_800ExtraBold",
-                    color: COLORS.secondary,
-                  }}
-                >
-                  {formatPrice(product.price ?? 0)}
-                </Text>
-              </View>
+              <Text
+                style={{
+                  fontSize: 17,
+                  fontFamily: "Manrope_800ExtraBold",
+                  color: COLORS.secondary,
+                }}
+              >
+                {formatPrice(product.price ?? 0)}
+              </Text>
             )}
           </View>
 

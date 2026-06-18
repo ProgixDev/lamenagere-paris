@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Image,
   Dimensions,
   ActivityIndicator,
+  Share,
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from "react-native";
@@ -25,34 +26,11 @@ import { getProductImage } from "../../../lib/mock-data";
 import { useCartStore } from "../../../features/cart/store";
 import { useFavoritesStore } from "../../../features/favorites/store";
 import { useProduct, usePopularProducts } from "../../../features/products/hooks";
-import type { Product } from "../../../lib/types";
 
 const { width: W, height: H } = Dimensions.get("window");
 const GALLERY_H = Math.min(W, H * 0.55);
 
 type Territory = (typeof TERRITORIES)[number]["value"];
-
-// ─── Mocked review data (deterministic from product id) ──
-const REVIEWERS = ["Sophie L.", "Karim B.", "Léa M.", "Vincent R.", "Amina T."];
-const REVIEW_TEXTS = [
-  "Qualité au rendez-vous, finition impeccable. Je recommande sans hésiter.",
-  "Le rendu est encore plus beau qu'en photo. Livraison en 3 semaines en métropole.",
-  "Service client réactif, équipe à l'écoute pour les ajustements sur mesure.",
-];
-
-function deriveRating(product: Product) {
-  const seed = product.id.charCodeAt(0) + product.id.charCodeAt(product.id.length - 1);
-  const value = 4 + ((seed % 10) / 10) * 0.9; // 4.0 – 4.9
-  return Math.round(value * 10) / 10;
-}
-
-function deriveReviewCount(product: Product) {
-  return ((product.id.charCodeAt(0) * 7) % 380) + 24;
-}
-
-function deriveSold(product: Product) {
-  return ((product.id.charCodeAt(1) * 11) % 980) + 20;
-}
 
 // ────────────────────────────────────────────────────────
 export default function ProductDetailScreen() {
@@ -71,17 +49,13 @@ export default function ProductDetailScreen() {
   const [customHeight, setCustomHeight] = useState("");
   const [openingType, setOpeningType] = useState<string | null>(null);
   const [territory, setTerritory] = useState<Territory>("metropole");
-  const [activeTab, setActiveTab] = useState<"overview" | "specs" | "reviews">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "specs">("overview");
   const [toast, setToast] = useState({
     visible: false,
     message: "",
     type: "success" as "success" | "error",
   });
   const galleryRef = useRef<ScrollView>(null);
-
-  const rating = useMemo(() => (product ? deriveRating(product) : 0), [product]);
-  const reviewCount = useMemo(() => (product ? deriveReviewCount(product) : 0), [product]);
-  const soldCount = useMemo(() => (product ? deriveSold(product) : 0), [product]);
 
   if (isLoading) {
     return (
@@ -191,7 +165,13 @@ export default function ProductDetailScreen() {
               <CircleButton icon="chevron-left" onPress={() => router.back()} />
               <View style={{ flexDirection: "row", gap: 8 }}>
                 <CircleButton icon="magnify" onPress={() => router.push("/(main)/search")} />
-                <CircleButton icon="share-variant" onPress={() => {}} />
+                <CircleButton
+                  icon="share-variant"
+                  onPress={() =>
+                    product &&
+                    Share.share({ message: `${product.name} — La Ménagère Paris` })
+                  }
+                />
               </View>
             </View>
           </SafeAreaView>
@@ -249,7 +229,6 @@ export default function ProductDetailScreen() {
           {([
             { id: "overview", label: "Aperçu" },
             { id: "specs", label: "Caractéristiques" },
-            { id: "reviews", label: `Avis (${reviewCount})` },
           ] as const).map((tab) => {
             const isActive = activeTab === tab.id;
             return (
@@ -306,26 +285,6 @@ export default function ProductDetailScreen() {
           <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 2 }}>
             par La Ménagère Paris
           </Text>
-
-          {/* Rating row */}
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 }}>
-            <View style={{ flexDirection: "row", gap: 1 }}>
-              {[0, 1, 2, 3, 4].map((i) => (
-                <MaterialCommunityIcons
-                  key={i}
-                  name={i < Math.floor(rating) ? "star" : i < rating ? "star-half-full" : "star-outline"}
-                  size={14}
-                  color={COLORS.secondary}
-                />
-              ))}
-            </View>
-            <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>
-              {rating}
-            </Text>
-            <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline }}>
-              · {reviewCount} avis · {soldCount}+ vendus
-            </Text>
-          </View>
 
           {/* Price */}
           <View style={{ marginTop: 16, marginBottom: 4 }}>
@@ -608,89 +567,6 @@ export default function ProductDetailScreen() {
           </View>
         )}
 
-        {activeTab === "reviews" && (
-          <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-            {/* Rating summary */}
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 16,
-                padding: 16,
-                borderRadius: 12,
-                backgroundColor: "#fff",
-                marginBottom: 16,
-              }}
-            >
-              <View>
-                <Text style={{ fontSize: 36, fontFamily: "Manrope_800ExtraBold", color: COLORS.onSurface }}>
-                  {rating}
-                </Text>
-                <View style={{ flexDirection: "row", gap: 1, marginTop: 2 }}>
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <MaterialCommunityIcons
-                      key={i}
-                      name={i < Math.floor(rating) ? "star" : i < rating ? "star-half-full" : "star-outline"}
-                      size={14}
-                      color={COLORS.secondary}
-                    />
-                  ))}
-                </View>
-              </View>
-              <View style={{ flex: 1 }}>
-                {[5, 4, 3, 2, 1].map((stars) => {
-                  const ratio = stars === Math.round(rating) ? 0.7 : stars > Math.round(rating) ? 0.05 : 0.15;
-                  return (
-                    <View key={stars} style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                      <Text style={{ fontSize: 10, color: COLORS.outline, width: 8, fontFamily: "Inter_500Medium" }}>
-                        {stars}
-                      </Text>
-                      <View style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: COLORS.surfaceContainer }}>
-                        <View
-                          style={{
-                            width: `${ratio * 100}%`,
-                            height: "100%",
-                            borderRadius: 2,
-                            backgroundColor: COLORS.secondary,
-                          }}
-                        />
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
-
-            {[0, 1, 2].map((i) => (
-              <ReviewCard
-                key={i}
-                name={REVIEWERS[(product.id.charCodeAt(0) + i) % REVIEWERS.length]}
-                stars={5 - (i % 2)}
-                text={REVIEW_TEXTS[i % REVIEW_TEXTS.length]}
-              />
-            ))}
-
-            <TouchableOpacity
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 6,
-                paddingVertical: 12,
-                borderRadius: 10,
-                borderWidth: 1,
-                borderColor: COLORS.outlineVariant,
-                marginTop: 4,
-              }}
-            >
-              <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>
-                Voir les {reviewCount} avis
-              </Text>
-              <MaterialCommunityIcons name="arrow-right" size={14} color={COLORS.onSurface} />
-            </TouchableOpacity>
-          </View>
-        )}
-
         {/* ── Related products ─────────────────────── */}
         <View style={{ marginTop: 16 }}>
           <Section title="Articles similaires" noBackground>
@@ -872,29 +748,6 @@ function SpecRow({ label, value, last }: { label: string; value: string; last?: 
       <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: COLORS.outline }}>{label}</Text>
       <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface, maxWidth: "60%", textAlign: "right" }}>
         {value}
-      </Text>
-    </View>
-  );
-}
-
-function ReviewCard({ name, stars, text }: { name: string; stars: number; text: string }) {
-  return (
-    <View style={{ padding: 14, borderRadius: 12, backgroundColor: "#fff", marginBottom: 10 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-        <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>{name}</Text>
-        <View style={{ flexDirection: "row", gap: 1 }}>
-          {[0, 1, 2, 3, 4].map((i) => (
-            <MaterialCommunityIcons
-              key={i}
-              name={i < stars ? "star" : "star-outline"}
-              size={12}
-              color={COLORS.secondary}
-            />
-          ))}
-        </View>
-      </View>
-      <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.onSurface, lineHeight: 18 }}>
-        {text}
       </Text>
     </View>
   );

@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -14,7 +15,8 @@ import * as Haptics from "expo-haptics";
 import { COLORS } from "../../lib/constants";
 import { formatPrice } from "../../lib/utils";
 import { useFavoritesStore } from "../../features/favorites/store";
-import { MOCK_PRODUCTS, getProductImage, CATEGORY_BG } from "../../lib/mock-data";
+import { useProductsByIds } from "../../features/products/hooks";
+import { getProductImage, CATEGORY_BG } from "../../lib/mock-data";
 
 const { width: W } = Dimensions.get("window");
 const CARD_W = (W - 20 * 2 - 12) / 2;
@@ -24,7 +26,7 @@ export default function FavoritesScreen() {
   const favorites = useFavoritesStore((s) => s.favorites);
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
 
-  const products = MOCK_PRODUCTS.filter((p) => favorites.includes(p.id));
+  const { data: products = [], isLoading } = useProductsByIds(favorites);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
@@ -45,7 +47,11 @@ export default function FavoritesScreen() {
         )}
       </View>
 
-      {products.length > 0 ? (
+      {isLoading && favorites.length > 0 ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator size="small" color={COLORS.primary} />
+        </View>
+      ) : products.length > 0 ? (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
             {products.map((product, idx) => {

@@ -11,7 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../lib/constants";
 import ConversationItem from "../../components/messaging/ConversationItem";
-import { useConversations } from "../../features/messaging/hooks";
+import { useConversations, useMarkAsRead } from "../../features/messaging/hooks";
 import LogoHeader from "../../components/layout/LogoHeader";
 
 export default function MessagesScreen() {
@@ -20,6 +20,13 @@ export default function MessagesScreen() {
   const { data, isLoading } = useConversations();
   const conversations = data ?? [];
   const totalUnread = conversations.reduce((s, c) => s + c.unreadCount, 0);
+  const markAsRead = useMarkAsRead();
+
+  const handleMarkAllRead = () => {
+    conversations
+      .filter((c) => c.unreadCount > 0)
+      .forEach((c) => markAsRead.mutate(c.id));
+  };
 
   const filtered = search
     ? conversations.filter(
@@ -66,8 +73,16 @@ export default function MessagesScreen() {
             </View>
           )}
         </View>
-        <TouchableOpacity>
-          <MaterialCommunityIcons name="dots-horizontal" size={24} color={COLORS.onSurface} />
+        <TouchableOpacity
+          onPress={handleMarkAllRead}
+          disabled={totalUnread === 0}
+          hitSlop={8}
+        >
+          <MaterialCommunityIcons
+            name="email-check-outline"
+            size={22}
+            color={totalUnread === 0 ? COLORS.outlineVariant : COLORS.onSurface}
+          />
         </TouchableOpacity>
       </View>
 

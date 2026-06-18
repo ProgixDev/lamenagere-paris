@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Ip,
@@ -12,6 +13,7 @@ import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { AuthUser } from '../../common/auth/auth-user';
 import { AuthService } from './auth.service';
 import {
+  ChangePasswordDto,
   ForgotPasswordDto,
   LoginDto,
   RegisterDto,
@@ -59,5 +61,25 @@ export class AuthController {
     @Body() dto: UpdateProfileDto,
   ) {
     return this.auth.updateProfile(user.id, dto);
+  }
+
+  @Post('change-password')
+  @HttpCode(200)
+  changePassword(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.auth.changePassword(
+      user.id,
+      user.email,
+      dto.currentPassword,
+      dto.newPassword,
+    );
+  }
+
+  @Delete('account')
+  @HttpCode(200)
+  deleteAccount(@CurrentUser() user: AuthUser) {
+    return this.auth.deleteAccount(user.id);
   }
 }

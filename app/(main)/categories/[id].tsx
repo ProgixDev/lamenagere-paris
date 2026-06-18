@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,9 @@ import {
   Image,
   Dimensions,
   RefreshControl,
+  ActivityIndicator,
+  type NativeSyntheticEvent,
+  type NativeScrollEvent,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -15,15 +18,18 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../../lib/constants";
 import { formatPrice } from "../../../lib/utils";
+import type { Product } from "../../../lib/types";
 import EmptyState from "../../../components/ui/EmptyState";
 import {
-  MOCK_CATEGORIES,
-  MOCK_PRODUCTS,
   getProductImage,
   PRODUCT_IMAGES,
   CATEGORY_BG,
 } from "../../../lib/mock-data";
 import { useFavoritesStore } from "../../../features/favorites/store";
+import {
+  useCategories,
+  useProductsByCategory,
+} from "../../../features/products/hooks";
 
 const { width: W } = Dimensions.get("window");
 const CARD_W = (W - 20 * 2 - 12) / 2;
@@ -38,7 +44,7 @@ const CATEGORY_HEROES: Record<string, any> = {
   "6": PRODUCT_IMAGES.buffetMiroir,
 };
 
-function ProductCard({ product, index }: { product: (typeof MOCK_PRODUCTS)[0]; index: number }) {
+function ProductCard({ product, index }: { product: Product; index: number }) {
   const router = useRouter();
   const toggleFav = useFavoritesStore((s) => s.toggleFavorite);
   const isFav = useFavoritesStore((s) => s.favorites.includes(product.id));
@@ -117,19 +123,47 @@ function ProductCard({ product, index }: { product: (typeof MOCK_PRODUCTS)[0]; i
   );
 }
 
+const NEAR_BOTTOM_PX = 600;
+
 export default function CategoryProductsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
 
-  const category = MOCK_CATEGORIES.find((c) => c.id === id);
-  const products = MOCK_PRODUCTS.filter((p) => p.category.id === id);
+  const { data: categories } = useCategories();
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    refetch,
+  } = useProductsByCategory(id);
+
+  const category = categories?.find((c) => c.id === id);
+  const products = useMemo<Product[]>(
+    () => data?.pages.flatMap((p) => p.items) ?? [],
+    [data],
+  );
   const heroImage = CATEGORY_HEROES[id];
 
-  const onRefresh = async () => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 600);
-  };
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
+
+  const onScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+      const distanceFromBottom =
+        contentSize.height - (contentOffset.y + layoutMeasurement.height);
+      if (distanceFromBottom < NEAR_BOTTOM_PX && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    },
+    [hasNextPage, isFetchingNextPage, fetchNextPage],
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>
@@ -137,6 +171,8 @@ export default function CategoryProductsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        onScroll={onScroll}
+        scrollEventThrottle={64}
       >
         {/* Hero header with image */}
         <View>
@@ -159,6 +195,7 @@ export default function CategoryProductsScreen() {
                 <MaterialCommunityIcons name="chevron-left" size={22} color="#fff" />
               </TouchableOpacity>
               <TouchableOpacity
+                onPress={() => router.push("/(main)/search")}
                 style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.3)", alignItems: "center", justifyContent: "center" }}
               >
                 <MaterialCommunityIcons name="magnify" size={20} color="#fff" />
@@ -178,20 +215,31 @@ export default function CategoryProductsScreen() {
         </View>
 
         {/* Product grid */}
-        {products.length > 0 ? (
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              paddingHorizontal: 20,
-              paddingTop: 20,
-              gap: 12,
-            }}
-          >
-            {products.map((product, idx) => (
-              <ProductCard key={product.id} product={product} index={idx} />
-            ))}
+        {isLoading ? (
+          <View style={{ paddingTop: 40, alignItems: "center" }}>
+            <ActivityIndicator size="small" color={COLORS.primary} />
           </View>
+        ) : products.length > 0 ? (
+          <>
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                paddingHorizontal: 20,
+                paddingTop: 20,
+                gap: 12,
+              }}
+            >
+              {products.map((product, idx) => (
+                <ProductCard key={product.id} product={product} index={idx} />
+              ))}
+            </View>
+            {isFetchingNextPage && (
+              <View style={{ paddingVertical: 20, alignItems: "center" }}>
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              </View>
+            )}
+          </>
         ) : (
           <EmptyState
             icon="magnify"

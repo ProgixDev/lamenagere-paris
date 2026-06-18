@@ -51,6 +51,16 @@ export class ForgotPasswordDto {
   email!: string;
 }
 
+export class ChangePasswordDto {
+  @IsString()
+  @MinLength(1)
+  currentPassword!: string;
+
+  @IsString()
+  @MinLength(6)
+  newPassword!: string;
+}
+
 export class UpdateProfileDto {
   @IsOptional()
   @IsString()

@@ -4,6 +4,7 @@ import {
   getPopularProductsApi,
   getProductByIdApi,
   getProductsByCategoryApi,
+  getProductsByIdsApi,
   searchProductsApi,
 } from "./api";
 
@@ -37,6 +38,15 @@ export const usePopularProducts = (limit = 10) =>
   useQuery({
     queryKey: ["products", "popular", limit],
     queryFn: () => getPopularProductsApi(limit),
+    staleTime: 5 * 60 * 1000,
+  });
+
+/** Fetch a set of products by id (favorites, featured). */
+export const useProductsByIds = (ids: string[]) =>
+  useQuery({
+    queryKey: ["products", "by-ids", [...ids].sort()],
+    queryFn: () => getProductsByIdsApi(ids),
+    enabled: ids.length > 0,
     staleTime: 5 * 60 * 1000,
   });
 

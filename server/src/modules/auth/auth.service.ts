@@ -99,6 +99,40 @@ export class AuthService {
     return { user, token: session.session.access_token };
   }
 
+  async changePassword(
+    userId: string,
+    email: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<{ success: boolean }> {
+    // Verify the current password before allowing a change.
+    const { error: verifyError } = await this.supabase.auth.signInWithPassword({
+      email,
+      password: currentPassword,
+    });
+    if (verifyError) {
+      throw new UnauthorizedException('Mot de passe actuel incorrect');
+    }
+    const { error } = await this.supabase.admin.updateUserById(userId, {
+      password: newPassword,
+    });
+    if (error) {
+      throw new BadRequestException('Modification du mot de passe impossible');
+    }
+    return { success: true };
+  }
+
+  async deleteAccount(userId: string): Promise<{ success: boolean }> {
+    const { error } = await this.supabase.admin.deleteUser(userId);
+    if (error) {
+      // Most commonly blocked by existing orders/quotes (FK restrict).
+      throw new BadRequestException(
+        'Suppression impossible : contactez le support si vous avez des commandes en cours.',
+      );
+    }
+    return { success: true };
+  }
+
   async logout(): Promise<void> {
     // Tokens are stateless JWTs; the client discards them. Nothing to do
     // server-side beyond acknowledging. (Refresh-token revocation could be

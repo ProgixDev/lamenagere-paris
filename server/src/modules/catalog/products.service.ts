@@ -80,4 +80,20 @@ export class ProductsService {
       .returns<ProductRow[]>();
     return (data ?? []).map(toProductDto);
   }
+
+  /**
+   * Mobile: fetch a specific set of published products by id (favorites,
+   * featured). Results are returned in the same order as the requested ids.
+   */
+  async listByIds(ids: string[]): Promise<ProductDto[]> {
+    if (ids.length === 0) return [];
+    const { data } = await this.supabase.client
+      .from('products')
+      .select(PRODUCT_SELECT)
+      .in('id', ids)
+      .eq('status', 'publie')
+      .returns<ProductRow[]>();
+    const byId = new Map((data ?? []).map((r) => [r.id, toProductDto(r)]));
+    return ids.map((id) => byId.get(id)).filter((p): p is ProductDto => !!p);
+  }
 }

@@ -8,6 +8,7 @@ import type {
   RegisterPayload,
 } from "./types";
 import {
+  deleteAccountApi,
   getProfileApi,
   loginApi,
   logoutApi,
@@ -105,6 +106,27 @@ export const useAuthStore = create<AuthStore>((set) => ({
       set({ isLoading: false, error: errorMessage(e) });
       throw e;
     }
+  },
+
+  deleteAccount: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      await deleteAccountApi();
+    } catch (e) {
+      set({ isLoading: false, error: errorMessage(e) });
+      throw e;
+    }
+    // Success: tear down the local session like a logout.
+    await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
+    await SecureStore.deleteItemAsync(USER_KEY);
+    await SecureStore.deleteItemAsync(PUSH_TOKEN_KEY);
+    set({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
+    });
   },
 
   logout: async () => {

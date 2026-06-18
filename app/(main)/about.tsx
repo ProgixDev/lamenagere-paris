@@ -85,9 +85,14 @@ export default function AboutScreen() {
 
         {/* Social */}
         <View style={{ flexDirection: "row", gap: 16, marginBottom: 28 }}>
-          {["instagram", "facebook", "linkedin"].map((social) => (
+          {[
+            { icon: "instagram", url: "https://www.instagram.com/lamenagereparis" },
+            { icon: "facebook", url: "https://www.facebook.com/lamenagereparis" },
+            { icon: "linkedin", url: "https://www.linkedin.com/company/lamenagereparis" },
+          ].map((social) => (
             <TouchableOpacity
-              key={social}
+              key={social.icon}
+              onPress={() => Linking.openURL(social.url)}
               style={{
                 width: 44,
                 height: 44,
@@ -97,7 +102,7 @@ export default function AboutScreen() {
                 justifyContent: "center",
               }}
             >
-              <MaterialCommunityIcons name={social as any} size={22} color={COLORS.primary} />
+              <MaterialCommunityIcons name={social.icon as any} size={22} color={COLORS.primary} />
             </TouchableOpacity>
           ))}
         </View>

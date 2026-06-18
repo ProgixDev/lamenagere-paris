@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { persistStorage } from "../../lib/persist-storage";
-import { MOCK_PRODUCTS } from "../../lib/mock-data";
+import { usePopularProducts } from "../products/hooks";
 
 export type HeroSlide = {
   id: string;
@@ -25,7 +25,7 @@ interface FeaturedStore {
   reorderSlides: (ids: string[]) => void;
 }
 
-const DEFAULT_FEATURED_IDS = MOCK_PRODUCTS.slice(0, 6).map((p) => p.id);
+const DEFAULT_FEATURED_IDS: string[] = [];
 
 const DEFAULT_SLIDES: HeroSlide[] = [
   {
@@ -97,9 +97,14 @@ export const useFeaturedStore = create<FeaturedStore>()(
   ),
 );
 
+/**
+ * Customer-facing "featured / best-sellers" list. Backed by the real popular
+ * products endpoint (the admin's local featured-id selection isn't yet synced
+ * to the server, so we surface popularity instead of fabricated data).
+ */
 export const useFeaturedProducts = () => {
-  const ids = useFeaturedStore((s) => s.featuredProductIds);
-  return MOCK_PRODUCTS.filter((p) => ids.includes(p.id));
+  const { data } = usePopularProducts(12);
+  return data ?? [];
 };
 
 export const useHeroSlides = () => useFeaturedStore((s) => s.heroSlides);

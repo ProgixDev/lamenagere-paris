@@ -126,7 +126,7 @@ export default function OrderDetailScreen() {
           </View>
         </Card>
 
-        <Button label="CONTACTER LE VENDEUR" onPress={() => {}} variant="secondary" size="lg" />
+        <Button label="CONTACTER LE VENDEUR" onPress={() => router.push("/(tabs)/messages")} variant="secondary" size="lg" />
 
         {CANCELLABLE_STATUSES.includes(order.status) && (
           <Button

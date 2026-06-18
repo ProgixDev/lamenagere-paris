@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -10,12 +10,41 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as SecureStore from "expo-secure-store";
 import { COLORS } from "../../lib/constants";
+import { PUSH_TOKEN_KEY } from "../../lib/storage";
+import { registerForPushNotifications } from "../../lib/notifications";
+import {
+  registerDeviceApi,
+  unregisterDeviceApi,
+} from "../../features/notifications/api";
+import { useNotifPrefStore } from "../../features/notifications/preference";
+import { useAuthStore } from "../../features/auth/store";
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const [notifications, setNotifications] = useState(true);
-  const [twoFactor, setTwoFactor] = useState(false);
+  const notifications = useNotifPrefStore((s) => s.enabled);
+  const setNotifEnabled = useNotifPrefStore((s) => s.setEnabled);
+  const deleteAccount = useAuthStore((s) => s.deleteAccount);
+
+  // Toggling actually (un)registers this device for push on the server.
+  const handleNotifToggle = async (value: boolean) => {
+    setNotifEnabled(value);
+    try {
+      if (value) {
+        const token = await registerForPushNotifications();
+        if (token) {
+          await registerDeviceApi(token);
+          await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token);
+        }
+      } else {
+        const token = await SecureStore.getItemAsync(PUSH_TOKEN_KEY);
+        if (token) await unregisterDeviceApi(token);
+      }
+    } catch {
+      // best-effort; preference is still saved locally
+    }
+  };
 
   const handleDeleteAccount = () => {
     Alert.alert(
@@ -23,7 +52,21 @@ export default function SettingsScreen() {
       "Cette action est irréversible. Toutes vos données seront supprimées.",
       [
         { text: "Annuler", style: "cancel" },
-        { text: "Supprimer", style: "destructive", onPress: () => {} },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteAccount();
+              // AuthGate redirects to login once the session is cleared.
+            } catch (e) {
+              const msg =
+                (e as { response?: { data?: { message?: string } } })?.response
+                  ?.data?.message ?? "Suppression impossible";
+              Alert.alert("Erreur", msg);
+            }
+          },
+        },
       ],
     );
   };
@@ -44,19 +87,16 @@ export default function SettingsScreen() {
         {/* Account */}
         <SettingsSection title="Compte">
           <SettingsRow icon="account-outline" label="Modifier mon profil" onPress={() => router.push("/(main)/edit-profile")} />
-          <SettingsRow icon="lock-outline" label="Modifier mon mot de passe" onPress={() => {}} />
+          <SettingsRow icon="lock-outline" label="Modifier mon mot de passe" onPress={() => router.push("/(main)/change-password")} />
           <SettingsRow icon="bell-outline" label="Notifications" rightComponent={
-            <Switch value={notifications} onValueChange={setNotifications} trackColor={{ true: COLORS.primary, false: "#e0e0e0" }} />
-          } />
-          <SettingsRow icon="shield-check-outline" label="Authentification à deux facteurs" rightComponent={
-            <Switch value={twoFactor} onValueChange={setTwoFactor} trackColor={{ true: COLORS.primary, false: "#e0e0e0" }} />
+            <Switch value={notifications} onValueChange={handleNotifToggle} trackColor={{ true: COLORS.primary, false: "#e0e0e0" }} />
           } last />
         </SettingsSection>
 
         {/* Preferences */}
         <SettingsSection title="Préférences">
-          <SettingsRow icon="translate" label="Langue" value="Français" onPress={() => {}} />
-          <SettingsRow icon="currency-eur" label="Devise" value="EUR (€)" onPress={() => {}} last />
+          <SettingsRow icon="translate" label="Langue" value="Français" />
+          <SettingsRow icon="currency-eur" label="Devise" value="EUR (€)" last />
         </SettingsSection>
 
         {/* Legal */}

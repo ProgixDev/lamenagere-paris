@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity } from "react-native";
+import React from "react";
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -9,19 +9,7 @@ import Button from "../../../components/ui/Button";
 import CheckoutSteps from "../../../components/cart/CheckoutSteps";
 import { useCart } from "../../../features/cart/hooks";
 import { useCheckoutStore } from "../../../features/checkout/store";
-
-function shippingMethodsFor(overseas: boolean) {
-  if (overseas) {
-    return [
-      { id: "maritime", label: "Maritime (8-12 semaines)", price: 0 },
-      { id: "aerien", label: "Aérien (2-3 semaines)", price: 350 },
-    ];
-  }
-  return [
-    { id: "standard", label: "Standard (2-3 semaines)", price: 0 },
-    { id: "express", label: "Express (5-7 jours)", price: 50 },
-  ];
-}
+import { useShippingOptions } from "../../../features/shipping/hooks";
 
 export default function CheckoutShippingScreen() {
   const router = useRouter();
@@ -30,20 +18,14 @@ export default function CheckoutShippingScreen() {
   const setShippingMethod = useCheckoutStore((s) => s.setShippingMethod);
 
   const overseas = isOverseas(territory);
-  const methods = useMemo(() => shippingMethodsFor(overseas), [overseas]);
-  const [selectedMethod, setSelectedMethod] = useState(methods[0].id);
+  const { data: shippingOptions, isLoading } = useShippingOptions();
+  const option = shippingOptions?.find((o) => o.territory === territory);
 
-  // Keep selection valid when the territory (and thus methods) changes.
-  useEffect(() => {
-    if (!methods.some((m) => m.id === selectedMethod)) {
-      setSelectedMethod(methods[0].id);
-    }
-  }, [methods, selectedMethod]);
-
-  const shippingCost = methods.find((m) => m.id === selectedMethod)?.price || 0;
+  const shippingCost = option?.fee ?? 0;
 
   const onContinue = () => {
-    setShippingMethod(selectedMethod);
+    if (!option) return;
+    setShippingMethod(option.territory);
     router.push("/(main)/checkout/payment");
   };
 
@@ -74,25 +56,27 @@ export default function CheckoutShippingScreen() {
           Mode de livraison
         </Text>
         <View className="gap-3 mb-8">
-          {methods.map((method) => (
-            <TouchableOpacity
-              key={method.id}
-              onPress={() => setSelectedMethod(method.id)}
+          {isLoading ? (
+            <View style={{ paddingVertical: 24, alignItems: "center" }}>
+              <ActivityIndicator size="small" color={COLORS.primary} />
+            </View>
+          ) : option ? (
+            <View
               className="flex-row items-center justify-between rounded-full px-6 py-4"
-              style={{
-                backgroundColor: selectedMethod === method.id ? COLORS.primary : "transparent",
-                borderWidth: 1,
-                borderColor: selectedMethod === method.id ? COLORS.primary : `${COLORS.outlineVariant}33`,
-              }}
+              style={{ backgroundColor: COLORS.primary, borderWidth: 1, borderColor: COLORS.primary }}
             >
-              <Text style={{ color: selectedMethod === method.id ? COLORS.onPrimary : COLORS.onSurface }} className="text-sm font-semibold">
-                {method.label}
+              <Text style={{ color: COLORS.onPrimary }} className="text-sm font-semibold">
+                {option.delay}
               </Text>
-              <Text style={{ color: selectedMethod === method.id ? COLORS.onPrimary : COLORS.outline }} className="text-sm">
-                {method.price === 0 ? "Gratuit" : `+${formatPrice(method.price)}`}
+              <Text style={{ color: COLORS.onPrimary }} className="text-sm">
+                {option.fee === 0 ? "Gratuit" : `+${formatPrice(option.fee)}`}
               </Text>
-            </TouchableOpacity>
-          ))}
+            </View>
+          ) : (
+            <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.outline }}>
+              Aucune option de livraison disponible pour cette destination.
+            </Text>
+          )}
         </View>
 
         <View className="rounded-xl p-6 mb-8" style={{ backgroundColor: COLORS.surfaceContainerLow }}>
@@ -114,7 +98,7 @@ export default function CheckoutShippingScreen() {
           </View>
         </View>
 
-        <Button label="Continuer vers le paiement →" onPress={onContinue} size="lg" />
+        <Button label="Continuer vers le paiement →" onPress={onContinue} size="lg" disabled={!option} />
       </ScrollView>
     </SafeAreaView>
   );
