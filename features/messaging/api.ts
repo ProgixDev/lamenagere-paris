@@ -6,6 +6,14 @@ export const getConversationsApi = async (): Promise<Conversation[]> => {
   return data;
 };
 
+export const startConversationApi = async (params: {
+  message: string;
+  productId?: string;
+}): Promise<Conversation> => {
+  const { data } = await apiClient.post<Conversation>("/conversations", params);
+  return data;
+};
+
 export const getConversationThreadApi = async (
   conversationId: string,
 ): Promise<Message[]> => {

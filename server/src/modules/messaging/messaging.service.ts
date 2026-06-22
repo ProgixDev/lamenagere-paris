@@ -11,10 +11,62 @@ import {
   toMessageDto,
 } from './messaging.serializer';
 import { SendMessageDto } from './dto/send-message.dto';
+import { StartConversationDto } from './dto/start-conversation.dto';
 
 @Injectable()
 export class MessagingService {
   constructor(private readonly supabase: SupabaseService) {}
+
+  /**
+   * Opens a new conversation with the support team, optionally attached to a
+   * product the customer is asking about, and posts their first message.
+   */
+  async start(
+    userId: string,
+    dto: StartConversationDto,
+  ): Promise<ConversationDto> {
+    let subject = 'Nouvelle demande';
+    if (dto.productId) {
+      const { data: product } = await this.supabase.client
+        .from('products')
+        .select('name')
+        .eq('id', dto.productId)
+        .maybeSingle<{ name: string }>();
+      if (product?.name) subject = `Question : ${product.name}`;
+    }
+
+    const nowIso = new Date().toISOString();
+    const { data: convo, error: convoError } = await this.supabase.client
+      .from('conversations')
+      .insert({
+        profile_id: userId,
+        subject,
+        product_id: dto.productId ?? null,
+        vendor_name: 'Service Client',
+        last_message: dto.message,
+        last_message_at: nowIso,
+        unread_admin: 1,
+      })
+      .select('id')
+      .single<{ id: string }>();
+    if (convoError || !convo) {
+      throw new NotFoundException('Création de la conversation impossible');
+    }
+
+    await this.supabase.client.from('messages').insert({
+      conversation_id: convo.id,
+      sender: 'customer',
+      sender_id: userId,
+      content: dto.message,
+    });
+
+    const { data: full } = await this.supabase.client
+      .from('conversations')
+      .select(CONVERSATION_SELECT)
+      .eq('id', convo.id)
+      .single<ConversationRow>();
+    return toConversationDto(full!);
+  }
 
   async list(userId: string): Promise<ConversationDto[]> {
     const { data } = await this.supabase.client

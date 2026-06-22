@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getConversationsApi,
+  startConversationApi,
   getConversationThreadApi,
   sendMessageApi,
   markAsReadApi,
@@ -19,6 +20,17 @@ export const useConversations = () => {
     },
     staleTime: 30 * 1000,
     refetchInterval: 30 * 1000,
+  });
+};
+
+export const useStartConversation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (params: { message: string; productId?: string }) =>
+      startConversationApi(params),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
   });
 };
 

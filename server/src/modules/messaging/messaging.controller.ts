@@ -10,6 +10,7 @@ import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { AuthUser } from '../../common/auth/auth-user';
 import { MessagingService } from './messaging.service';
 import { SendMessageDto } from './dto/send-message.dto';
+import { StartConversationDto } from './dto/start-conversation.dto';
 
 @Controller('conversations')
 export class MessagingController {
@@ -18,6 +19,11 @@ export class MessagingController {
   @Get()
   list(@CurrentUser() user: AuthUser) {
     return this.messaging.list(user.id);
+  }
+
+  @Post()
+  start(@CurrentUser() user: AuthUser, @Body() dto: StartConversationDto) {
+    return this.messaging.start(user.id, dto);
   }
 
   @Get(':id/messages')

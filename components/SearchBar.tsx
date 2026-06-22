@@ -3,16 +3,9 @@ import { View, Text, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../lib/constants";
-import { pickVisualSearchImage } from "../lib/visual-search";
 
 export default function SearchBar({ placeholder = "Rechercher La Ménagère" }: { placeholder?: string }) {
   const router = useRouter();
-
-  const handleCamera = async () => {
-    const uri = await pickVisualSearchImage();
-    if (!uri) return;
-    router.push({ pathname: "/(main)/search", params: { image: uri } });
-  };
 
   return (
     <View
@@ -48,9 +41,6 @@ export default function SearchBar({ placeholder = "Rechercher La Ménagère" }: 
           <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.outline }}>
             {placeholder}
           </Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleCamera} hitSlop={8}>
-          <MaterialCommunityIcons name="camera-outline" size={20} color={COLORS.onSurface} />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push("/(main)/search")}>
           <View

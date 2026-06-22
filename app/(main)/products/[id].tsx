@@ -28,6 +28,7 @@ import Button from "../../../components/ui/Button";
 import PressableScale from "../../../components/ui/PressableScale";
 import Input from "../../../components/ui/Input";
 import Toast from "../../../components/ui/Toast";
+import ContactSellerSheet from "../../../components/product/ContactSellerSheet";
 import { getProductImage } from "../../../lib/mock-data";
 import { useCartStore } from "../../../features/cart/store";
 import { useFavoritesStore } from "../../../features/favorites/store";
@@ -56,6 +57,7 @@ export default function ProductDetailScreen() {
   const [openingType, setOpeningType] = useState<string | null>(null);
   const [territory, setTerritory] = useState<Territory>("metropole");
   const [activeTab, setActiveTab] = useState<"overview" | "specs">("overview");
+  const [contactOpen, setContactOpen] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
   const [toast, setToast] = useState({
     visible: false,
@@ -669,7 +671,7 @@ export default function ProductDetailScreen() {
             icon="message-outline"
             color={COLORS.onSurface}
             label="Contact"
-            onPress={() => router.push("/(tabs)/messages")}
+            onPress={() => setContactOpen(true)}
           />
           <View style={{ flex: 1 }}>
             <Button
@@ -688,6 +690,14 @@ export default function ProductDetailScreen() {
         visible={toast.visible}
         onDismiss={() => setToast((p) => ({ ...p, visible: false }))}
       />
+
+      {product && (
+        <ContactSellerSheet
+          product={product}
+          visible={contactOpen}
+          onClose={() => setContactOpen(false)}
+        />
+      )}
     </View>
   );
 }

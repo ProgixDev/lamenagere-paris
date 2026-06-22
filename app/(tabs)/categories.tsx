@@ -7,6 +7,7 @@ import {
   Image,
   Dimensions,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
@@ -126,10 +127,11 @@ export default function CategoriesScreen() {
               backgroundColor: COLORS.primary,
             }}
           >
-            <Image
-              source={CATEGORY_COVERS[heroCat.id]}
+            <ExpoImage
+              source={heroCat.image ? { uri: heroCat.image } : CATEGORY_COVERS[heroCat.id]}
               style={{ width: "100%", height: 260 }}
-              resizeMode="cover"
+              contentFit="cover"
+              transition={300}
             />
             <LinearGradient
               colors={["transparent", "rgba(0,0,0,0.15)", "rgba(0,36,68,0.92)"]}
@@ -334,7 +336,7 @@ function CategoryBentoCard({
   index: number;
   onPress: () => void;
 }) {
-  const cover = CATEGORY_COVERS[category.id];
+  const cover = category.image ? { uri: category.image } : CATEGORY_COVERS[category.id];
   const tagline = CATEGORY_TAGLINES[category.id] ?? "";
   const height = tall ? COL_W * 1.4 : COL_W * 1.1;
   return (
@@ -350,10 +352,11 @@ function CategoryBentoCard({
       }}
     >
       {cover && (
-        <Image
+        <ExpoImage
           source={cover}
           style={{ width: "100%", height: "100%" }}
-          resizeMode="cover"
+          contentFit="cover"
+          transition={300}
         />
       )}
       <LinearGradient

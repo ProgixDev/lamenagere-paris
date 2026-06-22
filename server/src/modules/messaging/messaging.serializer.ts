@@ -2,6 +2,7 @@ import {
   PRODUCT_SELECT,
   ProductDto,
   ProductRow,
+  priceLabel,
   toProductDto,
 } from '../catalog/catalog.serializer';
 
@@ -73,6 +74,8 @@ export interface AdminConversationDto {
   unread: number;
   b2b?: boolean;
   pinnedEntity?: { kind: 'order' | 'quote'; ref: string; label: string };
+  /** Product the customer is asking about, shown as a card in the inbox. */
+  product?: { id: string; name: string; image?: string; priceLabel: string };
 }
 
 export interface AdminMessageDto {
@@ -112,6 +115,19 @@ export function toMessageDto(row: MessageRow): MessageDto {
   };
 }
 
+function toConversationProductCard(
+  product?: ProductRow | null,
+): AdminConversationDto['product'] {
+  if (!product) return undefined;
+  const primaryImage = (product.media ?? []).find((m) => m.type === 'image');
+  return {
+    id: product.id,
+    name: product.name,
+    image: primaryImage?.url ?? undefined,
+    priceLabel: priceLabel(product),
+  };
+}
+
 export function toAdminConversationDto(
   row: ConversationRow,
   clientName: string,
@@ -132,6 +148,7 @@ export function toAdminConversationDto(
             label: row.pinned_label ?? row.pinned_ref,
           }
         : undefined,
+    product: toConversationProductCard(row.product),
   };
 }
 

@@ -8,6 +8,7 @@ import {
   toAdminConversationDto,
   toAdminMessageDto,
 } from '../messaging/messaging.serializer';
+import { PRODUCT_SELECT, ProductRow } from '../catalog/catalog.serializer';
 
 interface ConvoWithProfile {
   id: string;
@@ -24,10 +25,10 @@ interface ConvoWithProfile {
   unread_customer: number;
   created_at: string;
   profile?: { full_name: string } | null;
+  product?: ProductRow | null;
 }
 
-const ADMIN_CONVO_SELECT =
-  '*, profile:profiles(full_name)';
+const ADMIN_CONVO_SELECT = `*, profile:profiles(full_name), product:products(${PRODUCT_SELECT})`;
 
 @Injectable()
 export class AdminConversationsService {

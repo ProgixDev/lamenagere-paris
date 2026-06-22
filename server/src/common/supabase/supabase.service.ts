@@ -63,4 +63,9 @@ export class SupabaseService implements OnModuleInit {
     const bucket = this.config.getOrThrow<string>('SUPABASE_STORAGE_BUCKET');
     return this._client.storage.from(bucket);
   }
+
+  /** Storage client for an explicit bucket (e.g. the dedicated category bucket). */
+  storageBucket(bucket: string) {
+    return this._client.storage.from(bucket);
+  }
 }
