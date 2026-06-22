@@ -1,8 +1,9 @@
-import { IsArray, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsArray, IsOptional, IsString } from 'class-validator';
 
 export class SendMessageDto {
-  @IsString() @MinLength(1) content!: string;
+  /** Optional when the message carries attachments only. */
+  @IsOptional() @IsString() content?: string;
 
-  /** URLs already uploaded via the media endpoint. */
+  /** URLs already uploaded via the upload endpoint. */
   @IsOptional() @IsArray() attachments?: string[];
 }

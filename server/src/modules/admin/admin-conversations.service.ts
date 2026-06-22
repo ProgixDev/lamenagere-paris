@@ -1,10 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import {
   AdminConversationDto,
   AdminMessageDto,
+  attachmentType,
   MESSAGE_SELECT,
   MessageRow,
+  messagePreview,
   toAdminConversationDto,
   toAdminMessageDto,
 } from '../messaging/messaging.serializer';
@@ -62,10 +68,17 @@ export class AdminConversationsService {
   async reply(
     conversationId: string,
     adminId: string,
-    content: string,
+    contentRaw?: string,
     attachments?: string[],
   ): Promise<AdminMessageDto> {
     await this.assertExists(conversationId);
+
+    const content = contentRaw?.trim() ?? '';
+    const files = attachments ?? [];
+    if (!content && files.length === 0) {
+      throw new BadRequestException('Message vide');
+    }
+
     const { data: message, error } = await this.supabase.client
       .from('messages')
       .insert({
@@ -78,10 +91,14 @@ export class AdminConversationsService {
       .single<{ id: string }>();
     if (error || !message) throw new NotFoundException('Envoi impossible');
 
-    if (attachments?.length) {
-      await this.supabase.client
-        .from('message_attachments')
-        .insert(attachments.map((url) => ({ message_id: message.id, url })));
+    if (files.length) {
+      await this.supabase.client.from('message_attachments').insert(
+        files.map((url) => ({
+          message_id: message.id,
+          url,
+          type: attachmentType(url),
+        })),
+      );
     }
 
     const { data: convo } = await this.supabase.client
@@ -92,7 +109,7 @@ export class AdminConversationsService {
     await this.supabase.client
       .from('conversations')
       .update({
-        last_message: content,
+        last_message: messagePreview(content, files.length),
         last_message_at: new Date().toISOString(),
         unread_customer: (convo?.unread_customer ?? 0) + 1,
       })

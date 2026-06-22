@@ -8,6 +8,18 @@ import {
 
 export type MsgSender = 'customer' | 'admin';
 
+/** Infers whether an attachment URL points to a video or an image. */
+export function attachmentType(url: string): 'image' | 'video' {
+  return /\.(mp4|mov|m4v|webm|avi|mkv)(\?|$)/i.test(url) ? 'video' : 'image';
+}
+
+/** Short preview text for a message that may only carry attachments. */
+export function messagePreview(content: string, attachmentCount: number): string {
+  if (content.trim()) return content.trim();
+  if (attachmentCount > 0) return '📎 Pièce jointe';
+  return '';
+}
+
 export interface MessageAttachmentRow {
   id: string;
   url: string;
@@ -83,7 +95,7 @@ export interface AdminMessageDto {
   conversationId: string;
   sender: 'admin' | 'client';
   content: string;
-  attachments?: string[];
+  attachments?: { type: string; url: string }[];
   createdAt: string;
 }
 
@@ -158,7 +170,9 @@ export function toAdminMessageDto(row: MessageRow): AdminMessageDto {
     conversationId: row.conversation_id,
     sender: row.sender === 'admin' ? 'admin' : 'client',
     content: row.content,
-    attachments: row.attachments?.map((a) => a.url),
+    attachments: row.attachments?.length
+      ? row.attachments.map((a) => ({ type: a.type, url: a.url }))
+      : undefined,
     createdAt: row.created_at,
   };
 }

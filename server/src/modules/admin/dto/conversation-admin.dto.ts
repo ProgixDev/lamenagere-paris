@@ -1,7 +1,8 @@
-import { IsArray, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsArray, IsEnum, IsOptional, IsString } from 'class-validator';
 
 export class AdminReplyDto {
-  @IsString() @MinLength(1) content!: string;
+  /** Optional when the reply carries attachments only. */
+  @IsOptional() @IsString() content?: string;
   @IsOptional() @IsArray() attachments?: string[];
 }
 

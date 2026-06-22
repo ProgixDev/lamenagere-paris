@@ -52,10 +52,14 @@ export default function ConversationScreen() {
   }, []);
 
   const handleSend = useCallback(
-    (content: string) => {
+    (content: string, attachments?: { url: string; type: "image" | "video" }[]) => {
       if (!id) return;
       sendMessage.mutate(
-        { conversationId: id, content },
+        {
+          conversationId: id,
+          content,
+          attachments: attachments?.map((a) => a.url),
+        },
         {
           onSuccess: () => {
             setTimeout(

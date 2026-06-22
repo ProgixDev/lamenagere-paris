@@ -49,10 +49,12 @@ export const useSendMessage = () => {
     mutationFn: ({
       conversationId,
       content,
+      attachments,
     }: {
       conversationId: string;
       content: string;
-    }) => sendMessageApi(conversationId, content),
+      attachments?: string[];
+    }) => sendMessageApi(conversationId, content, attachments),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: ["conversation", variables.conversationId, "messages"],

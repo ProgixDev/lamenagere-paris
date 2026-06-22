@@ -1,12 +1,18 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import {
+  attachmentType,
   CONVERSATION_SELECT,
   ConversationDto,
   ConversationRow,
   MESSAGE_SELECT,
   MessageDto,
   MessageRow,
+  messagePreview,
   toConversationDto,
   toMessageDto,
 } from './messaging.serializer';
@@ -96,13 +102,19 @@ export class MessagingService {
   ): Promise<MessageDto> {
     await this.assertOwned(userId, conversationId);
 
+    const content = dto.content?.trim() ?? '';
+    const attachments = dto.attachments ?? [];
+    if (!content && attachments.length === 0) {
+      throw new BadRequestException('Message vide');
+    }
+
     const { data: message, error } = await this.supabase.client
       .from('messages')
       .insert({
         conversation_id: conversationId,
         sender: 'customer',
         sender_id: userId,
-        content: dto.content,
+        content,
       })
       .select('id')
       .single<{ id: string }>();
@@ -110,9 +122,13 @@ export class MessagingService {
       throw new NotFoundException('Envoi du message impossible');
     }
 
-    if (dto.attachments?.length) {
+    if (attachments.length) {
       await this.supabase.client.from('message_attachments').insert(
-        dto.attachments.map((url) => ({ message_id: message.id, url })),
+        attachments.map((url) => ({
+          message_id: message.id,
+          url,
+          type: attachmentType(url),
+        })),
       );
     }
 
@@ -125,7 +141,7 @@ export class MessagingService {
     await this.supabase.client
       .from('conversations')
       .update({
-        last_message: dto.content,
+        last_message: messagePreview(content, attachments.length),
         last_message_at: new Date().toISOString(),
         unread_admin: (convo?.unread_admin ?? 0) + 1,
       })
