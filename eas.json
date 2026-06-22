@@ -10,6 +10,12 @@
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://lamenagere-paris.vercel.app",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51TjXM3C1XrjpLABrjMTrH8EW6lIqBcxt9gvSmN5HEQsCKMdeJ3j8PP3HcwOwVhTS9tLfXN5wdKTE3Aha32Fccee900K5jMKqqX",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://trpluywvtaecvarrzugp.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRycGx1eXd2dGFlY3ZhcnJ6dWdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTAxMzIsImV4cCI6MjA5NjA4NjEzMn0.5QfKUXJPPKr5xY7pC6GC5FOvz5-W4HLOVN4HXqdBjmU"
+      },
       "android": {
         "buildType": "apk"
       }

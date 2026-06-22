@@ -19,6 +19,15 @@ interface OrderPaymentRow {
   stripe_payment_intent_id: string | null;
 }
 
+// True when Stripe reports the object doesn't exist under the current key
+// (e.g. "No such payment_intent" after a key/account switch).
+function isResourceMissing(err: unknown): boolean {
+  return (
+    err instanceof Stripe.errors.StripeInvalidRequestError &&
+    err.code === 'resource_missing'
+  );
+}
+
 @Injectable()
 export class PaymentsService implements OnModuleInit {
   private readonly logger = new Logger(PaymentsService.name);
@@ -56,12 +65,24 @@ export class PaymentsService implements OnModuleInit {
       throw new BadRequestException('Cette commande est déjà payée');
     }
 
-    // Reuse an existing intent so retries don't create duplicate charges.
+    // Reuse an existing intent so retries don't create duplicate charges. If
+    // the stored id can't be found under the current Stripe key (key rotated or
+    // account switched mid-testing → "No such payment_intent"), drop it and
+    // fall through to create a fresh intent instead of failing the checkout.
     if (order.stripe_payment_intent_id) {
-      const existing = await this.stripe.paymentIntents.retrieve(
-        order.stripe_payment_intent_id,
-      );
-      return { clientSecret: existing.client_secret };
+      try {
+        const existing = await this.stripe.paymentIntents.retrieve(
+          order.stripe_payment_intent_id,
+        );
+        if (existing.status !== 'canceled') {
+          return { clientSecret: existing.client_secret };
+        }
+      } catch (err) {
+        if (!isResourceMissing(err)) throw err;
+        this.logger.warn(
+          `Stored PaymentIntent ${order.stripe_payment_intent_id} not found for order ${order.id}; creating a new one.`,
+        );
+      }
     }
 
     const intent = await this.stripe.paymentIntents.create({
@@ -102,9 +123,20 @@ export class PaymentsService implements OnModuleInit {
       throw new BadRequestException('Aucun paiement à confirmer');
     }
 
-    const intent = await this.stripe.paymentIntents.retrieve(
-      order.stripe_payment_intent_id,
-    );
+    let intent: StripeNs.PaymentIntent;
+    try {
+      intent = await this.stripe.paymentIntents.retrieve(
+        order.stripe_payment_intent_id,
+      );
+    } catch (err) {
+      if (!isResourceMissing(err)) throw err;
+      // Stored intent no longer exists under the current key — can't confirm;
+      // leave the order pending for the webhook / a fresh checkout to resolve.
+      this.logger.warn(
+        `Cannot confirm order ${order.id}: PaymentIntent ${order.stripe_payment_intent_id} not found.`,
+      );
+      return { status: 'pending' };
+    }
 
     if (intent.status === 'succeeded') {
       await this.supabase.client
