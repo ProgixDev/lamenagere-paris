@@ -1,5 +1,13 @@
-import React from "react";
-import { View, Text, Image } from "react-native";
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  Modal,
+  ScrollView,
+  Dimensions,
+} from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { COLORS } from "../../lib/constants";
@@ -11,6 +19,7 @@ interface MessageBubbleProps {
 }
 
 const MEDIA_W = 200;
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
 function VideoAttachment({ uri }: { uri: string }) {
   const player = useVideoPlayer(uri, (p) => {
@@ -23,6 +32,90 @@ function VideoAttachment({ uri }: { uri: string }) {
       contentFit="cover"
       nativeControls
     />
+  );
+}
+
+function ImageAttachment({ uri }: { uri: string }) {
+  const [fullscreen, setFullscreen] = useState(false);
+
+  return (
+    <>
+      <TouchableOpacity activeOpacity={0.9} onPress={() => setFullscreen(true)}>
+        <Image
+          source={{ uri }}
+          style={{ width: MEDIA_W, height: MEDIA_W, borderRadius: 12 }}
+          resizeMode="cover"
+        />
+        {/* Expand affordance */}
+        <View
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            width: 28,
+            height: 28,
+            borderRadius: 14,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <MaterialCommunityIcons name="fullscreen" size={18} color="#fff" />
+        </View>
+      </TouchableOpacity>
+
+      <Modal
+        visible={fullscreen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFullscreen(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.96)" }}>
+          {/* Pinch-to-zoom on iOS via ScrollView zoom */}
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{
+              flexGrow: 1,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            maximumZoomScale={4}
+            minimumZoomScale={1}
+            centerContent
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => setFullscreen(false)}
+              style={{ width: SCREEN_W, height: SCREEN_H, alignItems: "center", justifyContent: "center" }}
+            >
+              <Image
+                source={{ uri }}
+                style={{ width: SCREEN_W, height: SCREEN_H }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          </ScrollView>
+
+          <TouchableOpacity
+            onPress={() => setFullscreen(false)}
+            hitSlop={10}
+            style={{
+              position: "absolute",
+              top: 50,
+              right: 20,
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: "rgba(255,255,255,0.15)",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <MaterialCommunityIcons name="close" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -66,20 +159,15 @@ export default function MessageBubble({ message, showAvatar = true }: MessageBub
 
       <View style={{ alignItems: isUser ? "flex-end" : "flex-start" }}>
         {/* Attachments */}
-        {attachments.map((att, i) =>
-          att.type === "video" ? (
-            <View key={`${att.url}-${i}`} style={{ marginBottom: 6 }}>
+        {attachments.map((att, i) => (
+          <View key={`${att.url}-${i}`} style={{ marginBottom: 6 }}>
+            {att.type === "video" ? (
               <VideoAttachment uri={att.url} />
-            </View>
-          ) : (
-            <Image
-              key={`${att.url}-${i}`}
-              source={{ uri: att.url }}
-              style={{ width: MEDIA_W, height: MEDIA_W, borderRadius: 12, marginBottom: 6 }}
-              resizeMode="cover"
-            />
-          ),
-        )}
+            ) : (
+              <ImageAttachment uri={att.url} />
+            )}
+          </View>
+        ))}
 
         {/* Text bubble */}
         {hasText && (
