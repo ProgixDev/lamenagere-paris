@@ -35,7 +35,6 @@ import {
 } from "../../features/products/hooks";
 import HeroCarousel from "../../components/HeroCarousel";
 import SearchBar from "../../components/SearchBar";
-import PromoBanner from "../../components/PromoBanner";
 import LogoHeader from "../../components/layout/LogoHeader";
 
 const { width: W } = Dimensions.get("window");
@@ -434,8 +433,6 @@ export default function HomeScreen() {
         <View style={{ backgroundColor: COLORS.background }}>
           <TopCategoryTabs active={activeCategory} onSelect={setActiveCategory} categories={categories} />
         </View>
-
-        <PromoBanner />
 
         <HeroCarousel />
 

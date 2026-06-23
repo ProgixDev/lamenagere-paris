@@ -27,7 +27,6 @@ import {
 import { priceTagLabel } from "../../lib/pricing";
 import type { Product, Category } from "../../lib/types";
 import SearchBar from "../../components/SearchBar";
-import PromoBanner from "../../components/PromoBanner";
 import LogoHeader from "../../components/layout/LogoHeader";
 
 const { width: W } = Dimensions.get("window");
@@ -77,8 +76,6 @@ export default function CategoriesScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        <PromoBanner />
-
         {/* ── Editorial hero ───────────────────────── */}
         <View style={{ paddingHorizontal: PAGE_PAD, marginTop: 8, marginBottom: 6 }}>
           <Text
