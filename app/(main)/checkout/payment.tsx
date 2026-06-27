@@ -1,5 +1,14 @@
 import React, { useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Image,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -12,6 +21,11 @@ import Button from "../../../components/ui/Button";
 import CheckoutSteps from "../../../components/cart/CheckoutSteps";
 import { useCart } from "../../../features/cart/hooks";
 import { createOrderApi } from "../../../features/orders/api";
+import {
+  pickMessageMedia,
+  uploadMessageMedia,
+  type Attachment,
+} from "../../../features/messaging/upload";
 import {
   createPaymentIntentApi,
   confirmPaymentApi,
@@ -27,6 +41,24 @@ export default function CheckoutPaymentScreen() {
   const { shippingAddressId, territory, shippingMethod, setLastOrderNumber } =
     useCheckoutStore();
   const [loading, setLoading] = useState(false);
+  const [note, setNote] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  const handlePickAttachment = async () => {
+    if (uploading || loading) return;
+    const asset = await pickMessageMedia();
+    if (!asset) return;
+    setUploading(true);
+    try {
+      const uploaded = await uploadMessageMedia(asset);
+      setAttachments((prev) => [...prev, uploaded]);
+    } catch {
+      Alert.alert("Erreur", "L'envoi du fichier a échoué. Réessayez.");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handlePayment = async () => {
     if (!shippingAddressId) {
@@ -56,6 +88,8 @@ export default function CheckoutPaymentScreen() {
         shippingAddressId,
         shippingMethod,
         territory,
+        customerNote: note.trim() || undefined,
+        customerAttachments: attachments.length ? attachments : undefined,
       });
 
       // 2. Create the Stripe PaymentIntent for that order.
@@ -143,7 +177,123 @@ export default function CheckoutPaymentScreen() {
           </View>
         </View>
 
-        <Button label="Payer" onPress={handlePayment} loading={loading} size="lg" />
+        {/* Note + attachments — let the buyer describe their order and join photos. */}
+        <View className="rounded-xl p-5 mb-8" style={{ backgroundColor: COLORS.surfaceContainerLow }}>
+          <View className="flex-row items-center gap-2 mb-3">
+            <MaterialCommunityIcons name="note-text-outline" size={20} color={COLORS.secondary} />
+            <Text className="text-sm font-semibold" style={{ color: COLORS.primary, fontFamily: "Manrope_700Bold" }}>
+              Note pour votre commande
+            </Text>
+          </View>
+          <Text className="text-xs mb-3" style={{ color: COLORS.outline, fontFamily: "Inter_400Regular" }}>
+            Précisez vos besoins (dimensions, finitions, instructions…) et joignez
+            des photos si besoin.
+          </Text>
+
+          <View
+            className="rounded-xl px-4 py-3 mb-3"
+            style={{ backgroundColor: COLORS.background, minHeight: 90 }}
+          >
+            <TextInput
+              value={note}
+              onChangeText={setNote}
+              placeholder="Écrire une note (facultatif)…"
+              placeholderTextColor={COLORS.surfaceDim}
+              multiline
+              editable={!loading}
+              style={{
+                fontSize: 14,
+                color: COLORS.onSurface,
+                fontFamily: "Inter_400Regular",
+                lineHeight: 20,
+                textAlignVertical: "top",
+                minHeight: 64,
+              }}
+            />
+          </View>
+
+          {(attachments.length > 0 || uploading) && (
+            <View className="flex-row flex-wrap gap-2 mb-3">
+              {attachments.map((att, i) => (
+                <View key={`${att.url}-${i}`} style={{ width: 60, height: 60 }}>
+                  {att.type === "video" ? (
+                    <View
+                      style={{
+                        width: 60,
+                        height: 60,
+                        borderRadius: 10,
+                        backgroundColor: COLORS.surfaceContainer,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <MaterialCommunityIcons name="play-circle" size={26} color={COLORS.primary} />
+                    </View>
+                  ) : (
+                    <Image
+                      source={{ uri: att.url }}
+                      style={{ width: 60, height: 60, borderRadius: 10 }}
+                      resizeMode="cover"
+                    />
+                  )}
+                  <TouchableOpacity
+                    onPress={() =>
+                      setAttachments((prev) => prev.filter((_, idx) => idx !== i))
+                    }
+                    hitSlop={6}
+                    style={{
+                      position: "absolute",
+                      top: -6,
+                      right: -6,
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      backgroundColor: COLORS.onSurface,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <MaterialCommunityIcons name="close" size={12} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {uploading && (
+                <View
+                  style={{
+                    width: 60,
+                    height: 60,
+                    borderRadius: 10,
+                    backgroundColor: COLORS.surfaceContainer,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                </View>
+              )}
+            </View>
+          )}
+
+          <TouchableOpacity
+            onPress={handlePickAttachment}
+            disabled={uploading || loading}
+            className="flex-row items-center gap-2 self-start rounded-full px-4 py-2"
+            style={{ backgroundColor: COLORS.background, opacity: uploading || loading ? 0.6 : 1 }}
+          >
+            <MaterialCommunityIcons name="paperclip" size={18} color={COLORS.secondary} />
+            <Text className="text-sm font-medium" style={{ color: COLORS.secondary, fontFamily: "Inter_500Medium" }}>
+              Ajouter une photo
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <Button
+          label="Payer"
+          onPress={handlePayment}
+          loading={loading}
+          disabled={uploading}
+          size="lg"
+        />
 
         <Text className="text-[10px] text-center mt-4" style={{ color: COLORS.outline }}>
           Paiement sécurisé par Stripe. Vos données sont chiffrées.

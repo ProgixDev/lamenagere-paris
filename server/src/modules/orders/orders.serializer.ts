@@ -10,6 +10,11 @@ import { ProductDto } from '../catalog/catalog.serializer';
 import { AddressDto } from '../auth/auth.serializer';
 
 // ── Rows ────────────────────────────────────────────────────────────────────
+export interface OrderAttachment {
+  url: string;
+  type: 'image' | 'video';
+}
+
 export interface OrderItemRow {
   id: string;
   product_id: string | null;
@@ -58,6 +63,8 @@ export interface OrderRow {
   tracking_number: string | null;
   tracking_url: string | null;
   is_b2b: boolean;
+  customer_note: string | null;
+  customer_attachments: OrderAttachment[] | null;
   created_at: string;
   items?: OrderItemRow[];
   timeline?: OrderTimelineRow[];
@@ -95,6 +102,8 @@ export interface OrderDto {
   territory: ShippingZone;
   shippingMethod: string;
   estimatedDelivery: string;
+  customerNote?: string;
+  customerAttachments: OrderAttachment[];
   createdAt: string;
   timeline: OrderTimelineEntryDto[];
 }
@@ -191,6 +200,8 @@ export function toOrderDto(row: OrderRow): OrderDto {
     territory: row.territory,
     shippingMethod: row.shipping_method,
     estimatedDelivery: row.estimated_delivery,
+    customerNote: row.customer_note ?? undefined,
+    customerAttachments: row.customer_attachments ?? [],
     createdAt: row.created_at,
     timeline: buildTimeline(row),
   };

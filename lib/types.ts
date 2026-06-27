@@ -126,6 +126,10 @@ export interface Order {
   territory: ShippingZone;
   shippingMethod: string;
   estimatedDelivery: string;
+  /** Free-text note the buyer left when placing the order. */
+  customerNote?: string;
+  /** Photos/videos the buyer attached to the order. */
+  customerAttachments?: { url: string; type: "image" | "video" }[];
   createdAt: string;
   timeline: OrderTimelineEntry[];
 }

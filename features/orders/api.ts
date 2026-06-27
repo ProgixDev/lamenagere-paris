@@ -22,6 +22,8 @@ export const createOrderApi = async (payload: {
   shippingAddressId: string;
   shippingMethod: string;
   territory: string;
+  customerNote?: string;
+  customerAttachments?: { url: string; type: "image" | "video" }[];
 }): Promise<Order> => {
   const { data } = await apiClient.post<Order>("/orders", payload);
   return data;

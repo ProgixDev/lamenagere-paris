@@ -35,6 +35,13 @@ export class OrderItemInputDto {
   @IsOptional() @IsString() openingType?: string;
 }
 
+const ATTACHMENT_TYPES = ['image', 'video'] as const;
+
+export class OrderAttachmentDto {
+  @IsString() url!: string;
+  @IsEnum(ATTACHMENT_TYPES) type!: 'image' | 'video';
+}
+
 export class CreateOrderDto {
   @IsArray()
   @ValidateNested({ each: true })
@@ -44,4 +51,14 @@ export class CreateOrderDto {
   @IsString() shippingAddressId!: string;
   @IsString() shippingMethod!: string;
   @IsEnum(ZONES) territory!: ShippingZone;
+
+  /** Optional free-text note from the buyer describing their order. */
+  @IsOptional() @IsString() customerNote?: string;
+
+  /** Optional photos/videos the buyer attached to their order. */
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OrderAttachmentDto)
+  customerAttachments?: OrderAttachmentDto[];
 }

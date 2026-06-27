@@ -185,6 +185,8 @@ export class OrdersService {
         ship_country: address.country,
         ship_territory: address.territory,
         is_b2b: isB2b,
+        customer_note: dto.customerNote?.trim() || null,
+        customer_attachments: dto.customerAttachments ?? [],
       })
       .select('id')
       .single<{ id: string }>();
