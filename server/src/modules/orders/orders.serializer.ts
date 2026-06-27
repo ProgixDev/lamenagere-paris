@@ -6,7 +6,11 @@ import {
   orderStatusLabel,
   ShippingZone,
 } from '../../common/serialization/status-labels';
-import { ProductDto } from '../catalog/catalog.serializer';
+import {
+  ProductDto,
+  ConfigSelectionEntry,
+  ItemConfiguration,
+} from '../catalog/catalog.serializer';
 import { AddressDto } from '../auth/auth.serializer';
 
 // ── Rows ────────────────────────────────────────────────────────────────────
@@ -27,6 +31,7 @@ export interface OrderItemRow {
   custom_width: number | null;
   custom_height: number | null;
   opening_type: string | null;
+  configuration: ConfigSelectionEntry[] | null;
 }
 
 export interface OrderTimelineRow {
@@ -88,6 +93,7 @@ export interface OrderItemDto {
   price: number;
   customDimensions?: { width: number; height: number };
   openingType?: string;
+  configuration?: ItemConfiguration;
 }
 
 export interface OrderTimelineEntryDto {
@@ -201,6 +207,7 @@ export function toOrderDto(row: OrderRow): OrderDto {
         ? { width: Number(it.custom_width), height: Number(it.custom_height) }
         : undefined,
     openingType: it.opening_type ?? undefined,
+    configuration: it.configuration?.length ? it.configuration : undefined,
   }));
 
   return {

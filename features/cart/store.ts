@@ -1,8 +1,15 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { persistStorage } from "../../lib/persist-storage";
-import type { Product, CartItem } from "../../lib/types";
+import type { Product, CartItem, ItemConfiguration } from "../../lib/types";
 import { computeConfiguredPrice } from "../../lib/pricing";
+
+/** Optional configuration captured from the category's config blocks. */
+interface AddItemExtra {
+  configuration?: ItemConfiguration;
+  /** Add-on surcharge (euros) from selected colors/accessories/openings. */
+  configSurcharge?: number;
+}
 
 interface CartStore {
   items: CartItem[];
@@ -12,6 +19,7 @@ interface CartStore {
     quantity?: number,
     customDimensions?: { width: number; height: number },
     openingType?: string,
+    extra?: AddItemExtra,
   ) => void;
   removeItem: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
@@ -24,7 +32,7 @@ export const useCartStore = create<CartStore>()(
       items: [],
       lastUpdated: Date.now(),
 
-      addItem: (product, quantity = 1, customDimensions, openingType) => {
+      addItem: (product, quantity = 1, customDimensions, openingType, extra) => {
         // Made-to-measure products (priced per m²) can't be added without
         // dimensions — there'd be no price. The customer must configure them
         // on the product page first.
@@ -40,16 +48,19 @@ export const useCartStore = create<CartStore>()(
           return;
         }
         const { items } = get();
-        // A made-to-measure line (custom dimensions or chosen opening type) is
-        // unique — never merge it into another line. Plain products still merge.
-        const isConfigured = !!customDimensions || !!openingType;
+        const configuration = extra?.configuration?.length ? extra.configuration : undefined;
+        // A made-to-measure line (custom dimensions, opening type, or any config
+        // selection) is unique — never merge it. Plain products still merge.
+        const isConfigured = !!customDimensions || !!openingType || !!configuration;
         const existingIndex = isConfigured
           ? -1
           : items.findIndex((item) => item.product.id === product.id);
 
-        const calculatedPrice =
+        const base =
           computeConfiguredPrice(product, customDimensions, openingType) ??
-          product.price;
+          product.price ??
+          0;
+        const calculatedPrice = base + (extra?.configSurcharge ?? 0);
 
         if (existingIndex >= 0) {
           const updated = [...items];
@@ -65,6 +76,7 @@ export const useCartStore = create<CartStore>()(
             quantity,
             customDimensions,
             openingType,
+            configuration,
             calculatedPrice,
           };
           set({ items: [...items, newItem], lastUpdated: Date.now() });

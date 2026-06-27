@@ -10,6 +10,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { ShippingZone } from '../../../common/serialization/status-labels';
+import { ConfigSelectionEntry } from '../../catalog/catalog.serializer';
 
 const ZONES: ShippingZone[] = [
   'metropole',
@@ -33,6 +34,8 @@ export class OrderItemInputDto {
   @Type(() => CustomDimensionsDto)
   customDimensions?: CustomDimensionsDto;
   @IsOptional() @IsString() openingType?: string;
+  /** Captured config-block selections (re-priced server-side). */
+  @IsOptional() @IsArray() configuration?: ConfigSelectionEntry[];
 }
 
 const ATTACHMENT_TYPES = ['image', 'video'] as const;

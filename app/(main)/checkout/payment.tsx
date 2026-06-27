@@ -84,6 +84,7 @@ export default function CheckoutPaymentScreen() {
           quantity: item.quantity,
           customDimensions: item.customDimensions,
           openingType: item.openingType,
+          configuration: item.configuration,
         })),
         shippingAddressId,
         shippingMethod,

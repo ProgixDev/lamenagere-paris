@@ -19,6 +19,7 @@ import {
   TrackingInfo,
 } from './orders.serializer';
 import { CreateOrderDto } from './dto/create-order.dto';
+import type { ConfigBlock } from '../catalog/catalog.serializer';
 
 interface AddressRowFull {
   id: string;
@@ -49,6 +50,7 @@ interface ProductForOrder {
   delivery_metropole: string;
   delivery_outremer: string;
   media: { url: string; type: string; is_primary: boolean }[];
+  category: { config_blocks: ConfigBlock[] | null } | null;
 }
 
 @Injectable()
@@ -148,7 +150,7 @@ export class OrdersService {
     const { data: products } = await this.supabase.client
       .from('products')
       .select(
-        'id, name, price_mode, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, ref_width, ref_height, min_width, min_height, max_width, max_height, opening_types, delivery_metropole, delivery_outremer, media:product_media(url,type,is_primary)',
+        'id, name, price_mode, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, ref_width, ref_height, min_width, min_height, max_width, max_height, opening_types, delivery_metropole, delivery_outremer, media:product_media(url,type,is_primary), category:categories(config_blocks)',
       )
       .in('id', productIds)
       .returns<ProductForOrder[]>();
@@ -160,11 +162,18 @@ export class OrdersService {
       if (!product) {
         throw new BadRequestException(`Produit introuvable: ${item.productId}`);
       }
-      const unit = this.pricing.resolveUnitPriceCents(
+      const baseUnit = this.pricing.resolveUnitPriceCents(
         product,
         item.customDimensions,
         item.openingType,
       );
+      // Re-price config-block add-ons (colors/accessories/openings) server-side
+      // and snapshot the selection for the order line.
+      const { surchargeCents, snapshot } = this.pricing.priceConfiguration(
+        product.category?.config_blocks ?? [],
+        item.configuration,
+      );
+      const unit = baseUnit + surchargeCents;
       subtotal += unit * item.quantity;
       const primary =
         product.media?.find((m) => m.is_primary && m.type === 'image') ??
@@ -178,6 +187,7 @@ export class OrdersService {
         custom_width: item.customDimensions?.width ?? null,
         custom_height: item.customDimensions?.height ?? null,
         opening_type: item.openingType ?? null,
+        configuration: snapshot,
       };
     });
 

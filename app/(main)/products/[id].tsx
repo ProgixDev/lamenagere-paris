@@ -29,6 +29,13 @@ import PressableScale from "../../../components/ui/PressableScale";
 import Input from "../../../components/ui/Input";
 import Toast from "../../../components/ui/Toast";
 import ContactSellerSheet from "../../../components/product/ContactSellerSheet";
+import ProductConfigBlocks from "../../../components/product/ProductConfigBlocks";
+import {
+  buildConfiguration,
+  configSurchargeEuros,
+  configValidation,
+  type ConfigState,
+} from "../../../lib/config-blocks";
 import { getProductImage } from "../../../lib/mock-data";
 import { useCartStore } from "../../../features/cart/store";
 import { useFavoritesStore } from "../../../features/favorites/store";
@@ -55,6 +62,7 @@ export default function ProductDetailScreen() {
   const [customWidth, setCustomWidth] = useState("");
   const [customHeight, setCustomHeight] = useState("");
   const [openingType, setOpeningType] = useState<string | null>(null);
+  const [configState, setConfigState] = useState<ConfigState>({});
   const [territory, setTerritory] = useState<Territory>("metropole");
   const [activeTab, setActiveTab] = useState<"overview" | "specs">("overview");
   const [contactOpen, setContactOpen] = useState(false);
@@ -95,6 +103,7 @@ export default function ProductDetailScreen() {
     product.productType === PRODUCT_TYPES.CONFIGURABLE || isPerSqm;
   const openingTypes = product.openingTypes ?? [];
   const hasOpeningTypes = openingTypes.length > 0;
+  const configBlocks = product.category.configBlocks ?? [];
   const galleryImages = product.images.length > 0 ? product.images : ["__placeholder__"];
 
   const dims =
@@ -102,18 +111,28 @@ export default function ProductDetailScreen() {
       ? { width: parseFloat(customWidth), height: parseFloat(customHeight) }
       : undefined;
 
+  // Captured config-block selections + their add-on surcharge (euros).
+  const configuration = buildConfiguration(configBlocks, configState);
+  const configSurcharge = configSurchargeEuros(configuration);
+  const configCheck = configValidation(configBlocks, configState);
+
   // Live, display-only price (server re-validates at checkout).
-  const livePrice = computeConfiguredPrice(product, dims, openingType ?? undefined);
+  const basePrice = computeConfiguredPrice(product, dims, openingType ?? undefined);
+  const livePrice = basePrice != null ? basePrice + configSurcharge : undefined;
 
   // The cart button stays disabled until every required choice is made, so the
   // user can never tap it into an error state.
   const canAddToCart =
-    (!needsDimensions || !!dims) && (!hasOpeningTypes || !!openingType);
+    (!needsDimensions || !!dims) &&
+    (!hasOpeningTypes || !!openingType) &&
+    configCheck.ok;
   const missingHint = needsDimensions && !dims
     ? "Renseignez vos dimensions pour continuer"
     : hasOpeningTypes && !openingType
       ? "Choisissez un type d'ouverture"
-      : null;
+      : !configCheck.ok
+        ? configCheck.hint ?? "Complétez votre configuration"
+        : null;
 
   const handleAddToCart = async () => {
     if (needsDimensions && !dims) {
@@ -126,8 +145,16 @@ export default function ProductDetailScreen() {
       setToast({ visible: true, message: "Choisissez un type d'ouverture", type: "error" });
       return;
     }
+    if (!configCheck.ok) {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setToast({ visible: true, message: configCheck.hint ?? "Complétez votre configuration", type: "error" });
+      return;
+    }
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    addItem(product, quantity, dims, openingType ?? undefined);
+    addItem(product, quantity, dims, openingType ?? undefined, {
+      configuration,
+      configSurcharge,
+    });
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 1500);
     setToast({ visible: true, message: "Ajouté au panier", type: "success" });
@@ -474,6 +501,13 @@ export default function ProductDetailScreen() {
                 </View>
               </Section>
             )}
+
+            {/* Category configuration blocks (kitchens, sofas, accessories…) */}
+            <ProductConfigBlocks
+              blocks={configBlocks}
+              value={configState}
+              onChange={setConfigState}
+            />
 
             {/* Delivery */}
             <Section title="Livraison estimée">

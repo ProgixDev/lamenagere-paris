@@ -1,4 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import type {
+  ConfigBlock,
+  ConfigBlockItem,
+  ConfigBlockOption,
+  ConfigSelectionEntry,
+} from '../../modules/catalog/catalog.serializer';
 
 export type PriceMode = 'fixed' | 'calculated' | 'per_sqm' | 'quote';
 
@@ -53,6 +59,100 @@ export class PricingService {
   ): number {
     const base = this.resolveBaseCents(product, customDimensions);
     return base + this.openingSurchargeCents(product, openingType);
+  }
+
+  /**
+   * Re-prices the customer's config-block selections against the category's
+   * authoritative blocks (never trusting client-sent prices) and rebuilds a
+   * clean snapshot to store on the order line. Unknown blocks/keys are skipped
+   * so a stale selection can't break checkout.
+   */
+  priceConfiguration(
+    blocks: ConfigBlock[],
+    selection?: ConfigSelectionEntry[] | null,
+  ): { surchargeCents: number; snapshot: ConfigSelectionEntry[] } {
+    if (!selection?.length || !blocks?.length) {
+      return { surchargeCents: 0, snapshot: [] };
+    }
+    const byId = new Map(blocks.map((b) => [b.id, b]));
+    let surchargeCents = 0;
+    const snapshot: ConfigSelectionEntry[] = [];
+
+    for (const sel of selection) {
+      const block = byId.get(sel.blockId);
+      if (!block) continue;
+      const entry: ConfigSelectionEntry = {
+        blockId: block.id,
+        type: block.type,
+        label: block.label,
+      };
+      let touched = false;
+
+      if (block.type === 'measurements' && sel.measurements?.length) {
+        const fields = new Map((block.fields ?? []).map((f) => [f.key, f]));
+        const ms = sel.measurements
+          .map((m) => {
+            const f = fields.get(m.key);
+            let v = Number(m.value);
+            if (!f || !Number.isFinite(v)) return null;
+            if (f.min != null && v < f.min) v = f.min;
+            if (f.max != null && v > f.max) v = f.max;
+            return { key: f.key, label: f.label, value: v, unit: f.unit };
+          })
+          .filter((m): m is NonNullable<typeof m> => m != null);
+        if (ms.length) {
+          entry.measurements = ms;
+          touched = true;
+        }
+      } else if (block.type === 'shape' && sel.shape) {
+        const opt = (block.options ?? []).find((o) => o.key === sel.shape!.key);
+        if (opt) {
+          entry.shape = { key: opt.key, label: opt.label };
+          touched = true;
+        }
+      } else if (block.type === 'colors' && sel.colors?.length) {
+        const opts = block.options ?? [];
+        const colors = sel.colors
+          .map((c) => opts.find((o) => o.key === c.key))
+          .filter((o): o is ConfigBlockOption => !!o)
+          .map((o) => ({ key: o.key, label: o.label, surchargeCents: o.surchargeCents }));
+        colors.forEach((c) => (surchargeCents += c.surchargeCents ?? 0));
+        if (colors.length) {
+          entry.colors = colors;
+          touched = true;
+        }
+      } else if (block.type === 'accessories' && sel.accessories?.length) {
+        const items = block.items ?? [];
+        const accs = sel.accessories
+          .map((a) => items.find((i) => i.id === a.id))
+          .filter((i): i is ConfigBlockItem => !!i)
+          .map((i) => ({ id: i.id, title: i.title, priceCents: i.priceCents }));
+        accs.forEach((a) => (surchargeCents += a.priceCents ?? 0));
+        if (accs.length) {
+          entry.accessories = accs;
+          touched = true;
+        }
+      } else if (block.type === 'opening_details' && sel.opening) {
+        const opt = (block.options ?? []).find((o) => o.key === sel.opening!.key);
+        if (opt) {
+          entry.opening = { key: opt.key, label: opt.label, surchargeCents: opt.surchargeCents };
+          surchargeCents += opt.surchargeCents ?? 0;
+          touched = true;
+        }
+      } else if (block.type === 'photos' && sel.photos?.length) {
+        const photos = sel.photos
+          .filter((p) => typeof p?.url === 'string')
+          .map((p) => ({ url: p.url, type: p.type === 'video' ? ('video' as const) : ('image' as const) }));
+        if (photos.length) {
+          entry.photos = photos;
+          touched = true;
+        }
+      }
+
+      if (touched) snapshot.push(entry);
+    }
+
+    return { surchargeCents, snapshot };
   }
 
   private resolveBaseCents(

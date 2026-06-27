@@ -1,5 +1,5 @@
 import { apiClient } from "../../lib/api";
-import type { Order } from "../../lib/types";
+import type { Order, ItemConfiguration } from "../../lib/types";
 import type { TrackingInfo } from "./types";
 
 export const getOrdersApi = async (): Promise<Order[]> => {
@@ -18,6 +18,7 @@ export const createOrderApi = async (payload: {
     quantity: number;
     customDimensions?: { width: number; height: number };
     openingType?: string;
+    configuration?: ItemConfiguration;
   }[];
   shippingAddressId: string;
   shippingMethod: string;

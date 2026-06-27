@@ -15,6 +15,14 @@ export interface UploadResult {
   url: string;
 }
 
+export interface MediaItem {
+  path: string;
+  url: string;
+  name: string;
+  size?: number;
+  createdAt?: string;
+}
+
 /** Dedicated public bucket holding category cover images. */
 export const CATEGORY_IMAGE_BUCKET = 'category-images';
 
@@ -71,6 +79,32 @@ export class StorageService {
   getPublicUrl(path: string): string {
     return this.storageForFolder(this.folderOf(path)).getPublicUrl(path).data
       .publicUrl;
+  }
+
+  /** Lists previously-uploaded files in a folder (newest first) for the media library. */
+  async list(folder: MediaFolder, limit = 200): Promise<MediaItem[]> {
+    const storage = this.storageForFolder(folder);
+    const { data, error } = await storage.list(folder, {
+      limit,
+      sortBy: { column: 'created_at', order: 'desc' },
+    });
+    if (error) {
+      throw new InternalServerErrorException(
+        `Échec du listage des médias: ${error.message}`,
+      );
+    }
+    return (data ?? [])
+      .filter((f) => f.id) // skip pseudo-folder entries (no id)
+      .map((f) => {
+        const path = `${folder}/${f.name}`;
+        return {
+          path,
+          url: storage.getPublicUrl(path).data.publicUrl,
+          name: f.name,
+          size: (f.metadata?.size as number | undefined) ?? undefined,
+          createdAt: f.created_at ?? undefined,
+        };
+      });
   }
 
   async remove(paths: string[]): Promise<void> {

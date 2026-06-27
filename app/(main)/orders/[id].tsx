@@ -22,6 +22,7 @@ import {
   useCancelOrder,
   useRequestRefund,
 } from "../../../features/orders/hooks";
+import { summarizeConfiguration } from "../../../lib/config-blocks";
 import type { RefundStatus } from "../../../lib/types";
 
 const CANCELLABLE_STATUSES = ["commande_confirmee", "en_preparation"];
@@ -173,16 +174,28 @@ export default function OrderDetailScreen() {
         {/* Items */}
         <Card padding="lg">
           <Text className="text-sm font-semibold mb-3" style={{ color: COLORS.onSurface }}>Articles</Text>
-          {order.items.map((item) => (
-            <View key={item.id} className="flex-row justify-between mb-2">
-              <Text className="text-sm flex-1" style={{ color: COLORS.onSurface }} numberOfLines={1}>
-                {item.product.name} x{item.quantity}
-              </Text>
-              <Text className="text-sm" style={{ color: COLORS.secondary }}>
-                {formatPrice(item.price * item.quantity)}
-              </Text>
-            </View>
-          ))}
+          {order.items.map((item) => {
+            const summary = item.configuration?.length
+              ? summarizeConfiguration(item.configuration)
+              : "";
+            return (
+              <View key={item.id} className="flex-row justify-between mb-2">
+                <View className="flex-1 pr-2">
+                  <Text className="text-sm" style={{ color: COLORS.onSurface }} numberOfLines={1}>
+                    {item.product.name} x{item.quantity}
+                  </Text>
+                  {summary ? (
+                    <Text className="text-xs mt-0.5" style={{ color: COLORS.outline }} numberOfLines={2}>
+                      {summary}
+                    </Text>
+                  ) : null}
+                </View>
+                <Text className="text-sm" style={{ color: COLORS.secondary }}>
+                  {formatPrice(item.price * item.quantity)}
+                </Text>
+              </View>
+            );
+          })}
         </Card>
 
         {/* Address */}

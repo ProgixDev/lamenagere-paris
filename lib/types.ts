@@ -56,7 +56,65 @@ export interface Category {
   image?: string;
   description?: string;
   productCount?: number;
+  /** Configuration blocks (template) products of this category inherit. */
+  configBlocks?: ConfigBlock[];
 }
+
+// ── Category configuration blocks (templates) ───────────────────────────────
+export type ConfigBlockType =
+  | "measurements"
+  | "shape"
+  | "colors"
+  | "accessories"
+  | "opening_details"
+  | "photos";
+
+export interface ConfigBlockField {
+  key: string;
+  label: string;
+  unit?: string;
+  min?: number;
+  max?: number;
+}
+export interface ConfigBlockOption {
+  key: string;
+  label: string;
+  image?: string;
+  hex?: string;
+  surchargeCents?: number;
+}
+export interface ConfigBlockItem {
+  id: string;
+  title: string;
+  image?: string;
+  priceCents?: number;
+}
+export interface ConfigBlock {
+  id: string;
+  type: ConfigBlockType;
+  label: string;
+  required?: boolean;
+  multiple?: boolean;
+  helpText?: string;
+  planImage?: string;
+  fields?: ConfigBlockField[];
+  options?: ConfigBlockOption[];
+  items?: ConfigBlockItem[];
+}
+
+// ── Captured selection snapshot (stored on cart + order lines) ──────────────
+export interface ConfigSelectionEntry {
+  blockId: string;
+  type: ConfigBlockType;
+  label: string;
+  measurements?: { key: string; label: string; value: number; unit?: string }[];
+  shape?: { key: string; label: string };
+  colors?: { key: string; label: string; surchargeCents?: number }[];
+  accessories?: { id: string; title: string; priceCents?: number }[];
+  opening?: { key: string; label: string; surchargeCents?: number };
+  photos?: { url: string; type: "image" | "video" }[];
+}
+export type ItemConfiguration = ConfigSelectionEntry[];
 
 export interface Product {
   id: string;
@@ -111,6 +169,8 @@ export interface CartItem {
   };
   /** Chosen opening type key (e.g. "coulissante"), when the product offers them. */
   openingType?: string;
+  /** Captured selections for the category's config blocks. */
+  configuration?: ItemConfiguration;
   calculatedPrice?: number;
 }
 
@@ -152,6 +212,7 @@ export interface OrderItem {
     height: number;
   };
   openingType?: string;
+  configuration?: ItemConfiguration;
 }
 
 export interface OrderTimelineEntry {

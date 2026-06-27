@@ -5,6 +5,7 @@ import * as Haptics from "expo-haptics";
 import { COLORS } from "../../lib/constants";
 import { formatPrice, formatDimensions } from "../../lib/utils";
 import { openingTypeLabel } from "../../lib/opening-types";
+import { summarizeConfiguration } from "../../lib/config-blocks";
 import { getProductImage } from "../../lib/mock-data";
 import type { CartItem as CartItemType } from "../../lib/types";
 import QuantitySelector from "../ui/QuantitySelector";
@@ -20,9 +21,10 @@ export default function CartItem({
   onUpdateQuantity,
   onRemove,
 }: CartItemProps) {
-  const { product, quantity, customDimensions, openingType, calculatedPrice } = item;
+  const { product, quantity, customDimensions, openingType, configuration, calculatedPrice } = item;
   const price = calculatedPrice || product.price || 0;
   const imgSource = getProductImage(product.images[0]);
+  const configSummary = configuration?.length ? summarizeConfiguration(configuration) : "";
 
   const handleRemove = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -108,6 +110,20 @@ export default function CartItem({
               {openingTypeLabel(openingType)}
             </Text>
           )}
+
+          {configSummary ? (
+            <Text
+              style={{
+                fontSize: 11,
+                fontFamily: "Inter_400Regular",
+                color: COLORS.outline,
+                marginTop: 2,
+              }}
+              numberOfLines={2}
+            >
+              {configSummary}
+            </Text>
+          ) : null}
 
           <Text
             style={{

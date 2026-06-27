@@ -55,6 +55,20 @@ export interface ConfigBlock {
   items?: ConfigBlockItem[];
 }
 
+// ── Captured selection snapshot (stored on order_items.configuration) ───────
+export interface ConfigSelectionEntry {
+  blockId: string;
+  type: ConfigBlockType;
+  label: string;
+  measurements?: { key: string; label: string; value: number; unit?: string }[];
+  shape?: { key: string; label: string };
+  colors?: { key: string; label: string; surchargeCents?: number }[];
+  accessories?: { id: string; title: string; priceCents?: number }[];
+  opening?: { key: string; label: string; surchargeCents?: number };
+  photos?: { url: string; type: 'image' | 'video' }[];
+}
+export type ItemConfiguration = ConfigSelectionEntry[];
+
 // ── DB row shapes ───────────────────────────────────────────────────────────
 export interface CategoryRow {
   id: string;
