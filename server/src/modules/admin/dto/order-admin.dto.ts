@@ -35,6 +35,10 @@ export class UpdateOrderDto {
   @IsOptional() @IsString() estimatedDelivery?: string;
 }
 
+export class RejectRefundDto {
+  @IsOptional() @IsString() note?: string;
+}
+
 export class OrderListQuery {
   @IsOptional() @IsEnum(STATUSES) status?: OrderStatus;
   @IsOptional() @IsString() territory?: string;

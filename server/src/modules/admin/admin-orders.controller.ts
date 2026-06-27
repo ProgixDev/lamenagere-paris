@@ -17,6 +17,7 @@ import { AdminOrdersService } from './admin-orders.service';
 import {
   AddOrderNoteDto,
   OrderListQuery,
+  RejectRefundDto,
   ShipOrderDto,
   UpdateOrderDto,
   UpdateOrderStatusDto,
@@ -62,10 +63,23 @@ export class AdminOrdersController {
     return this.orders.ship(id, dto);
   }
 
+  // Admin-initiated direct refund (kept for backward compatibility) — same as accept.
   @Post(':id/refund')
   @HttpCode(200)
   refund(@Param('id') id: string) {
-    return this.orders.refund(id);
+    return this.orders.acceptRefund(id);
+  }
+
+  @Post(':id/refund/accept')
+  @HttpCode(200)
+  acceptRefund(@Param('id') id: string) {
+    return this.orders.acceptRefund(id);
+  }
+
+  @Post(':id/refund/reject')
+  @HttpCode(200)
+  rejectRefund(@Param('id') id: string, @Body() dto: RejectRefundDto) {
+    return this.orders.rejectRefund(id, dto.note);
   }
 
   @Post(':id/note')

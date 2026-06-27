@@ -10,6 +10,8 @@ import { ProductDto } from '../catalog/catalog.serializer';
 import { AddressDto } from '../auth/auth.serializer';
 
 // ── Rows ────────────────────────────────────────────────────────────────────
+export type RefundStatus = 'none' | 'requested' | 'refunded' | 'rejected';
+
 export interface OrderAttachment {
   url: string;
   type: 'image' | 'video';
@@ -65,6 +67,13 @@ export interface OrderRow {
   is_b2b: boolean;
   customer_note: string | null;
   customer_attachments: OrderAttachment[] | null;
+  refund_status: RefundStatus;
+  refund_reason: string | null;
+  refund_decision_note: string | null;
+  refund_requested_at: string | null;
+  refund_decided_at: string | null;
+  refund_amount_cents: number | null;
+  stripe_refund_id: string | null;
   created_at: string;
   items?: OrderItemRow[];
   timeline?: OrderTimelineRow[];
@@ -104,6 +113,12 @@ export interface OrderDto {
   estimatedDelivery: string;
   customerNote?: string;
   customerAttachments: OrderAttachment[];
+  refundStatus: RefundStatus;
+  refundReason?: string;
+  refundDecisionNote?: string;
+  refundRequestedAt?: string;
+  refundDecidedAt?: string;
+  refundAmount?: number;
   createdAt: string;
   timeline: OrderTimelineEntryDto[];
 }
@@ -118,6 +133,7 @@ export interface AdminOrderDto {
   total: string;
   status: OrderStatus;
   statusLabel: string;
+  refundStatus: RefundStatus;
   image: string;
   createdAt: string;
   territory: ShippingZone;
@@ -202,6 +218,15 @@ export function toOrderDto(row: OrderRow): OrderDto {
     estimatedDelivery: row.estimated_delivery,
     customerNote: row.customer_note ?? undefined,
     customerAttachments: row.customer_attachments ?? [],
+    refundStatus: row.refund_status ?? 'none',
+    refundReason: row.refund_reason ?? undefined,
+    refundDecisionNote: row.refund_decision_note ?? undefined,
+    refundRequestedAt: row.refund_requested_at ?? undefined,
+    refundDecidedAt: row.refund_decided_at ?? undefined,
+    refundAmount:
+      row.refund_amount_cents != null
+        ? centsToEuros(row.refund_amount_cents)
+        : undefined,
     createdAt: row.created_at,
     timeline: buildTimeline(row),
   };
@@ -239,6 +264,7 @@ export function toAdminOrderDto(row: OrderRow): AdminOrderDto {
     total: formatEURFromCents(row.total_cents),
     status: row.status,
     statusLabel: orderStatusLabel(row.status),
+    refundStatus: row.refund_status ?? 'none',
     image: firstImage ?? '',
     createdAt: row.created_at,
     territory: row.territory,

@@ -1,5 +1,13 @@
-import React from "react";
-import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  Alert,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -9,15 +17,60 @@ import Skeleton from "../../../components/ui/Skeleton";
 import OrderTimeline from "../../../components/order/OrderTimeline";
 import Button from "../../../components/ui/Button";
 import Card from "../../../components/ui/Card";
-import { useOrder, useCancelOrder } from "../../../features/orders/hooks";
+import {
+  useOrder,
+  useCancelOrder,
+  useRequestRefund,
+} from "../../../features/orders/hooks";
+import type { RefundStatus } from "../../../lib/types";
 
 const CANCELLABLE_STATUSES = ["commande_confirmee", "en_preparation"];
+
+const REFUND_BANNER: Record<
+  Exclude<RefundStatus, "none">,
+  { icon: keyof typeof MaterialCommunityIcons.glyphMap; title: string; tone: string }
+> = {
+  requested: {
+    icon: "clock-outline",
+    title: "Remboursement en cours d'examen",
+    tone: COLORS.secondary,
+  },
+  refunded: {
+    icon: "check-circle-outline",
+    title: "Remboursement effectué",
+    tone: "#1B873F",
+  },
+  rejected: {
+    icon: "close-circle-outline",
+    title: "Demande de remboursement refusée",
+    tone: COLORS.error,
+  },
+};
 
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { data: order, isLoading } = useOrder(id);
   const cancelOrder = useCancelOrder();
+  const requestRefund = useRequestRefund(id);
+  const [refundModal, setRefundModal] = useState(false);
+  const [refundReason, setRefundReason] = useState("");
+
+  const submitRefund = () => {
+    requestRefund.mutate(refundReason.trim() || undefined, {
+      onSuccess: () => {
+        setRefundModal(false);
+        setRefundReason("");
+      },
+      onError: (e: any) =>
+        Alert.alert(
+          "Erreur",
+          e?.response?.data?.message ||
+            e?.message ||
+            "Impossible d'envoyer la demande de remboursement",
+        ),
+    });
+  };
 
   const handleCancel = () => {
     if (!order) return;
@@ -76,6 +129,42 @@ export default function OrderDetailScreen() {
             {formatDate(order.createdAt)}
           </Text>
         </View>
+
+        {order.refundStatus && order.refundStatus !== "none" && (
+          <View
+            className="rounded-xl p-4 flex-row gap-3"
+            style={{ backgroundColor: COLORS.surfaceContainerLow }}
+          >
+            <MaterialCommunityIcons
+              name={REFUND_BANNER[order.refundStatus].icon}
+              size={22}
+              color={REFUND_BANNER[order.refundStatus].tone}
+            />
+            <View className="flex-1">
+              <Text
+                className="text-sm font-semibold"
+                style={{ color: REFUND_BANNER[order.refundStatus].tone, fontFamily: "Manrope_700Bold" }}
+              >
+                {REFUND_BANNER[order.refundStatus].title}
+              </Text>
+              {order.refundStatus === "refunded" && order.refundAmount != null && (
+                <Text className="text-xs mt-1" style={{ color: COLORS.onSurfaceVariant }}>
+                  {formatPrice(order.refundAmount)} remboursés sur votre moyen de paiement.
+                </Text>
+              )}
+              {order.refundStatus === "rejected" && order.refundDecisionNote && (
+                <Text className="text-xs mt-1" style={{ color: COLORS.onSurfaceVariant }}>
+                  {order.refundDecisionNote}
+                </Text>
+              )}
+              {order.refundStatus === "requested" && (
+                <Text className="text-xs mt-1" style={{ color: COLORS.onSurfaceVariant }}>
+                  Votre demande a bien été transmise. Nous reviendrons vers vous rapidement.
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
 
         <Card padding="lg">
           <OrderTimeline timeline={order.timeline} />
@@ -137,7 +226,85 @@ export default function OrderDetailScreen() {
             loading={cancelOrder.isPending}
           />
         )}
+
+        {order.paymentStatus === "paid" &&
+          (!order.refundStatus || order.refundStatus === "none") && (
+            <Button
+              label="DEMANDER UN REMBOURSEMENT"
+              onPress={() => setRefundModal(true)}
+              variant="secondary"
+              size="lg"
+            />
+          )}
       </ScrollView>
+
+      {/* Refund reason modal */}
+      <Modal
+        visible={refundModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRefundModal(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.45)",
+            justifyContent: "center",
+            paddingHorizontal: 24,
+          }}
+        >
+          <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: 20 }}>
+            <Text
+              className="text-base font-semibold mb-2"
+              style={{ color: COLORS.onSurface, fontFamily: "Manrope_700Bold" }}
+            >
+              Demander un remboursement
+            </Text>
+            <Text className="text-xs mb-3" style={{ color: COLORS.onSurfaceVariant }}>
+              Expliquez-nous brièvement la raison (facultatif). Notre équipe
+              examinera votre demande.
+            </Text>
+            <View
+              className="rounded-xl px-4 py-3 mb-4"
+              style={{ backgroundColor: COLORS.surfaceContainerLow, minHeight: 90 }}
+            >
+              <TextInput
+                value={refundReason}
+                onChangeText={setRefundReason}
+                placeholder="Motif du remboursement…"
+                placeholderTextColor={COLORS.surfaceDim}
+                multiline
+                editable={!requestRefund.isPending}
+                style={{
+                  fontSize: 14,
+                  color: COLORS.onSurface,
+                  fontFamily: "Inter_400Regular",
+                  lineHeight: 20,
+                  textAlignVertical: "top",
+                  minHeight: 64,
+                }}
+              />
+            </View>
+            <View className="flex-row gap-3">
+              <View className="flex-1">
+                <Button
+                  label="Annuler"
+                  onPress={() => setRefundModal(false)}
+                  variant="secondary"
+                  disabled={requestRefund.isPending}
+                />
+              </View>
+              <View className="flex-1">
+                <Button
+                  label="Envoyer"
+                  onPress={submitRefund}
+                  loading={requestRefund.isPending}
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

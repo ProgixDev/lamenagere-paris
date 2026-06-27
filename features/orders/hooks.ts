@@ -1,5 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getOrdersApi, getOrderByIdApi, cancelOrderApi } from "./api";
+import {
+  getOrdersApi,
+  getOrderByIdApi,
+  cancelOrderApi,
+  requestRefundApi,
+} from "./api";
 
 export const useOrders = () =>
   useQuery({
@@ -22,6 +27,17 @@ export const useCancelOrder = () => {
     onSuccess: (_, orderId) => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       queryClient.invalidateQueries({ queryKey: ["order", orderId] });
+    },
+  });
+};
+
+export const useRequestRefund = (orderId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (reason?: string) => requestRefundApi(orderId, reason),
+    onSuccess: (order) => {
+      queryClient.setQueryData(["order", orderId], order);
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
     },
   });
 };

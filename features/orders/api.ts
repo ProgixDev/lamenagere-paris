@@ -33,6 +33,17 @@ export const cancelOrderApi = async (orderId: string): Promise<void> => {
   await apiClient.post(`/orders/${orderId}/cancel`);
 };
 
+export const requestRefundApi = async (
+  orderId: string,
+  reason?: string,
+): Promise<Order> => {
+  const { data } = await apiClient.post<Order>(
+    `/orders/${orderId}/request-refund`,
+    { reason },
+  );
+  return data;
+};
+
 export const trackOrderApi = async (
   orderId: string,
 ): Promise<TrackingInfo> => {

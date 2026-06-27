@@ -10,6 +10,7 @@ import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { AuthUser } from '../../common/auth/auth-user';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { RequestRefundDto } from './dto/request-refund.dto';
 
 @Controller('orders')
 export class OrdersController {
@@ -39,5 +40,15 @@ export class OrdersController {
   @HttpCode(200)
   cancel(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.orders.cancel(user.id, id);
+  }
+
+  @Post(':id/request-refund')
+  @HttpCode(200)
+  requestRefund(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: RequestRefundDto,
+  ) {
+    return this.orders.requestRefund(user.id, id, dto.reason);
   }
 }

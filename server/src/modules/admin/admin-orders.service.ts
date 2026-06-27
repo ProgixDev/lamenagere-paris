@@ -4,6 +4,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
+import { PaymentsService } from '../payments/payments.service';
+import { DevicesService } from '../notifications/devices.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { formatEURFromCents } from '../../common/serialization/money.util';
 import {
   orderStatusLabel,
@@ -38,7 +41,12 @@ export interface AdminOrderDetail {
 
 @Injectable()
 export class AdminOrdersService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly payments: PaymentsService,
+    private readonly devices: DevicesService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async list(query: OrderListQuery): Promise<PaginatedResponse<AdminOrderDto>> {
     const page = Number(query.page ?? 1);
@@ -156,14 +164,68 @@ export class AdminOrdersService {
     return { id: data.id, body: data.body, createdAt: data.created_at };
   }
 
-  /** Refund is deferred (Stripe). Records intent on the timeline only. */
-  async refund(idOrNumber: string): Promise<{ status: string }> {
+  /**
+   * Accepts a refund: issues the real Stripe refund (idempotent), marks the
+   * order refunded, records an audit note and notifies the customer. Works
+   * whether or not the customer filed a request first (admin-initiated refund).
+   */
+  async acceptRefund(idOrNumber: string): Promise<AdminOrderDto> {
     const row = await this.loadByIdOrNumber(idOrNumber);
+    if (row.refund_status === 'refunded') {
+      return toAdminOrderDto(row); // already done — no-op
+    }
+
+    const { refundId, amountCents } = await this.payments.refundOrder(row.id);
+
+    await this.supabase.client
+      .from('orders')
+      .update({
+        refund_status: 'refunded',
+        refund_amount_cents: amountCents,
+        refund_decided_at: new Date().toISOString(),
+      })
+      .eq('id', row.id);
+
     await this.supabase.client.from('order_notes').insert({
       order_id: row.id,
-      body: 'Remboursement demandé (intégration Stripe à venir).',
+      body: `Remboursement accepté et traité (Stripe ${refundId}, ${formatEURFromCents(amountCents)}).`,
     });
-    return { status: 'pending_refund' };
+
+    await this.notifyCustomer(
+      row.profile_id,
+      'Remboursement accepté',
+      `Votre remboursement de ${formatEURFromCents(amountCents)} pour la commande ${row.order_number} a été traité.`,
+      row.id,
+    );
+
+    return toAdminOrderDto(await this.loadByIdOrNumber(idOrNumber));
+  }
+
+  /** Rejects a refund request: records the decision and notifies the customer. */
+  async rejectRefund(idOrNumber: string, note?: string): Promise<AdminOrderDto> {
+    const row = await this.loadByIdOrNumber(idOrNumber);
+    await this.supabase.client
+      .from('orders')
+      .update({
+        refund_status: 'rejected',
+        refund_decision_note: note?.trim() || null,
+        refund_decided_at: new Date().toISOString(),
+      })
+      .eq('id', row.id);
+
+    await this.supabase.client.from('order_notes').insert({
+      order_id: row.id,
+      body: `Demande de remboursement refusée${note?.trim() ? `: ${note.trim()}` : ''}.`,
+    });
+
+    await this.notifyCustomer(
+      row.profile_id,
+      'Demande de remboursement refusée',
+      `Votre demande de remboursement pour la commande ${row.order_number} a été refusée.`,
+      row.id,
+    );
+
+    return toAdminOrderDto(await this.loadByIdOrNumber(idOrNumber));
   }
 
   async exportCsv(): Promise<string> {
@@ -188,6 +250,26 @@ export class AdminOrdersService {
   }
 
   // ── helpers ────────────────────────────────────────────────────────────────
+  /** Best-effort push to the order's customer; never throws into the request. */
+  private async notifyCustomer(
+    profileId: string,
+    title: string,
+    body: string,
+    orderId: string,
+  ): Promise<void> {
+    try {
+      const tokens = await this.devices.tokensForProfiles([profileId]);
+      if (tokens.length === 0) return;
+      await this.notifications.send(tokens, {
+        title,
+        body,
+        data: { orderId, type: 'refund' },
+      });
+    } catch {
+      // notifications are non-critical — swallow so the refund still succeeds
+    }
+  }
+
   private async appendTimeline(
     orderId: string,
     status: OrderStatus,

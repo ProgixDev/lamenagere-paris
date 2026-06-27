@@ -19,6 +19,14 @@ interface OrderPaymentRow {
   stripe_payment_intent_id: string | null;
 }
 
+interface OrderRefundRow {
+  id: string;
+  total_cents: number;
+  payment_status: string;
+  stripe_payment_intent_id: string | null;
+  stripe_refund_id: string | null;
+}
+
 // True when Stripe reports the object doesn't exist under the current key
 // (e.g. "No such payment_intent" after a key/account switch).
 function isResourceMissing(err: unknown): boolean {
@@ -149,6 +157,62 @@ export class PaymentsService implements OnModuleInit {
     // Anything else (processing, requires_action, canceled…) leaves the order
     // pending; the webhook will reconcile the final state.
     return { status: 'pending' };
+  }
+
+  /**
+   * Issues a FULL Stripe refund for a paid order and marks it refunded.
+   * Idempotent: if the order already has a stripe_refund_id we return it
+   * without calling Stripe again, so a double "accept" never double-refunds.
+   * Throws if the order isn't paid or has no PaymentIntent to refund.
+   */
+  async refundOrder(
+    orderId: string,
+  ): Promise<{ refundId: string; amountCents: number }> {
+    const { data: order } = await this.supabase.client
+      .from('orders')
+      .select(
+        'id, total_cents, payment_status, stripe_payment_intent_id, stripe_refund_id',
+      )
+      .eq('id', orderId)
+      .maybeSingle<OrderRefundRow>();
+
+    if (!order) throw new NotFoundException('Commande introuvable');
+
+    // Already refunded → return the existing refund (idempotent).
+    if (order.stripe_refund_id) {
+      return { refundId: order.stripe_refund_id, amountCents: order.total_cents };
+    }
+    if (order.payment_status !== 'paid') {
+      throw new BadRequestException(
+        'Seules les commandes payées peuvent être remboursées',
+      );
+    }
+    if (!order.stripe_payment_intent_id) {
+      throw new BadRequestException(
+        'Aucun paiement Stripe associé à cette commande',
+      );
+    }
+
+    let refund: StripeNs.Refund;
+    try {
+      refund = await this.stripe.refunds.create({
+        payment_intent: order.stripe_payment_intent_id,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Échec du remboursement Stripe';
+      this.logger.error(
+        `Stripe refund failed for order ${order.id}: ${message}`,
+      );
+      throw new BadRequestException(`Remboursement Stripe impossible: ${message}`);
+    }
+
+    await this.supabase.client
+      .from('orders')
+      .update({ stripe_refund_id: refund.id, payment_status: 'refunded' })
+      .eq('id', order.id);
+
+    return { refundId: refund.id, amountCents: order.total_cents };
   }
 
   /**

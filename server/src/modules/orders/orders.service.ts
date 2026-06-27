@@ -78,6 +78,43 @@ export class OrdersService {
     return toTracking(row);
   }
 
+  /**
+   * Customer files a refund request on a paid order. Only allowed once per
+   * order while no request/decision is in flight; an admin later accepts
+   * (issuing the Stripe refund) or rejects it.
+   */
+  async requestRefund(
+    userId: string,
+    id: string,
+    reason?: string,
+  ): Promise<OrderDto> {
+    const row = await this.loadOwned(userId, id);
+    if (row.payment_status !== 'paid') {
+      throw new BadRequestException(
+        'Seules les commandes payées peuvent faire l’objet d’un remboursement',
+      );
+    }
+    if (row.refund_status && row.refund_status !== 'none') {
+      throw new BadRequestException(
+        'Une demande de remboursement est déjà en cours ou a déjà été traitée',
+      );
+    }
+    await this.supabase.client
+      .from('orders')
+      .update({
+        refund_status: 'requested',
+        refund_reason: reason?.trim() || null,
+        refund_requested_at: new Date().toISOString(),
+      })
+      .eq('id', row.id);
+    await this.supabase.client.from('order_notes').insert({
+      order_id: row.id,
+      author_id: userId,
+      body: `Demande de remboursement du client: ${reason?.trim() || '(aucun motif précisé)'}`,
+    });
+    return this.findOne(userId, row.id);
+  }
+
   async cancel(userId: string, id: string): Promise<void> {
     const row = await this.loadOwned(userId, id);
     if (row.status === 'expediee' || row.status === 'livree') {

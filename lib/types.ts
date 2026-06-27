@@ -130,9 +130,17 @@ export interface Order {
   customerNote?: string;
   /** Photos/videos the buyer attached to the order. */
   customerAttachments?: { url: string; type: "image" | "video" }[];
+  paymentStatus?: PaymentStatus;
+  refundStatus?: RefundStatus;
+  refundReason?: string;
+  refundDecisionNote?: string;
+  refundAmount?: number;
   createdAt: string;
   timeline: OrderTimelineEntry[];
 }
+
+export type PaymentStatus = "unpaid" | "paid" | "failed" | "refunded";
+export type RefundStatus = "none" | "requested" | "refunded" | "rejected";
 
 export interface OrderItem {
   id: string;

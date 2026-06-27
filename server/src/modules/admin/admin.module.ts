@@ -28,8 +28,10 @@ import { AdminUsersService } from './admin-users.service';
 import { AdminActivityController } from './admin-activity.controller';
 import { AuditInterceptor } from '../../common/interceptors/audit.interceptor';
 import { HomeController } from '../catalog/home.controller';
+import { PaymentsModule } from '../payments/payments.module';
 
 @Module({
+  imports: [PaymentsModule],
   controllers: [
     AdminProductsController,
     AdminCategoriesController,
