@@ -50,6 +50,7 @@ interface ProductForOrder {
   delivery_metropole: string;
   delivery_outremer: string;
   media: { url: string; type: string; is_primary: boolean }[];
+  config_blocks: ConfigBlock[] | null;
   category: { config_blocks: ConfigBlock[] | null } | null;
 }
 
@@ -150,7 +151,7 @@ export class OrdersService {
     const { data: products } = await this.supabase.client
       .from('products')
       .select(
-        'id, name, price_mode, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, ref_width, ref_height, min_width, min_height, max_width, max_height, opening_types, delivery_metropole, delivery_outremer, media:product_media(url,type,is_primary), category:categories(config_blocks)',
+        'id, name, price_mode, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, ref_width, ref_height, min_width, min_height, max_width, max_height, opening_types, delivery_metropole, delivery_outremer, config_blocks, media:product_media(url,type,is_primary), category:categories(config_blocks)',
       )
       .in('id', productIds)
       .returns<ProductForOrder[]>();
@@ -169,8 +170,11 @@ export class OrdersService {
       );
       // Re-price config-block add-ons (colors/accessories/openings) server-side
       // and snapshot the selection for the order line.
+      const effectiveBlocks = product.config_blocks?.length
+        ? product.config_blocks
+        : product.category?.config_blocks ?? [];
       const { surchargeCents, snapshot } = this.pricing.priceConfiguration(
-        product.category?.config_blocks ?? [],
+        effectiveBlocks,
         item.configuration,
       );
       const unit = baseUnit + surchargeCents;

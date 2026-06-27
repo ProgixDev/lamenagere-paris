@@ -10,6 +10,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
+import { ConfigBlock } from '../../catalog/catalog.serializer';
 
 export type ProductType = 'standard' | 'quote_only' | 'configurable';
 export type PriceMode = 'fixed' | 'calculated' | 'per_sqm' | 'quote';
@@ -74,6 +75,12 @@ export class UpsertProductDto {
   /** Optional ordered media URLs already uploaded via /admin/media. */
   @IsOptional() @IsArray() imageUrls?: string[];
   @IsOptional() @IsArray() videoUrls?: string[];
+
+  /**
+   * Per-product override of the category's config blocks. Empty/omitted →
+   * the product inherits its category template (stored as null).
+   */
+  @IsOptional() @IsArray() configBlocks?: ConfigBlock[];
 }
 
 export class BulkActionDto {

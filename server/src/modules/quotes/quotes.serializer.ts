@@ -82,6 +82,7 @@ function stubProduct(row: QuoteRow): ProductDto {
     media: row.product_image
       ? [{ type: 'image', url: row.product_image }]
       : [],
+    configBlocks: [],
     createdAt: '',
   };
 }

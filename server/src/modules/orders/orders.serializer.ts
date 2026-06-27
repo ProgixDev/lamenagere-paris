@@ -163,6 +163,7 @@ function stubProduct(item: OrderItemRow): ProductDto {
     media: item.product_image
       ? [{ type: 'image', url: item.product_image }]
       : [],
+    configBlocks: [],
     createdAt: '',
   };
 }

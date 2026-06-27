@@ -156,6 +156,8 @@ export interface Product {
     outreMer: string;
   };
   media: { type: "image" | "video"; url: string }[];
+  /** Effective config blocks (product override ?? category template). */
+  configBlocks?: ConfigBlock[];
   createdAt: string;
 }
 

@@ -103,7 +103,8 @@ export default function ProductDetailScreen() {
     product.productType === PRODUCT_TYPES.CONFIGURABLE || isPerSqm;
   const openingTypes = product.openingTypes ?? [];
   const hasOpeningTypes = openingTypes.length > 0;
-  const configBlocks = product.category.configBlocks ?? [];
+  // Effective blocks: product override wins, else the category template.
+  const configBlocks = product.configBlocks ?? product.category.configBlocks ?? [];
   const galleryImages = product.images.length > 0 ? product.images : ["__placeholder__"];
 
   const dims =
