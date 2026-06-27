@@ -73,7 +73,7 @@ function stubProduct(row: QuoteRow): ProductDto {
     name: row.product_name ?? 'Produit',
     slug: '',
     description: '',
-    category: { id: '', name: '', slug: '', icon: '' },
+    category: { id: '', name: '', slug: '', icon: '', configBlocks: [] },
     productType: 'quote_only',
     priceMode: 'quote',
     images: row.product_image ? [row.product_image] : [],

@@ -87,6 +87,7 @@ export class AdminCategoriesService {
       b2b_only: dto.b2bOnly ?? false,
       delivery_override: dto.deliveryOverride,
     };
+    if (dto.configBlocks != null) row.config_blocks = dto.configBlocks;
     if (dto.sortOrder != null) row.sort_order = dto.sortOrder;
     if (id) row.id = id;
 

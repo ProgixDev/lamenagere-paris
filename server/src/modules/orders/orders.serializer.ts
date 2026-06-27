@@ -147,7 +147,7 @@ function stubProduct(item: OrderItemRow): ProductDto {
     name: item.product_name,
     slug: '',
     description: '',
-    category: { id: '', name: '', slug: '', icon: '' },
+    category: { id: '', name: '', slug: '', icon: '', configBlocks: [] },
     productType: 'standard',
     priceMode: 'fixed',
     price: centsToEuros(item.unit_price_cents),

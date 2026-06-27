@@ -7,19 +7,19 @@
 
 -- refund_status values: 'none' | 'requested' | 'refunded' | 'rejected'.
 ALTER TABLE orders
-  ADD COLUMN refund_status text NOT NULL DEFAULT 'none';
+  ADD COLUMN IF NOT EXISTS refund_status text NOT NULL DEFAULT 'none';
 ALTER TABLE orders
-  ADD COLUMN refund_reason text;             -- customer's stated reason
+  ADD COLUMN IF NOT EXISTS refund_reason text;             -- customer's stated reason
 ALTER TABLE orders
-  ADD COLUMN refund_decision_note text;      -- admin's note (esp. on reject)
+  ADD COLUMN IF NOT EXISTS refund_decision_note text;      -- admin's note (esp. on reject)
 ALTER TABLE orders
-  ADD COLUMN refund_requested_at timestamptz;
+  ADD COLUMN IF NOT EXISTS refund_requested_at timestamptz;
 ALTER TABLE orders
-  ADD COLUMN refund_decided_at timestamptz;
+  ADD COLUMN IF NOT EXISTS refund_decided_at timestamptz;
 ALTER TABLE orders
-  ADD COLUMN refund_amount_cents integer;    -- amount actually refunded
+  ADD COLUMN IF NOT EXISTS refund_amount_cents integer;    -- amount actually refunded
 ALTER TABLE orders
-  ADD COLUMN stripe_refund_id text;          -- Stripe refund id (idempotency)
+  ADD COLUMN IF NOT EXISTS stripe_refund_id text;          -- Stripe refund id (idempotency)
 
-CREATE INDEX idx_orders_refund_status ON orders(refund_status)
+CREATE INDEX IF NOT EXISTS idx_orders_refund_status ON orders(refund_status)
   WHERE refund_status <> 'none';

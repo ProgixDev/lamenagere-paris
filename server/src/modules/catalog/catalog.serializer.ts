@@ -9,6 +9,52 @@ export type PriceMode = 'fixed' | 'calculated' | 'per_sqm' | 'quote';
 export type ProductStatus = 'publie' | 'brouillon' | 'archive';
 export type StockLabel = 'en_stock' | 'stock_faible' | 'rupture' | null;
 
+// ── Category configuration blocks (templates) ───────────────────────────────
+export type ConfigBlockType =
+  | 'measurements'
+  | 'shape'
+  | 'colors'
+  | 'accessories'
+  | 'opening_details'
+  | 'photos';
+
+export interface ConfigBlockField {
+  key: string;
+  label: string;
+  unit?: string;
+  min?: number;
+  max?: number;
+}
+
+export interface ConfigBlockOption {
+  key: string;
+  label: string;
+  image?: string;
+  hex?: string;
+  surchargeCents?: number;
+}
+
+export interface ConfigBlockItem {
+  id: string;
+  title: string;
+  image?: string;
+  priceCents?: number;
+}
+
+export interface ConfigBlock {
+  id: string;
+  type: ConfigBlockType;
+  label: string;
+  required?: boolean;
+  /** Allow selecting more than one option/item (colors, accessories). */
+  multiple?: boolean;
+  helpText?: string;
+  planImage?: string;
+  fields?: ConfigBlockField[];
+  options?: ConfigBlockOption[];
+  items?: ConfigBlockItem[];
+}
+
 // ── DB row shapes ───────────────────────────────────────────────────────────
 export interface CategoryRow {
   id: string;
@@ -24,6 +70,7 @@ export interface CategoryRow {
   is_featured_home: boolean;
   b2b_only: boolean;
   delivery_override: string | null;
+  config_blocks: ConfigBlock[] | null;
 }
 
 export interface ProductMediaRow {
@@ -80,6 +127,8 @@ export interface CategoryDto {
   image?: string;
   description?: string;
   productCount?: number;
+  /** Ordered configuration blocks products of this category inherit. */
+  configBlocks: ConfigBlock[];
 }
 
 export interface ProductDto {
@@ -132,6 +181,7 @@ export function toCategoryDto(row: CategoryRow, productCount?: number): Category
     image: row.image_url ?? undefined,
     description: row.description ?? undefined,
     productCount,
+    configBlocks: row.config_blocks ?? [],
   };
 }
 
@@ -154,7 +204,7 @@ export function toProductDto(row: ProductRow): ProductDto {
     description: row.description,
     category: row.category
       ? toCategoryDto(row.category)
-      : ({ id: row.category_id, name: '', slug: '', icon: '' } as CategoryDto),
+      : ({ id: row.category_id, name: '', slug: '', icon: '', configBlocks: [] } as CategoryDto),
     productType: row.product_type,
     priceMode: row.price_mode,
     price: row.base_price_cents != null ? centsToEuros(row.base_price_cents) : undefined,
@@ -278,7 +328,7 @@ export const PRODUCT_SELECT =
   'id, sku, name, slug, description, short_description, category_id, product_type, price_mode, status, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, opening_types, dim_width, dim_height, dim_depth, dim_unit, ref_width, ref_height, ref_unit, min_width, min_height, max_width, max_height, customizable, delivery_metropole, delivery_outremer, stock_qty, low_stock_threshold, created_at, category:categories(*), media:product_media(*)';
 
 export const CATEGORY_SELECT =
-  'id, name, slug, icon, image_url, description, accent_color, parent_id, sort_order, is_visible, is_featured_home, b2b_only, delivery_override';
+  'id, name, slug, icon, image_url, description, accent_color, parent_id, sort_order, is_visible, is_featured_home, b2b_only, delivery_override, config_blocks';
 
 // imported above; re-export so callers have one import site.
 export { formatEUR };

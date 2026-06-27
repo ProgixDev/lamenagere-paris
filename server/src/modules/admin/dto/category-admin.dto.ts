@@ -6,6 +6,7 @@ import {
   IsString,
   MinLength,
 } from 'class-validator';
+import { ConfigBlock } from '../../catalog/catalog.serializer';
 
 export class UpsertCategoryDto {
   @IsString() @MinLength(1) name!: string;
@@ -20,6 +21,8 @@ export class UpsertCategoryDto {
   @IsOptional() @IsBoolean() isFeaturedHome?: boolean;
   @IsOptional() @IsBoolean() b2bOnly?: boolean;
   @IsOptional() @IsString() deliveryOverride?: string;
+  /** Ordered configuration blocks (template) for this category. */
+  @IsOptional() @IsArray() configBlocks?: ConfigBlock[];
 }
 
 export class ReorderDto {

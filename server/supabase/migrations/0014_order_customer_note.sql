@@ -6,6 +6,6 @@
 -- ============================================================================
 
 ALTER TABLE orders
-  ADD COLUMN customer_note text;
+  ADD COLUMN IF NOT EXISTS customer_note text;
 ALTER TABLE orders
-  ADD COLUMN customer_attachments jsonb NOT NULL DEFAULT '[]'::jsonb;
+  ADD COLUMN IF NOT EXISTS customer_attachments jsonb NOT NULL DEFAULT '[]'::jsonb;
