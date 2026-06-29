@@ -7,6 +7,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
 } from '@nestjs/common';
 import { Roles } from '../../common/auth/roles.decorator';
 import { AdminFeaturedService } from './admin-featured.service';
@@ -22,10 +23,10 @@ import {
 export class AdminFeaturedController {
   constructor(private readonly featured: AdminFeaturedService) {}
 
-  // featured products
+  // featured products (categoryId omitted ⇒ global home rail)
   @Get('products')
-  listFeatured() {
-    return this.featured.listFeatured();
+  listFeatured(@Query('categoryId') categoryId?: string) {
+    return this.featured.listFeatured(categoryId);
   }
 
   @Post('products')
@@ -42,8 +43,11 @@ export class AdminFeaturedController {
 
   @Delete('products/:productId')
   @HttpCode(204)
-  removeFeatured(@Param('productId') productId: string) {
-    return this.featured.removeFeatured(productId);
+  removeFeatured(
+    @Param('productId') productId: string,
+    @Query('categoryId') categoryId?: string,
+  ) {
+    return this.featured.removeFeatured(productId, categoryId);
   }
 
   // carousel

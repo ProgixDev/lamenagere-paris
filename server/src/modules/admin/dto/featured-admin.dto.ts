@@ -9,6 +9,8 @@ import {
 
 export class AddFeaturedDto {
   @IsString() productId!: string;
+  /** When set, features the product inside that category's rail, not the home rail. */
+  @IsOptional() @IsString() categoryId?: string;
 }
 
 export class UpsertSlideDto {
@@ -37,4 +39,6 @@ export class UpsertBannerDto {
 
 export class ReorderDto {
   @IsArray() ids!: string[];
+  /** Scope of the rail being reordered (omit for the global home rail). */
+  @IsOptional() @IsString() categoryId?: string;
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { COLORS } from "../lib/constants";
 import { getProductImage } from "../lib/mock-data";
 import { priceTagLabel } from "../lib/pricing";
 import { usePopularProducts } from "../features/products/hooks";
+import { useHeroSlides, type HeroSlide } from "../features/featured/store";
 
 const { width: W } = Dimensions.get("window");
 const HERO_W = W - 48;
@@ -23,38 +24,55 @@ const HERO_H = 200;
 const AUTO_ADVANCE_MS = 4000;
 
 /**
- * Auto-advancing carousel of featured products. Each slide is tappable and
- * navigates to the product page.
+ * Auto-advancing hero carousel driven by the admin's curated slides
+ * (GET /home). When no slides are configured, it falls back to the most
+ * popular products so the home is never empty. Each slide is tappable.
  */
 export default function HeroCarousel() {
-  const { data: products = [] } = usePopularProducts(8);
+  const adminSlides = useHeroSlides();
+  const { data: popular = [] } = usePopularProducts(8);
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
 
+  // Prefer the admin's slides; otherwise synthesize slides from popular products.
+  const slides = useMemo<HeroSlide[]>(() => {
+    if (adminSlides.length > 0) return adminSlides;
+    return popular.map((p) => ({
+      id: p.id,
+      kind: "image" as const,
+      src: p.images[0] ?? "",
+      title: p.name,
+      subtitle: priceTagLabel(p),
+      productId: p.id,
+    }));
+  }, [adminSlides, popular]);
+
   useEffect(() => {
-    if (products.length <= 1) return;
+    if (slides.length <= 1) return;
     const t = setInterval(() => {
       setIndex((prev) => {
-        const next = (prev + 1) % products.length;
+        const next = (prev + 1) % slides.length;
         scrollRef.current?.scrollTo({ x: next * HERO_W, animated: true });
         return next;
       });
     }, AUTO_ADVANCE_MS);
     return () => clearInterval(t);
-  }, [products.length]);
+  }, [slides.length]);
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const i = Math.round(e.nativeEvent.contentOffset.x / HERO_W);
     if (i !== index) setIndex(i);
   };
 
-  const openProduct = (id: string) => {
+  const openSlide = (slide: HeroSlide) => {
+    if (!slide.productId && !slide.categoryId) return;
     Haptics.selectionAsync();
-    router.push(`/(main)/products/${id}`);
+    if (slide.productId) router.push(`/(main)/products/${slide.productId}`);
+    else if (slide.categoryId) router.push(`/(main)/categories/${slide.categoryId}`);
   };
 
-  if (products.length === 0) return null;
+  if (slides.length === 0) return null;
 
   return (
     <View style={{ marginHorizontal: 24, marginBottom: 24 }}>
@@ -69,13 +87,13 @@ export default function HeroCarousel() {
         decelerationRate="fast"
         style={{ borderRadius: 16 }}
       >
-        {products.map((product) => {
-          const source = getProductImage(product.images[0]);
+        {slides.map((slide) => {
+          const source = getProductImage(slide.src);
           return (
             <TouchableOpacity
-              key={product.id}
+              key={slide.id}
               activeOpacity={0.95}
-              onPress={() => openProduct(product.id)}
+              onPress={() => openSlide(slide)}
               style={{ width: HERO_W, height: HERO_H }}
             >
               {source ? (
@@ -110,33 +128,25 @@ export default function HeroCarousel() {
                 }}
                 pointerEvents="none"
               >
-                <Text
-                  style={{
-                    fontSize: 10,
-                    color: "rgba(255,255,255,0.85)",
-                    fontFamily: "Inter_600SemiBold",
-                    letterSpacing: 2,
-                    textTransform: "uppercase",
-                    marginBottom: 4,
-                  }}
-                >
-                  Sélection
-                </Text>
+                {slide.subtitle ? (
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      color: "rgba(255,255,255,0.85)",
+                      fontFamily: "Inter_600SemiBold",
+                      letterSpacing: 2,
+                      textTransform: "uppercase",
+                      marginBottom: 4,
+                    }}
+                  >
+                    {slide.subtitle}
+                  </Text>
+                ) : null}
                 <Text
                   numberOfLines={1}
                   style={{ fontSize: 20, color: "#fff", fontFamily: "Manrope_700Bold" }}
                 >
-                  {product.name}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 14,
-                    color: "#fff",
-                    fontFamily: "Manrope_800ExtraBold",
-                    marginTop: 2,
-                  }}
-                >
-                  {priceTagLabel(product)}
+                  {slide.title}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -144,9 +154,9 @@ export default function HeroCarousel() {
         })}
       </ScrollView>
 
-      {products.length > 1 && (
+      {slides.length > 1 && (
         <View style={{ flexDirection: "row", justifyContent: "center", gap: 6, marginTop: 10 }}>
-          {products.map((_, i) => (
+          {slides.map((_, i) => (
             <View
               key={i}
               style={{

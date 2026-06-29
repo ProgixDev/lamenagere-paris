@@ -43,10 +43,24 @@ export class AdminFeaturedService {
   constructor(private readonly supabase: SupabaseService) {}
 
   // ── featured products ──────────────────────────────────────────────────────
-  async listFeatured(): Promise<ProductDto[]> {
-    const { data } = await this.supabase.client
-      .from('featured_products')
-      .select(`position, product:products(${PRODUCT_SELECT})`)
+  // A null categoryId targets the global home rail; a set categoryId targets
+  // that category's curated rail. Scope helpers keep the two rails independent.
+  private scopeCategory<T extends { eq: any; is: any }>(
+    query: T,
+    categoryId?: string,
+  ): T {
+    return categoryId
+      ? query.eq('category_id', categoryId)
+      : query.is('category_id', null);
+  }
+
+  async listFeatured(categoryId?: string): Promise<ProductDto[]> {
+    const { data } = await this.scopeCategory(
+      this.supabase.client
+        .from('featured_products')
+        .select(`position, product:products(${PRODUCT_SELECT})`),
+      categoryId,
+    )
       .order('position', { ascending: true })
       .returns<{ position: number; product: ProductRow | null }[]>();
     return (data ?? [])
@@ -55,33 +69,66 @@ export class AdminFeaturedService {
       .map(toProductDto);
   }
 
-  async addFeatured(dto: AddFeaturedDto): Promise<void> {
-    const { count } = await this.supabase.client
+  /** Public per-category "Notre sélection" rail (published products only). */
+  async listFeaturedForCategory(categoryId: string): Promise<ProductDto[]> {
+    const { data } = await this.supabase.client
       .from('featured_products')
-      .select('id', { count: 'exact', head: true });
+      .select(`position, product:products(${PRODUCT_SELECT})`)
+      .eq('category_id', categoryId)
+      .order('position', { ascending: true })
+      .returns<{ position: number; product: ProductRow | null }[]>();
+    return (data ?? [])
+      .map((r) => r.product)
+      .filter((p): p is ProductRow => !!p && p.status === 'publie')
+      .map(toProductDto);
+  }
+
+  async addFeatured(dto: AddFeaturedDto): Promise<void> {
+    const categoryId = dto.categoryId;
+    const { count } = await this.scopeCategory(
+      this.supabase.client
+        .from('featured_products')
+        .select('id', { count: 'exact', head: true }),
+      categoryId,
+    );
+    const { data: existing } = await this.scopeCategory(
+      this.supabase.client
+        .from('featured_products')
+        .select('id')
+        .eq('product_id', dto.productId),
+      categoryId,
+    ).maybeSingle();
+    if (existing) return; // already in this rail
     const { error } = await this.supabase.client
       .from('featured_products')
-      .upsert(
-        { product_id: dto.productId, position: count ?? 0 },
-        { onConflict: 'product_id' },
-      );
+      .insert({
+        product_id: dto.productId,
+        category_id: categoryId ?? null,
+        position: count ?? 0,
+      });
     if (error) throw new BadRequestException('Ajout impossible');
   }
 
-  async removeFeatured(productId: string): Promise<void> {
-    await this.supabase.client
-      .from('featured_products')
-      .delete()
-      .eq('product_id', productId);
+  async removeFeatured(productId: string, categoryId?: string): Promise<void> {
+    await this.scopeCategory(
+      this.supabase.client
+        .from('featured_products')
+        .delete()
+        .eq('product_id', productId),
+      categoryId,
+    );
   }
 
   async reorderFeatured(dto: ReorderDto): Promise<void> {
     await Promise.all(
       dto.ids.map((productId, position) =>
-        this.supabase.client
-          .from('featured_products')
-          .update({ position })
-          .eq('product_id', productId),
+        this.scopeCategory(
+          this.supabase.client
+            .from('featured_products')
+            .update({ position })
+            .eq('product_id', productId),
+          dto.categoryId,
+        ),
       ),
     );
   }

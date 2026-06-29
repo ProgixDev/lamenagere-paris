@@ -1,12 +1,22 @@
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import {
   getCategoriesApi,
+  getCategoryFeaturedApi,
+  getHomeApi,
   getPopularProductsApi,
   getProductByIdApi,
   getProductsByCategoryApi,
   getProductsByIdsApi,
   searchProductsApi,
 } from "./api";
+
+/** Admin-curated storefront home (featured products, carousel, banners). */
+export const useHome = () =>
+  useQuery({
+    queryKey: ["home"],
+    queryFn: getHomeApi,
+    staleTime: 5 * 60 * 1000,
+  });
 
 export const useCategories = () =>
   useQuery({
@@ -23,6 +33,15 @@ export const useProductsByCategory = (categoryId: string) =>
     getNextPageParam: (lastPage) =>
       lastPage.hasMore ? lastPage.page + 1 : undefined,
     initialPageParam: 1,
+    staleTime: 5 * 60 * 1000,
+  });
+
+/** Admin-curated "Notre sélection" rail for a category. */
+export const useCategoryFeatured = (categoryId: string) =>
+  useQuery({
+    queryKey: ["categories", categoryId, "featured"],
+    queryFn: () => getCategoryFeaturedApi(categoryId),
+    enabled: !!categoryId,
     staleTime: 5 * 60 * 1000,
   });
 

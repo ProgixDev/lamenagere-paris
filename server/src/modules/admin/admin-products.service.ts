@@ -170,7 +170,6 @@ export class AdminProductsService {
       low_stock_threshold: dto.lowStockThreshold,
       seo_title: dto.seoTitle,
       seo_description: dto.seoDescription,
-      is_featured: dto.isFeatured ?? false,
       // Empty/omitted → null so the product inherits its category template.
       config_blocks: dto.configBlocks?.length ? dto.configBlocks : null,
     };

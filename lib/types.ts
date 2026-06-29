@@ -278,3 +278,35 @@ export interface PaginatedResponse<T> {
   page: number;
   hasMore: boolean;
 }
+
+// ── Storefront home payload (GET /home) ─────────────────────────────────────
+export interface CarouselSlide {
+  id: string;
+  kind: "image" | "video";
+  title: string;
+  subtitle?: string;
+  mediaUrl: string;
+  linkKind: "none" | "category" | "product";
+  linkCategoryId?: string;
+  linkProductId?: string;
+  isActive: boolean;
+  position: number;
+}
+
+export interface PromoBanner {
+  id: string;
+  badge?: string;
+  title: string;
+  subtitle?: string;
+  style?: string;
+  startsAt?: string;
+  endsAt?: string;
+  isActive: boolean;
+  position: number;
+}
+
+export interface HomeData {
+  featured: Product[];
+  carousel: CarouselSlide[];
+  banners: PromoBanner[];
+}

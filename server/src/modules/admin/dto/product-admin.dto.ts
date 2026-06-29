@@ -70,7 +70,6 @@ export class UpsertProductDto {
 
   @IsOptional() @IsString() seoTitle?: string;
   @IsOptional() @IsString() seoDescription?: string;
-  @IsOptional() @IsBoolean() isFeatured?: boolean;
 
   /** Optional ordered media URLs already uploaded via /admin/media. */
   @IsOptional() @IsArray() imageUrls?: string[];

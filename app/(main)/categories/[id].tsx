@@ -28,6 +28,7 @@ import {
 import { useFavoritesStore } from "../../../features/favorites/store";
 import {
   useCategories,
+  useCategoryFeatured,
   useProductsByCategory,
 } from "../../../features/products/hooks";
 
@@ -117,6 +118,72 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
   );
 }
 
+// ─── "Notre sélection" rail (admin-curated, ordered) ──────
+function SelectionRail({ products }: { products: Product[] }) {
+  const router = useRouter();
+  if (products.length === 0) return null;
+  return (
+    <View style={{ paddingTop: 20 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          paddingHorizontal: 20,
+          marginBottom: 12,
+        }}
+      >
+        <MaterialCommunityIcons name="star" size={16} color={COLORS.primary} />
+        <Text style={{ fontSize: 18, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}>
+          Notre sélection
+        </Text>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
+      >
+        {products.map((product) => {
+          const source = getProductImage(product.images[0]);
+          return (
+            <TouchableOpacity
+              key={product.id}
+              activeOpacity={0.92}
+              onPress={() => router.push(`/(main)/products/${product.id}`)}
+              style={{ width: 150 }}
+            >
+              <View
+                style={{
+                  width: 150,
+                  height: 150,
+                  borderRadius: 12,
+                  overflow: "hidden",
+                  backgroundColor: COLORS.surfaceContainer,
+                }}
+              >
+                {source && (
+                  <Image source={source} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                )}
+              </View>
+              <Text
+                numberOfLines={2}
+                style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.onSurface, marginTop: 6 }}
+              >
+                {product.name}
+              </Text>
+              <Text
+                style={{ fontSize: 15, fontFamily: "Manrope_800ExtraBold", color: COLORS.secondary, marginTop: 2 }}
+              >
+                {priceTagLabel(product)}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
 const NEAR_BOTTOM_PX = 600;
 
 export default function CategoryProductsScreen() {
@@ -125,6 +192,7 @@ export default function CategoryProductsScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const { data: categories } = useCategories();
+  const { data: selection = [] } = useCategoryFeatured(id);
   const {
     data,
     fetchNextPage,
@@ -207,6 +275,9 @@ export default function CategoryProductsScreen() {
             </Text>
           </View>
         </View>
+
+        {/* Curated "Notre sélection" rail */}
+        <SelectionRail products={selection} />
 
         {/* Product grid */}
         {isLoading ? (

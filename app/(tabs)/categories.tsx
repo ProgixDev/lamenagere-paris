@@ -52,14 +52,13 @@ const CATEGORY_TAGLINES: Record<string, string> = {
   "6": "Détails qui font la pièce",
 };
 
-const HERO_CATEGORY_ID = "2"; // Cuisines
-
 export default function CategoriesScreen() {
   const router = useRouter();
   const featured = useFeaturedProducts();
   const { data: categories = [] } = useCategories();
   const { data: popular = [] } = usePopularProducts(6);
-  const heroCat = categories.find((c) => c.id === HERO_CATEGORY_ID) ?? categories[0];
+  // Hero = the first category in the admin-defined order (sort_order).
+  const heroCat = categories[0];
   const otherCats = heroCat
     ? categories.filter((c) => c.id !== heroCat.id)
     : categories;

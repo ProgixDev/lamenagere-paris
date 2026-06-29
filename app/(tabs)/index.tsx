@@ -27,7 +27,10 @@ import { priceTagLabel } from "../../lib/pricing";
 import type { Product } from "../../lib/types";
 import { useFavoritesStore } from "../../features/favorites/store";
 import { useCartStore } from "../../features/cart/store";
-import { useFeaturedProducts } from "../../features/featured/store";
+import {
+  useFeaturedProducts,
+  usePromoBanners,
+} from "../../features/featured/store";
 import {
   useCategories,
   usePopularProducts,
@@ -313,6 +316,137 @@ function ProductCardTemu({
   );
 }
 
+// ─── Promo banners (admin-curated) ────────────────────────
+function PromoBanners() {
+  const banners = usePromoBanners();
+  if (banners.length === 0) return null;
+  return (
+    <View style={{ paddingHorizontal: 24, marginBottom: 24, gap: 10 }}>
+      {banners.map((b) => (
+        <View
+          key={b.id}
+          style={{
+            borderRadius: 16,
+            padding: 18,
+            backgroundColor: COLORS.primary,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 14,
+          }}
+        >
+          {b.badge ? (
+            <View
+              style={{
+                backgroundColor: "rgba(255,255,255,0.18)",
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 999,
+              }}
+            >
+              <Text style={{ color: "#fff", fontFamily: "Manrope_700Bold", fontSize: 11 }}>
+                {b.badge}
+              </Text>
+            </View>
+          ) : null}
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: "#fff", fontFamily: "Manrope_700Bold", fontSize: 16 }}>
+              {b.title}
+            </Text>
+            {b.subtitle ? (
+              <Text
+                style={{
+                  color: "rgba(255,255,255,0.85)",
+                  fontFamily: "Inter_400Regular",
+                  fontSize: 12,
+                  marginTop: 2,
+                }}
+              >
+                {b.subtitle}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ─── Featured "Sélection" rail (admin-curated) ────────────
+function FeaturedRail({ products }: { products: Product[] }) {
+  const router = useRouter();
+  if (products.length === 0) return null;
+  return (
+    <View style={{ marginBottom: 24 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          paddingHorizontal: 24,
+          marginBottom: 12,
+        }}
+      >
+        <Icon name="star" size={16} color={COLORS.primary} />
+        <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 18, color: COLORS.onSurface }}>
+          Notre sélection
+        </Text>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 24, gap: 12 }}
+      >
+        {products.map((product) => {
+          const source = getProductImage(product.images[0]);
+          return (
+            <TouchableOpacity
+              key={product.id}
+              activeOpacity={0.92}
+              onPress={() => router.push(`/(main)/products/${product.id}`)}
+              style={{ width: 150 }}
+            >
+              <View
+                style={{
+                  width: 150,
+                  height: 150,
+                  borderRadius: 12,
+                  overflow: "hidden",
+                  backgroundColor: COLORS.surfaceContainer,
+                }}
+              >
+                {source && (
+                  <Image source={source} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                )}
+              </View>
+              <Text
+                numberOfLines={2}
+                style={{
+                  fontSize: 12,
+                  fontFamily: "Inter_500Medium",
+                  color: COLORS.onSurface,
+                  marginTop: 6,
+                }}
+              >
+                {product.name}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 15,
+                  fontFamily: "Manrope_800ExtraBold",
+                  color: COLORS.secondary,
+                  marginTop: 2,
+                }}
+              >
+                {priceTagLabel(product)}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
 // ─── Two-column masonry feed ──────────────────────────────
 type FeedItem = { key: string; product: Product; imgHeight: number };
 
@@ -435,6 +569,13 @@ export default function HomeScreen() {
         </View>
 
         <HeroCarousel />
+
+        {isAll && activeFilter === "all" && (
+          <>
+            <PromoBanners />
+            <FeaturedRail products={featured} />
+          </>
+        )}
 
         <FilterChips active={activeFilter} onSelect={setActiveFilter} />
 
