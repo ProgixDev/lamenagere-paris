@@ -166,6 +166,8 @@ function stubProduct(item: OrderItemRow): ProductDto {
       : [],
     configBlocks: [],
     createdAt: '',
+    ratingAvg: 0,
+    ratingCount: 0,
   };
 }
 

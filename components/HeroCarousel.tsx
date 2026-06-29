@@ -19,7 +19,7 @@ import { usePopularProducts } from "../features/products/hooks";
 import { useHeroSlides, type HeroSlide } from "../features/featured/store";
 
 const { width: W } = Dimensions.get("window");
-const HERO_W = W - 48;
+const HERO_W = W;
 const HERO_H = 200;
 const AUTO_ADVANCE_MS = 4000;
 
@@ -75,7 +75,7 @@ export default function HeroCarousel() {
   if (slides.length === 0) return null;
 
   return (
-    <View style={{ marginHorizontal: 24, marginBottom: 24 }}>
+    <View style={{ marginBottom: 24 }}>
       <ScrollView
         ref={scrollRef}
         horizontal
@@ -85,7 +85,6 @@ export default function HeroCarousel() {
         scrollEventThrottle={16}
         snapToInterval={HERO_W}
         decelerationRate="fast"
-        style={{ borderRadius: 16 }}
       >
         {slides.map((slide) => {
           const source = getProductImage(slide.src);
@@ -99,7 +98,7 @@ export default function HeroCarousel() {
               {source ? (
                 <Image
                   source={source}
-                  style={{ width: HERO_W, height: HERO_H, borderRadius: 16 }}
+                  style={{ width: HERO_W, height: HERO_H }}
                   resizeMode="cover"
                 />
               ) : (
@@ -107,7 +106,6 @@ export default function HeroCarousel() {
                   style={{
                     width: HERO_W,
                     height: HERO_H,
-                    borderRadius: 16,
                     backgroundColor: COLORS.surfaceContainer,
                   }}
                 />
@@ -121,8 +119,6 @@ export default function HeroCarousel() {
                   left: 0,
                   right: 0,
                   height: 120,
-                  borderBottomLeftRadius: 16,
-                  borderBottomRightRadius: 16,
                   justifyContent: "flex-end",
                   padding: 18,
                 }}

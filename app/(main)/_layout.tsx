@@ -23,6 +23,7 @@ export default function MainLayout() {
       <Stack.Screen name="orders/[id]" />
       <Stack.Screen name="messages/[id]" />
       <Stack.Screen name="favorites" />
+      <Stack.Screen name="notifications" options={{ animation: "slide_from_bottom" }} />
       <Stack.Screen name="addresses" />
       <Stack.Screen name="settings" />
       <Stack.Screen name="about" />

@@ -5,18 +5,8 @@ import { StripeGate } from "../components/StripeGate";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as SplashScreen from "expo-splash-screen";
-import {
-  useFonts,
-  Inter_300Light,
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-} from "@expo-google-fonts/inter";
-import {
-  Manrope_700Bold,
-  Manrope_800ExtraBold,
-} from "@expo-google-fonts/manrope";
+import { useFonts } from "expo-font";
+import { Text as RNText, TextInput as RNTextInput } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { useAuthStore } from "../features/auth/store";
@@ -28,11 +18,26 @@ import {
   type CampaignTarget,
 } from "../lib/notifications";
 import { registerDeviceApi } from "../features/notifications/api";
+import { useNotifInboxStore } from "../features/notifications/inbox";
 import { PUSH_TOKEN_KEY } from "../lib/storage";
 import "../lib/nativewind-interop";
 import "../global.css";
 
 SplashScreen.preventAutoHideAsync();
+
+// The whole app uses Futura Now Headline Medium (the only licensed weight we
+// have). Make it the default fontFamily so any Text/TextInput that doesn't set
+// its own family still renders in Futura.
+const APP_FONT = "FuturaNowHeadlineMedium";
+const RNTextAny = RNText as any;
+RNTextAny.defaultProps = RNTextAny.defaultProps || {};
+RNTextAny.defaultProps.style = [{ fontFamily: APP_FONT }, RNTextAny.defaultProps.style];
+const RNTextInputAny = RNTextInput as any;
+RNTextInputAny.defaultProps = RNTextInputAny.defaultProps || {};
+RNTextInputAny.defaultProps.style = [
+  { fontFamily: APP_FONT },
+  RNTextInputAny.defaultProps.style,
+];
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,15 +49,39 @@ const queryClient = new QueryClient({
   },
 });
 
+// Captures a delivered notification into the in-app inbox (so it shows up in
+// the bell with an unread badge). Safe to call from both the foreground and the
+// tap listeners — the store dedupes by id.
+function recordToInbox(notification: Notifications.Notification) {
+  const { request } = notification;
+  const content = request.content;
+  useNotifInboxStore.getState().add({
+    id: request.identifier,
+    title: content.title ?? "Notification",
+    body: content.body ?? "",
+    target: content.data?.target as CampaignTarget | undefined,
+    receivedAt: Date.now(),
+  });
+}
+
 function NotificationRouter() {
   const router = useRouter();
   useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const target = response.notification.request.content.data?.target as CampaignTarget | undefined;
+    // Foreground delivery → log to inbox.
+    const received = Notifications.addNotificationReceivedListener((notification) => {
+      recordToInbox(notification);
+    });
+    // Tap on a notification → log to inbox and follow its deep link.
+    const response = Notifications.addNotificationResponseReceivedListener((res) => {
+      recordToInbox(res.notification);
+      const target = res.notification.request.content.data?.target as CampaignTarget | undefined;
       if (!target) return;
       router.push(buildDeepLinkFromTarget(target) as any);
     });
-    return () => sub.remove();
+    return () => {
+      received.remove();
+      response.remove();
+    };
   }, [router]);
   return null;
 }
@@ -138,14 +167,19 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 export default function RootLayout() {
   const [showSplash, setShowSplash] = useState(true);
 
+  // Map every legacy font name (Inter_*/Manrope_*) used across the app to the
+  // single licensed Futura file, so existing fontFamily references render in
+  // Futura without touching dozens of component files.
+  const futura = require("../assets/font/FuturaNowHeadlineMedium.ttf");
   const [fontsLoaded] = useFonts({
-    Inter_300Light,
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-    Manrope_700Bold,
-    Manrope_800ExtraBold,
+    [APP_FONT]: futura,
+    Inter_300Light: futura,
+    Inter_400Regular: futura,
+    Inter_500Medium: futura,
+    Inter_600SemiBold: futura,
+    Inter_700Bold: futura,
+    Manrope_700Bold: futura,
+    Manrope_800ExtraBold: futura,
   });
 
   useEffect(() => {

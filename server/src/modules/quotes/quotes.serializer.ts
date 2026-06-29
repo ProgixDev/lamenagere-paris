@@ -84,6 +84,8 @@ function stubProduct(row: QuoteRow): ProductDto {
       : [],
     configBlocks: [],
     createdAt: '',
+    ratingAvg: 0,
+    ratingCount: 0,
   };
 }
 

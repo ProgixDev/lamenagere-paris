@@ -11,6 +11,7 @@ import { RolesGuard } from './common/auth/roles.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { OrdersModule } from './modules/orders/orders.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
 import { QuotesModule } from './modules/quotes/quotes.module';
 import { MessagingModule } from './modules/messaging/messaging.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -33,6 +34,7 @@ import { AppController } from './app.controller';
     AuthModule,
     CatalogModule,
     OrdersModule,
+    ReviewsModule,
     QuotesModule,
     MessagingModule,
     NotificationsModule,

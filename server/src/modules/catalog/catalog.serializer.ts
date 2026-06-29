@@ -130,6 +130,8 @@ export interface ProductRow {
   /** Per-product override of the category's blocks; null = inherit. */
   config_blocks: ConfigBlock[] | null;
   created_at: string;
+  rating_avg: number | string | null;
+  rating_count: number | null;
   category?: CategoryRow | null;
   media?: ProductMediaRow[];
 }
@@ -172,6 +174,9 @@ export interface ProductDto {
   /** Effective config blocks (product override ?? category template). */
   configBlocks: ConfigBlock[];
   createdAt: string;
+  /** Average customer rating (0–5) and number of reviews. */
+  ratingAvg: number;
+  ratingCount: number;
 }
 
 // ── Admin display DTOs (super_admin/src/lib/types.ts) ───────────────────────
@@ -275,6 +280,8 @@ export function toProductDto(row: ProductRow): ProductDto {
       ? row.config_blocks
       : row.category?.config_blocks ?? [],
     createdAt: row.created_at,
+    ratingAvg: row.rating_avg != null ? Number(row.rating_avg) : 0,
+    ratingCount: row.rating_count ?? 0,
   };
 }
 
@@ -347,7 +354,7 @@ export function toAdminCategoryDto(
 }
 
 export const PRODUCT_SELECT =
-  'id, sku, name, slug, description, short_description, category_id, product_type, price_mode, status, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, opening_types, dim_width, dim_height, dim_depth, dim_unit, ref_width, ref_height, ref_unit, min_width, min_height, max_width, max_height, customizable, delivery_metropole, delivery_outremer, stock_qty, low_stock_threshold, config_blocks, created_at, category:categories(*), media:product_media(*)';
+  'id, sku, name, slug, description, short_description, category_id, product_type, price_mode, status, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, opening_types, dim_width, dim_height, dim_depth, dim_unit, ref_width, ref_height, ref_unit, min_width, min_height, max_width, max_height, customizable, delivery_metropole, delivery_outremer, stock_qty, low_stock_threshold, config_blocks, created_at, rating_avg, rating_count, category:categories(*), media:product_media(*)';
 
 export const CATEGORY_SELECT =
   'id, name, slug, icon, image_url, description, accent_color, parent_id, sort_order, is_visible, is_featured_home, b2b_only, delivery_override, config_blocks';

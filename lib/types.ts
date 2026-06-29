@@ -168,6 +168,17 @@ export interface Product {
   /** Effective config blocks (product override ?? category template). */
   configBlocks?: ConfigBlock[];
   createdAt: string;
+  /** Average customer rating (0–5) and number of reviews. */
+  ratingAvg?: number;
+  ratingCount?: number;
+}
+
+export interface ProductReview {
+  id: string;
+  rating: number;
+  comment?: string;
+  authorName?: string;
+  createdAt: string;
 }
 
 export interface CartItem {

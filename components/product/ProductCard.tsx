@@ -133,6 +133,17 @@ export default function ProductCard({
         >
           {product.name}
         </Text>
+        {product.ratingCount ? (
+          <View className="flex-row items-center mb-1" style={{ gap: 3 }}>
+            <MaterialCommunityIcons name="star" size={11} color={COLORS.secondary} />
+            <Text className="text-[11px]" style={{ color: COLORS.onSurface, fontFamily: "Manrope_700Bold" }}>
+              {(product.ratingAvg ?? 0).toFixed(1)}
+            </Text>
+            <Text className="text-[10px]" style={{ color: COLORS.outline }}>
+              ({product.ratingCount})
+            </Text>
+          </View>
+        ) : null}
         <View className="flex-row items-center justify-between">
           <Text
             className="font-bold"

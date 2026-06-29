@@ -39,14 +39,19 @@ import {
 import HeroCarousel from "../../components/HeroCarousel";
 import SearchBar from "../../components/SearchBar";
 import LogoHeader from "../../components/layout/LogoHeader";
+import SortFilterSheet from "../../components/home/SortFilterSheet";
+import {
+  DEFAULT_FILTERS,
+  isNonDefault,
+  isPriceActive,
+  type FilterState,
+} from "../../features/products/filter-types";
 
 const { width: W } = Dimensions.get("window");
 const GUTTER = 8;
 const COL_W = (W - 12 * 2 - GUTTER) / 2;
 
-type FilterKind = "all" | "deals" | "rated" | "best";
-
-// ─── Top category tabs (underline) ────────────────────────
+// ─── Top category rail (icon tiles + labels) ──────────────
 function TopCategoryTabs({
   active,
   onSelect,
@@ -54,14 +59,14 @@ function TopCategoryTabs({
 }: {
   active: string;
   onSelect: (id: string) => void;
-  categories: { id: string; name: string }[];
+  categories: { id: string; name: string; icon?: string }[];
 }) {
-  const cats = [{ id: "all", name: "Tout" }, ...categories];
+  const cats = [{ id: "all", name: "Tout", icon: "view-grid" }, ...categories];
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: 16, gap: 22, paddingVertical: 10 }}
+      contentContainerStyle={{ paddingHorizontal: 14, gap: 12, paddingTop: 6, paddingBottom: 10 }}
     >
       {cats.map((cat) => {
         const isActive = cat.id === active;
@@ -72,93 +77,40 @@ function TopCategoryTabs({
               Haptics.selectionAsync();
               onSelect(cat.id);
             }}
-            style={{ alignItems: "center" }}
+            activeOpacity={0.85}
+            style={{ alignItems: "center", width: 66 }}
           >
-            <Text
+            <View
               style={{
-                fontSize: isActive ? 17 : 15,
+                width: 60,
+                height: 60,
+                borderRadius: 18,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: isActive ? COLORS.primary : COLORS.surfaceContainerLowest,
+                borderWidth: 1,
+                borderColor: isActive ? COLORS.primary : COLORS.outlineVariant,
+              }}
+            >
+              <Icon
+                name={cat.icon || "view-grid"}
+                size={26}
+                color={isActive ? "#fff" : COLORS.primary}
+              />
+            </View>
+            <Text
+              numberOfLines={1}
+              style={{
+                marginTop: 6,
+                fontSize: 11,
                 fontFamily: isActive ? "Manrope_700Bold" : "Inter_500Medium",
                 color: isActive ? COLORS.onSurface : COLORS.outline,
-                paddingBottom: 6,
+                maxWidth: 66,
+                textAlign: "center",
               }}
             >
               {cat.name}
             </Text>
-            {isActive && (
-              <View
-                style={{
-                  width: 22,
-                  height: 3,
-                  borderRadius: 2,
-                  backgroundColor: COLORS.primary,
-                }}
-              />
-            )}
-          </TouchableOpacity>
-        );
-      })}
-    </ScrollView>
-  );
-}
-
-// ─── Filter chips ─────────────────────────────────────────
-const FILTER_CHIPS: { id: FilterKind; label: string; icon?: any }[] = [
-  { id: "all", label: "Tout" },
-  { id: "deals", label: "Promos", icon: "lightning-bolt" },
-  { id: "rated", label: "5★ Notés", icon: "star" },
-  { id: "best", label: "Best-sellers", icon: "thumb-up" },
-];
-
-function FilterChips({
-  active,
-  onSelect,
-}: {
-  active: FilterKind;
-  onSelect: (k: FilterKind) => void;
-}) {
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: 12, gap: 18, paddingVertical: 8 }}
-    >
-      {FILTER_CHIPS.map((chip) => {
-        const isActive = chip.id === active;
-        return (
-          <TouchableOpacity
-            key={chip.id}
-            onPress={() => onSelect(chip.id)}
-            style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
-          >
-            {chip.icon && (
-              <Icon
-                name={chip.icon}
-                size={14}
-                color={isActive ? COLORS.onSurface : COLORS.outline}
-              />
-            )}
-            <View style={{ alignItems: "center" }}>
-              <Text
-                style={{
-                  fontSize: 14,
-                  fontFamily: isActive ? "Manrope_700Bold" : "Inter_500Medium",
-                  color: isActive ? COLORS.onSurface : COLORS.outline,
-                  paddingBottom: 4,
-                }}
-              >
-                {chip.label}
-              </Text>
-              {isActive && (
-                <View
-                  style={{
-                    width: 18,
-                    height: 3,
-                    borderRadius: 2,
-                    backgroundColor: COLORS.primary,
-                  }}
-                />
-              )}
-            </View>
           </TouchableOpacity>
         );
       })}
@@ -225,12 +177,14 @@ function ProductCardTemu({
       style={{
         width: COL_W,
         backgroundColor: "#fff",
-        borderRadius: 12,
+        borderRadius: 8,
         overflow: "hidden",
+        borderWidth: 1,
+        borderColor: COLORS.outlineVariant + "44",
       }}
     >
       {/* Image */}
-      <View style={{ width: COL_W, height: imgHeight, backgroundColor: COLORS.surfaceContainer }}>
+      <View style={{ width: "100%", height: imgHeight, backgroundColor: COLORS.surfaceContainer }}>
         {imgSource && (
           <Image
             source={imgSource}
@@ -274,6 +228,18 @@ function ProductCardTemu({
         >
           {product.name}
         </Text>
+
+        {product.ratingCount ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginBottom: 4 }}>
+            <Icon name="star" size={11} color={COLORS.secondary} />
+            <Text style={{ fontSize: 11, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}>
+              {(product.ratingAvg ?? 0).toFixed(1)}
+            </Text>
+            <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: COLORS.outline }}>
+              ({product.ratingCount})
+            </Text>
+          </View>
+        ) : null}
 
         {/* Price + add */}
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
@@ -409,7 +375,7 @@ function FeaturedRail({ products }: { products: Product[] }) {
                 style={{
                   width: 150,
                   height: 150,
-                  borderRadius: 12,
+                  borderRadius: 8,
                   overflow: "hidden",
                   backgroundColor: COLORS.surfaceContainer,
                 }}
@@ -478,7 +444,8 @@ const NEAR_BOTTOM_PX = 600;
 
 export default function HomeScreen() {
   const [activeCategory, setActiveCategory] = useState("all");
-  const [activeFilter, setActiveFilter] = useState<FilterKind>("all");
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [refreshing, setRefreshing] = useState(false);
   const featured = useFeaturedProducts();
 
@@ -498,18 +465,56 @@ export default function HomeScreen() {
     ? popularQuery.isLoading
     : categoryQuery.isLoading;
 
-  // Client-side filter chips over the loaded list.
+  // Price bounds + histogram for the filter sheet, derived from the loaded list.
+  const priceBounds = useMemo(() => {
+    const prices = baseProducts
+      .map((p) => p.price)
+      .filter((v): v is number => typeof v === "number" && v > 0);
+    if (prices.length === 0) return { min: 0, max: 0 };
+    return { min: Math.floor(Math.min(...prices)), max: Math.ceil(Math.max(...prices)) };
+  }, [baseProducts]);
+
+  const histogram = useMemo(() => {
+    const { min, max } = priceBounds;
+    if (max <= min) return undefined;
+    const buckets = new Array(32).fill(0);
+    baseProducts.forEach((p) => {
+      if (typeof p.price !== "number" || p.price <= 0) return;
+      const idx = Math.min(31, Math.floor(((p.price - min) / (max - min)) * 32));
+      buckets[idx] += 1;
+    });
+    const peak = Math.max(1, ...buckets);
+    return buckets.map((c) => c / peak);
+  }, [baseProducts, priceBounds]);
+
+  // Client-side sort + price/rating filter over the loaded list.
   const products = useMemo(() => {
-    let list = baseProducts;
-    if (activeFilter === "deals") {
-      list = list.filter((p) => p.priceMode === "fixed");
-    } else if (activeFilter === "rated") {
-      list = list.filter((_, i) => i % 2 === 0);
-    } else if (activeFilter === "best") {
-      list = featured.length > 0 ? featured : list;
+    let list = [...baseProducts];
+
+    if (filters.minRating > 0) {
+      list = list.filter((p) => (p.ratingAvg ?? 0) >= filters.minRating);
     }
+
+    if (isPriceActive(filters)) {
+      const lo = filters.minPrice > 0 ? filters.minPrice : priceBounds.min;
+      const hi = filters.maxPrice > 0 ? filters.maxPrice : priceBounds.max;
+      list = list.filter(
+        (p) => typeof p.price === "number" && p.price >= lo && p.price <= hi,
+      );
+    }
+
+    const priceOf = (p: Product) =>
+      typeof p.price === "number" ? p.price : Number.POSITIVE_INFINITY;
+    if (filters.sort === "recent") {
+      list.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+    } else if (filters.sort === "price_asc") {
+      list.sort((a, b) => priceOf(a) - priceOf(b));
+    } else if (filters.sort === "price_desc") {
+      list.sort((a, b) => priceOf(b) - priceOf(a));
+    }
+
     return list;
-  }, [baseProducts, activeFilter, featured]);
+  }, [baseProducts, filters, priceBounds]);
 
   // Build the masonry feed from the real product list.
   const feed = useMemo<FeedItem[]>(() => {
@@ -554,7 +559,11 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
       <LogoHeader />
-      <SearchBar />
+      <SearchBar
+        showNotifications
+        onFilterPress={() => setSheetOpen(true)}
+        filterActive={isNonDefault(filters)}
+      />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -570,14 +579,12 @@ export default function HomeScreen() {
 
         <HeroCarousel />
 
-        {isAll && activeFilter === "all" && (
+        {isAll && !isNonDefault(filters) && (
           <>
             <PromoBanners />
             <FeaturedRail products={featured} />
           </>
         )}
-
-        <FilterChips active={activeFilter} onSelect={setActiveFilter} />
 
         <MasonryFeed items={feed} />
 
@@ -597,6 +604,15 @@ export default function HomeScreen() {
           </View>
         ) : null}
       </ScrollView>
+
+      <SortFilterSheet
+        visible={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        value={filters}
+        priceBounds={priceBounds}
+        histogram={histogram}
+        onApply={setFilters}
+      />
     </SafeAreaView>
   );
 }

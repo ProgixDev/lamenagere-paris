@@ -17,13 +17,15 @@ import Skeleton from "../../../components/ui/Skeleton";
 import OrderTimeline from "../../../components/order/OrderTimeline";
 import Button from "../../../components/ui/Button";
 import Card from "../../../components/ui/Card";
+import StarRating from "../../../components/ui/StarRating";
 import {
   useOrder,
   useCancelOrder,
   useRequestRefund,
 } from "../../../features/orders/hooks";
+import { useCreateReview } from "../../../features/reviews/hooks";
 import { summarizeConfiguration } from "../../../lib/config-blocks";
-import type { RefundStatus } from "../../../lib/types";
+import type { OrderItem, RefundStatus } from "../../../lib/types";
 
 const CANCELLABLE_STATUSES = ["commande_confirmee", "en_preparation"];
 
@@ -54,8 +56,44 @@ export default function OrderDetailScreen() {
   const { data: order, isLoading } = useOrder(id);
   const cancelOrder = useCancelOrder();
   const requestRefund = useRequestRefund(id);
+  const createReview = useCreateReview();
   const [refundModal, setRefundModal] = useState(false);
   const [refundReason, setRefundReason] = useState("");
+  const [rateItem, setRateItem] = useState<OrderItem | null>(null);
+  const [ratingValue, setRatingValue] = useState(0);
+  const [ratingComment, setRatingComment] = useState("");
+  const [ratedItems, setRatedItems] = useState<Set<string>>(new Set());
+
+  const openRate = (item: OrderItem) => {
+    setRateItem(item);
+    setRatingValue(0);
+    setRatingComment("");
+  };
+
+  const submitRating = () => {
+    if (!rateItem || ratingValue < 1) return;
+    createReview.mutate(
+      {
+        productId: rateItem.product.id,
+        orderItemId: rateItem.id,
+        rating: ratingValue,
+        comment: ratingComment.trim() || undefined,
+      },
+      {
+        onSuccess: () => {
+          setRatedItems((s) => new Set(s).add(rateItem.id));
+          setRateItem(null);
+        },
+        onError: (e: any) =>
+          Alert.alert(
+            "Erreur",
+            e?.response?.data?.message ||
+              e?.message ||
+              "Impossible d'enregistrer votre note",
+          ),
+      },
+    );
+  };
 
   const submitRefund = () => {
     requestRefund.mutate(refundReason.trim() || undefined, {
@@ -178,21 +216,53 @@ export default function OrderDetailScreen() {
             const summary = item.configuration?.length
               ? summarizeConfiguration(item.configuration)
               : "";
+            const rated = ratedItems.has(item.id);
             return (
-              <View key={item.id} className="flex-row justify-between mb-2">
-                <View className="flex-1 pr-2">
-                  <Text className="text-sm" style={{ color: COLORS.onSurface }} numberOfLines={1}>
-                    {item.product.name} x{item.quantity}
-                  </Text>
-                  {summary ? (
-                    <Text className="text-xs mt-0.5" style={{ color: COLORS.outline }} numberOfLines={2}>
-                      {summary}
+              <View key={item.id} className="mb-2">
+                <View className="flex-row justify-between">
+                  <View className="flex-1 pr-2">
+                    <Text className="text-sm" style={{ color: COLORS.onSurface }} numberOfLines={1}>
+                      {item.product.name} x{item.quantity}
                     </Text>
-                  ) : null}
+                    {summary ? (
+                      <Text className="text-xs mt-0.5" style={{ color: COLORS.outline }} numberOfLines={2}>
+                        {summary}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Text className="text-sm" style={{ color: COLORS.secondary }}>
+                    {formatPrice(item.price * item.quantity)}
+                  </Text>
                 </View>
-                <Text className="text-sm" style={{ color: COLORS.secondary }}>
-                  {formatPrice(item.price * item.quantity)}
-                </Text>
+
+                {order.status === "livree" && (
+                  rated ? (
+                    <View className="flex-row items-center mt-1.5" style={{ gap: 4 }}>
+                      <MaterialCommunityIcons name="check" size={14} color={COLORS.success} />
+                      <Text className="text-xs" style={{ color: COLORS.success, fontFamily: "Inter_600SemiBold" }}>
+                        Merci pour votre note
+                      </Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => openRate(item)}
+                      className="flex-row items-center self-start mt-1.5"
+                      style={{
+                        gap: 4,
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 9999,
+                        borderWidth: 1,
+                        borderColor: `${COLORS.outlineVariant}55`,
+                      }}
+                    >
+                      <MaterialCommunityIcons name="star-outline" size={14} color={COLORS.secondary} />
+                      <Text className="text-xs" style={{ color: COLORS.secondary, fontFamily: "Inter_600SemiBold" }}>
+                        Noter ce produit
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                )}
               </View>
             );
           })}
@@ -312,6 +382,81 @@ export default function OrderDetailScreen() {
                   label="Envoyer"
                   onPress={submitRefund}
                   loading={requestRefund.isPending}
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Rate product modal */}
+      <Modal
+        visible={!!rateItem}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRateItem(null)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.45)",
+            justifyContent: "center",
+            paddingHorizontal: 24,
+          }}
+        >
+          <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: 20 }}>
+            <Text
+              className="text-base font-semibold mb-1"
+              style={{ color: COLORS.onSurface, fontFamily: "Manrope_700Bold" }}
+            >
+              Noter ce produit
+            </Text>
+            <Text className="text-xs mb-3" style={{ color: COLORS.onSurfaceVariant }} numberOfLines={1}>
+              {rateItem?.product.name}
+            </Text>
+
+            <View className="items-center mb-4">
+              <StarRating rating={ratingValue} size={36} onChange={setRatingValue} />
+            </View>
+
+            <View
+              className="rounded-xl px-4 py-3 mb-4"
+              style={{ backgroundColor: COLORS.surfaceContainerLow, minHeight: 80 }}
+            >
+              <TextInput
+                value={ratingComment}
+                onChangeText={setRatingComment}
+                placeholder="Partagez votre avis (facultatif)…"
+                placeholderTextColor={COLORS.surfaceDim}
+                multiline
+                maxLength={500}
+                editable={!createReview.isPending}
+                style={{
+                  fontSize: 14,
+                  color: COLORS.onSurface,
+                  fontFamily: "Inter_400Regular",
+                  lineHeight: 20,
+                  textAlignVertical: "top",
+                  minHeight: 56,
+                }}
+              />
+            </View>
+
+            <View className="flex-row gap-3">
+              <View className="flex-1">
+                <Button
+                  label="Annuler"
+                  onPress={() => setRateItem(null)}
+                  variant="secondary"
+                  disabled={createReview.isPending}
+                />
+              </View>
+              <View className="flex-1">
+                <Button
+                  label="Envoyer"
+                  onPress={submitRating}
+                  loading={createReview.isPending}
+                  disabled={ratingValue < 1}
                 />
               </View>
             </View>

@@ -43,6 +43,8 @@ import { getProductImage } from "../../../lib/mock-data";
 import { useCartStore } from "../../../features/cart/store";
 import { useFavoritesStore } from "../../../features/favorites/store";
 import { useProduct, usePopularProducts } from "../../../features/products/hooks";
+import { useProductReviews } from "../../../features/reviews/hooks";
+import StarRating from "../../../components/ui/StarRating";
 
 const { width: W, height: H } = Dimensions.get("window");
 const GALLERY_H = Math.min(W, H * 0.55);
@@ -54,6 +56,7 @@ export default function ProductDetailScreen() {
   const router = useRouter();
   const { data: product, isLoading } = useProduct(id);
   const { data: popular = [] } = usePopularProducts(12);
+  const { data: reviews = [] } = useProductReviews(id);
 
   const addItem = useCartStore((s) => s.addItem);
   const isFavorited = useFavoritesStore((s) => s.favorites.includes(id));
@@ -336,6 +339,18 @@ export default function ProductDetailScreen() {
             par La Ménagère Paris
           </Text>
 
+          {product.ratingCount ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 8 }}>
+              <Icon name="star" size={15} color={COLORS.secondary} />
+              <Text style={{ fontSize: 14, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}>
+                {(product.ratingAvg ?? 0).toFixed(1)}
+              </Text>
+              <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline }}>
+                · {product.ratingCount} avis
+              </Text>
+            </View>
+          ) : null}
+
           {/* Price — starting price; the full total is computed in the configure flow. */}
           <View style={{ marginTop: 16, marginBottom: 4 }}>
             {isPerSqm ? (
@@ -418,6 +433,39 @@ export default function ProductDetailScreen() {
             </View>
           </Animated.ScrollView>
         </Animated.View>
+
+        {/* ── Customer reviews ─────────────────────── */}
+        {reviews.length > 0 && (
+          <View style={{ marginTop: 16 }}>
+            <Section title="Avis clients" noBackground>
+              <View style={{ gap: 14 }}>
+                {reviews.map((r) => (
+                  <View key={r.id}>
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                      <Text style={{ fontSize: 13, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}>
+                        {r.authorName || "Client"}
+                      </Text>
+                      <StarRating rating={r.rating} size={14} />
+                    </View>
+                    {r.comment ? (
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontFamily: "Inter_400Regular",
+                          color: COLORS.onSurfaceVariant,
+                          marginTop: 4,
+                          lineHeight: 19,
+                        }}
+                      >
+                        {r.comment}
+                      </Text>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            </Section>
+          </View>
+        )}
 
         {/* ── Related products ─────────────────────── */}
         <View style={{ marginTop: 16 }}>
