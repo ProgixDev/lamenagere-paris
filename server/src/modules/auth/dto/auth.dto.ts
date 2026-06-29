@@ -5,7 +5,9 @@ import {
   IsOptional,
   IsString,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export type AccountType = 'particulier' | 'professionnel';
 
@@ -61,10 +63,24 @@ export class ChangePasswordDto {
   newPassword!: string;
 }
 
+export class DeliveryAddressDto {
+  @IsString() firstName!: string;
+  @IsString() lastName!: string;
+  @IsString() street!: string;
+  @IsString() postalCode!: string;
+  @IsString() city!: string;
+  @IsOptional() @IsString() phone?: string;
+}
+
 export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   fullName?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DeliveryAddressDto)
+  deliveryAddress?: DeliveryAddressDto;
 
   @IsOptional()
   @IsEnum(['particulier', 'professionnel'])

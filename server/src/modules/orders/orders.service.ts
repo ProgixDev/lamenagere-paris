@@ -9,6 +9,7 @@ import {
   isOverseas,
   orderStatusLabel,
   ShippingZone,
+  territoryFromPostalCode,
 } from '../../common/serialization/status-labels';
 import {
   ORDER_SELECT,
@@ -20,6 +21,7 @@ import {
 } from './orders.serializer';
 import { CreateOrderDto } from './dto/create-order.dto';
 import type { ConfigBlock } from '../catalog/catalog.serializer';
+import { TicketsService } from '../tickets/tickets.service';
 
 interface AddressRowFull {
   id: string;
@@ -30,6 +32,7 @@ interface AddressRowFull {
   city: string;
   country: string;
   territory: ShippingZone;
+  phone: string | null;
 }
 
 interface ProductForOrder {
@@ -54,11 +57,21 @@ interface ProductForOrder {
   category: { config_blocks: ConfigBlock[] | null } | null;
 }
 
+interface QuoteForOrder {
+  id: string;
+  product_id: string | null;
+  product_name: string | null;
+  product_image: string | null;
+  quoted_price_cents: number | null;
+  status: string;
+}
+
 @Injectable()
 export class OrdersService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly pricing: PricingService,
+    private readonly tickets: TicketsService,
   ) {}
 
   async list(userId: string): Promise<OrderDto[]> {
@@ -115,6 +128,21 @@ export class OrdersService {
       author_id: userId,
       body: `Demande de remboursement du client: ${reason?.trim() || '(aucun motif précisé)'}`,
     });
+
+    // Also surface the refund request in the SAV (tickets) — best-effort.
+    try {
+      await this.tickets.create(userId, {
+        subject: `Demande de remboursement — ${row.order_number}`,
+        category: 'paiement',
+        description:
+          reason?.trim() ||
+          'Demande de remboursement (aucun motif précisé).',
+        orderId: row.id,
+      });
+    } catch {
+      // a failed SAV ticket must not block the refund request
+    }
+
     return this.findOne(userId, row.id);
   }
 
@@ -137,28 +165,105 @@ export class OrdersService {
       throw new BadRequestException('Le panier est vide');
     }
 
-    // 1. Address (must belong to the user) -> snapshot.
-    const { data: address } = await this.supabase.client
-      .from('addresses')
-      .select('id, first_name, last_name, street, postal_code, city, country, territory')
-      .eq('id', dto.shippingAddressId)
-      .eq('profile_id', userId)
-      .maybeSingle<AddressRowFull>();
-    if (!address) throw new NotFoundException('Adresse de livraison introuvable');
+    // 1. Resolve the shipping snapshot from either the inline delivery form or
+    //    a saved address that must belong to the user.
+    let ship: {
+      first_name: string;
+      last_name: string;
+      street: string;
+      postal_code: string;
+      city: string;
+      country: string;
+      phone: string | null;
+      territory: ShippingZone;
+    };
+    if (dto.shippingAddress) {
+      const a = dto.shippingAddress;
+      ship = {
+        first_name: a.firstName,
+        last_name: a.lastName,
+        street: a.street,
+        postal_code: a.postalCode,
+        city: a.city,
+        country: a.country ?? 'France',
+        phone: a.phone ?? null,
+        territory: a.territory ?? territoryFromPostalCode(a.postalCode),
+      };
+    } else if (dto.shippingAddressId) {
+      const { data: address } = await this.supabase.client
+        .from('addresses')
+        .select('id, first_name, last_name, street, postal_code, city, country, territory, phone')
+        .eq('id', dto.shippingAddressId)
+        .eq('profile_id', userId)
+        .maybeSingle<AddressRowFull>();
+      if (!address) throw new NotFoundException('Adresse de livraison introuvable');
+      ship = {
+        first_name: address.first_name,
+        last_name: address.last_name,
+        street: address.street,
+        postal_code: address.postal_code,
+        city: address.city,
+        country: address.country,
+        phone: address.phone ?? null,
+        territory: dto.territory ?? address.territory,
+      };
+    } else {
+      throw new BadRequestException('Adresse de livraison requise');
+    }
+    const territory = ship.territory;
 
-    // 2. Resolve each line price server-side.
-    const productIds = dto.items.map((i) => i.productId);
+    // 2. Resolve each line price server-side. Devis lines use the admin-quoted
+    //    price; normal lines are priced from the product + config blocks.
+    const productIds = dto.items.filter((i) => !i.quoteId).map((i) => i.productId);
     const { data: products } = await this.supabase.client
       .from('products')
       .select(
         'id, name, price_mode, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, ref_width, ref_height, min_width, min_height, max_width, max_height, opening_types, delivery_metropole, delivery_outremer, config_blocks, media:product_media(url,type,is_primary), category:categories(config_blocks)',
       )
-      .in('id', productIds)
+      .in('id', productIds.length ? productIds : ['00000000-0000-0000-0000-000000000000'])
       .returns<ProductForOrder[]>();
     const byId = new Map((products ?? []).map((p) => [p.id, p]));
 
+    const quoteIds = dto.items
+      .map((i) => i.quoteId)
+      .filter((q): q is string => !!q);
+    const quotesById = new Map<string, QuoteForOrder>();
+    if (quoteIds.length) {
+      const { data: qs } = await this.supabase.client
+        .from('quotes')
+        .select('id, product_id, product_name, product_image, quoted_price_cents, status')
+        .in('id', quoteIds)
+        .eq('profile_id', userId)
+        .returns<QuoteForOrder[]>();
+      for (const q of qs ?? []) quotesById.set(q.id, q);
+    }
+
     let subtotal = 0;
     const itemRows = dto.items.map((item) => {
+      // Devis line → fixed admin-quoted price.
+      if (item.quoteId) {
+        const q = quotesById.get(item.quoteId);
+        if (!q) throw new BadRequestException('Devis introuvable');
+        if (
+          q.quoted_price_cents == null ||
+          (q.status !== 'devis_envoye' && q.status !== 'devis_accepte')
+        ) {
+          throw new BadRequestException('Ce devis ne peut pas être commandé');
+        }
+        subtotal += q.quoted_price_cents * item.quantity;
+        return {
+          product_id: q.product_id,
+          product_name: q.product_name ?? 'Devis',
+          product_image: q.product_image ?? null,
+          quantity: item.quantity,
+          unit_price_cents: q.quoted_price_cents,
+          custom_width: null,
+          custom_height: null,
+          opening_type: null,
+          configuration: [],
+        };
+      }
+
       const product = byId.get(item.productId);
       if (!product) {
         throw new BadRequestException(`Produit introuvable: ${item.productId}`);
@@ -199,7 +304,7 @@ export class OrdersService {
     const { data: zoneFee } = await this.supabase.client
       .from('shipping_zone_fees')
       .select('delay, fee_cents')
-      .eq('zone', dto.territory)
+      .eq('zone', territory)
       .maybeSingle<{ delay: string; fee_cents: number }>();
     const shippingCost = zoneFee?.fee_cents ?? 0;
     const total = subtotal + shippingCost;
@@ -211,7 +316,7 @@ export class OrdersService {
     });
     const orderNumber = `LMP-${year}-${String(seq ?? 1).padStart(5, '0')}`;
 
-    const estimatedDelivery = isOverseas(dto.territory)
+    const estimatedDelivery = isOverseas(territory)
       ? zoneFee?.delay ?? '8-12 semaines'
       : zoneFee?.delay ?? '2-3 semaines';
 
@@ -225,16 +330,17 @@ export class OrdersService {
         subtotal_cents: subtotal,
         shipping_cost_cents: shippingCost,
         total_cents: total,
-        territory: dto.territory,
+        territory,
         shipping_method: dto.shippingMethod,
         estimated_delivery: estimatedDelivery,
-        ship_first_name: address.first_name,
-        ship_last_name: address.last_name,
-        ship_street: address.street,
-        ship_postal_code: address.postal_code,
-        ship_city: address.city,
-        ship_country: address.country,
-        ship_territory: address.territory,
+        ship_first_name: ship.first_name,
+        ship_last_name: ship.last_name,
+        ship_street: ship.street,
+        ship_postal_code: ship.postal_code,
+        ship_city: ship.city,
+        ship_country: ship.country,
+        ship_territory: ship.territory,
+        ship_phone: ship.phone,
         is_b2b: isB2b,
         customer_note: dto.customerNote?.trim() || null,
         customer_attachments: dto.customerAttachments ?? [],
@@ -259,7 +365,16 @@ export class OrdersService {
       occurred_at: new Date().toISOString(),
     });
 
-    // 7. Profile aggregates.
+    // 7. Mark any consumed devis as accepted so they can't be re-ordered.
+    if (quoteIds.length) {
+      await this.supabase.client
+        .from('quotes')
+        .update({ status: 'devis_accepte', decided_at: new Date().toISOString() })
+        .in('id', quoteIds)
+        .eq('profile_id', userId);
+    }
+
+    // 8. Profile aggregates.
     await this.bumpProfileAggregates(userId, total);
 
     return this.findOne(userId, order.id);

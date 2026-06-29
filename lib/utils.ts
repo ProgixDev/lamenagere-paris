@@ -96,3 +96,16 @@ export const isOverseas = (territory: string): boolean => {
     territory,
   );
 };
+
+/** Infers the shipping zone from a French postal code (DOM = 97x), else métropole. */
+export const territoryFromPostalCode = (
+  postalCode: string,
+): import("./types").ShippingZone => {
+  const p = (postalCode ?? "").replace(/\s/g, "");
+  if (p.startsWith("971")) return "guadeloupe";
+  if (p.startsWith("972")) return "martinique";
+  if (p.startsWith("973")) return "guyane";
+  if (p.startsWith("974")) return "reunion";
+  if (p.startsWith("976")) return "mayotte";
+  return "metropole";
+};

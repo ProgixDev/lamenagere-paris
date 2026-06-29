@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -17,25 +17,28 @@ import Icon from "../../../components/ui/Icon";
 import Animated, {
   FadeInUp,
   FadeOut,
-  FadeInDown,
+  useSharedValue,
+  useAnimatedRef,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  interpolate,
+  interpolateColor,
+  scrollTo,
+  runOnJS,
+  runOnUI,
+  withRepeat,
+  withTiming,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
-import { COLORS, PRODUCT_TYPES, PRICE_MODES, TERRITORIES } from "../../../lib/constants";
+import { COLORS, PRODUCT_TYPES, PRICE_MODES } from "../../../lib/constants";
 import { formatPrice } from "../../../lib/utils";
-import { computeConfiguredPrice, priceTagLabel } from "../../../lib/pricing";
-import { openingTypeLabel, diagramForTypes } from "../../../lib/opening-types";
+import { priceTagLabel } from "../../../lib/pricing";
 import Button from "../../../components/ui/Button";
 import PressableScale from "../../../components/ui/PressableScale";
-import Input from "../../../components/ui/Input";
 import Toast from "../../../components/ui/Toast";
 import ContactSellerSheet from "../../../components/product/ContactSellerSheet";
-import ProductConfigBlocks from "../../../components/product/ProductConfigBlocks";
-import {
-  buildConfiguration,
-  configSurchargeEuros,
-  configValidation,
-  type ConfigState,
-} from "../../../lib/config-blocks";
+import DevisRequestSheet from "../../../components/product/DevisRequestSheet";
+import ProductOptionsPreview from "../../../components/product/ProductOptionsPreview";
 import { getProductImage } from "../../../lib/mock-data";
 import { useCartStore } from "../../../features/cart/store";
 import { useFavoritesStore } from "../../../features/favorites/store";
@@ -44,7 +47,6 @@ import { useProduct, usePopularProducts } from "../../../features/products/hooks
 const { width: W, height: H } = Dimensions.get("window");
 const GALLERY_H = Math.min(W, H * 0.55);
 
-type Territory = (typeof TERRITORIES)[number]["value"];
 
 // ────────────────────────────────────────────────────────
 export default function ProductDetailScreen() {
@@ -58,14 +60,9 @@ export default function ProductDetailScreen() {
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
 
   const [galleryIndex, setGalleryIndex] = useState(0);
-  const [quantity, setQuantity] = useState(1);
-  const [customWidth, setCustomWidth] = useState("");
-  const [customHeight, setCustomHeight] = useState("");
-  const [openingType, setOpeningType] = useState<string | null>(null);
-  const [configState, setConfigState] = useState<ConfigState>({});
-  const [territory, setTerritory] = useState<Territory>("metropole");
-  const [activeTab, setActiveTab] = useState<"overview" | "specs">("overview");
+  const [activeIndex, setActiveIndex] = useState(0);
   const [contactOpen, setContactOpen] = useState(false);
+  const [devisOpen, setDevisOpen] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
   const [toast, setToast] = useState({
     visible: false,
@@ -73,6 +70,44 @@ export default function ProductDetailScreen() {
     type: "success" as "success" | "error",
   });
   const galleryRef = useRef<ScrollView>(null);
+
+  // Swipeable Aperçu ⇆ Caractéristiques tabs (reanimated paged view).
+  const pagerRef = useAnimatedRef<Animated.ScrollView>();
+  const scrollX = useSharedValue(0);
+  const page0H = useSharedValue(0);
+  const page1H = useSharedValue(0);
+  const TAB_W = W / 2;
+
+  const onPagerScroll = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      scrollX.value = e.contentOffset.x;
+    },
+    onMomentumEnd: (e) => {
+      runOnJS(setActiveIndex)(Math.round(e.contentOffset.x / W));
+    },
+  });
+  const goToTab = (i: number) => {
+    setActiveIndex(i);
+    runOnUI(() => {
+      "worklet";
+      scrollTo(pagerRef, i * W, 0, true);
+    })();
+  };
+  const indicatorStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: interpolate(scrollX.value, [0, W], [0, TAB_W]) }],
+  }));
+  const label0Style = useAnimatedStyle(() => ({
+    color: interpolateColor(scrollX.value, [0, W], [COLORS.onSurface, COLORS.outline]),
+  }));
+  const label1Style = useAnimatedStyle(() => ({
+    color: interpolateColor(scrollX.value, [0, W], [COLORS.outline, COLORS.onSurface]),
+  }));
+  const pagerHeightStyle = useAnimatedStyle(() => {
+    const h0 = page0H.value;
+    const h1 = page1H.value;
+    if (h0 <= 0 || h1 <= 0) return {};
+    return { height: interpolate(scrollX.value, [0, W], [h0, h1]) };
+  });
 
   if (isLoading) {
     return (
@@ -107,55 +142,20 @@ export default function ProductDetailScreen() {
   const configBlocks = product.configBlocks ?? product.category.configBlocks ?? [];
   const galleryImages = product.images.length > 0 ? product.images : ["__placeholder__"];
 
-  const dims =
-    needsDimensions && customWidth && customHeight
-      ? { width: parseFloat(customWidth), height: parseFloat(customHeight) }
-      : undefined;
+  // Products that need any choice (dimensions, opening, or config blocks) are
+  // configured in the dedicated guided flow rather than inline on this page.
+  const hasConfiguration =
+    needsDimensions || hasOpeningTypes || configBlocks.length > 0;
 
-  // Captured config-block selections + their add-on surcharge (euros).
-  const configuration = buildConfiguration(configBlocks, configState);
-  const configSurcharge = configSurchargeEuros(configuration);
-  const configCheck = configValidation(configBlocks, configState);
-
-  // Live, display-only price (server re-validates at checkout).
-  const basePrice = computeConfiguredPrice(product, dims, openingType ?? undefined);
-  const livePrice = basePrice != null ? basePrice + configSurcharge : undefined;
-
-  // The cart button stays disabled until every required choice is made, so the
-  // user can never tap it into an error state.
-  const canAddToCart =
-    (!needsDimensions || !!dims) &&
-    (!hasOpeningTypes || !!openingType) &&
-    configCheck.ok;
-  const missingHint = needsDimensions && !dims
-    ? "Renseignez vos dimensions pour continuer"
-    : hasOpeningTypes && !openingType
-      ? "Choisissez un type d'ouverture"
-      : !configCheck.ok
-        ? configCheck.hint ?? "Complétez votre configuration"
-        : null;
-
-  const handleAddToCart = async () => {
-    if (needsDimensions && !dims) {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      setToast({ visible: true, message: "Renseignez vos dimensions", type: "error" });
+  const handlePrimaryAction = async () => {
+    if (hasConfiguration) {
+      await Haptics.selectionAsync();
+      router.push(`/(main)/configure/${product.id}`);
       return;
     }
-    if (hasOpeningTypes && !openingType) {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      setToast({ visible: true, message: "Choisissez un type d'ouverture", type: "error" });
-      return;
-    }
-    if (!configCheck.ok) {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      setToast({ visible: true, message: configCheck.hint ?? "Complétez votre configuration", type: "error" });
-      return;
-    }
+    // Simple product → straight to the cart.
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    addItem(product, quantity, dims, openingType ?? undefined, {
-      configuration,
-      configSurcharge,
-    });
+    addItem(product, 1);
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 1500);
     setToast({ visible: true, message: "Ajouté au panier", type: "success" });
@@ -171,16 +171,11 @@ export default function ProductDetailScreen() {
     if (i !== galleryIndex) setGalleryIndex(i);
   };
 
-  const territoryEta =
-    territory === "metropole"
-      ? product.deliveryEstimates.metropole
-      : product.deliveryEstimates.outreMer;
-
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 140 }}
+        contentContainerStyle={{ paddingBottom: 190 }}
         stickyHeaderIndices={[2]}
       >
         {/* ── Gallery ──────────────────────────────── */}
@@ -212,6 +207,11 @@ export default function ProductDetailScreen() {
             <View style={{ flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 14, paddingTop: 6 }}>
               <CircleButton icon="chevron-left" onPress={() => router.back()} />
               <View style={{ flexDirection: "row", gap: 8 }}>
+                <CircleButton
+                  icon={isFavorited ? "heart" : "heart-outline"}
+                  color={isFavorited ? "#E74040" : COLORS.onSurface}
+                  onPress={handleFavorite}
+                />
                 <CircleButton icon="magnify" onPress={() => router.push("/(main)/search")} />
                 <CircleButton
                   icon="share-variant"
@@ -261,49 +261,51 @@ export default function ProductDetailScreen() {
           <TrustItem icon="message-text-outline" label="Conseils dédiés" />
         </View>
 
-        {/* ── Sticky tab bar ───────────────────────── */}
+        {/* ── Sticky swipeable tab bar ─────────────── */}
         <View
           style={{
-            flexDirection: "row",
-            paddingHorizontal: 16,
-            paddingTop: 10,
-            paddingBottom: 8,
             backgroundColor: COLORS.background,
             borderBottomWidth: 1,
             borderBottomColor: `${COLORS.outlineVariant}66`,
-            gap: 22,
+            paddingTop: 8,
           }}
         >
-          {([
-            { id: "overview", label: "Aperçu" },
-            { id: "specs", label: "Caractéristiques" },
-          ] as const).map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <TouchableOpacity key={tab.id} onPress={() => setActiveTab(tab.id)} style={{ alignItems: "center" }}>
-                <Text
-                  style={{
-                    fontSize: 14,
-                    fontFamily: isActive ? "Manrope_700Bold" : "Inter_500Medium",
-                    color: isActive ? COLORS.onSurface : COLORS.outline,
-                    paddingBottom: 6,
-                  }}
+          <View style={{ flexDirection: "row" }}>
+            {(["Aperçu", "Caractéristiques"] as const).map((label, i) => (
+              <TouchableOpacity
+                key={label}
+                onPress={() => goToTab(i)}
+                activeOpacity={0.7}
+                style={{ flex: 1, alignItems: "center", paddingVertical: 10 }}
+              >
+                <Animated.Text
+                  style={[
+                    {
+                      fontSize: 14,
+                      fontFamily: i === activeIndex ? "Manrope_700Bold" : "Inter_500Medium",
+                    },
+                    i === 0 ? label0Style : label1Style,
+                  ]}
                 >
-                  {tab.label}
-                </Text>
-                {isActive && (
-                  <View
-                    style={{
-                      width: 18,
-                      height: 3,
-                      borderRadius: 2,
-                      backgroundColor: COLORS.primary,
-                    }}
-                  />
-                )}
+                  {label}
+                </Animated.Text>
               </TouchableOpacity>
-            );
-          })}
+            ))}
+          </View>
+          <Animated.View
+            style={[
+              {
+                position: "absolute",
+                bottom: 0,
+                left: TAB_W / 2 - 24,
+                width: 48,
+                height: 3,
+                borderRadius: 2,
+                backgroundColor: COLORS.primary,
+              },
+              indicatorStyle,
+            ]}
+          />
         </View>
 
         {/* ── Title + price block ──────────────────── */}
@@ -334,53 +336,47 @@ export default function ProductDetailScreen() {
             par La Ménagère Paris
           </Text>
 
-          {/* Price */}
+          {/* Price — starting price; the full total is computed in the configure flow. */}
           <View style={{ marginTop: 16, marginBottom: 4 }}>
             {isPerSqm ? (
               <View>
-                <Text
-                  style={{
-                    fontSize: 28,
-                    fontFamily: "Manrope_800ExtraBold",
-                    color: COLORS.secondary,
-                  }}
-                >
-                  {livePrice != null
-                    ? formatPrice(livePrice)
-                    : product.pricePerSqm != null
-                      ? `${formatPrice(product.pricePerSqm)}/m²`
-                      : "Sur mesure"}
+                <Text style={{ fontSize: 28, fontFamily: "Manrope_800ExtraBold", color: COLORS.secondary }}>
+                  {product.pricePerSqm != null ? `${formatPrice(product.pricePerSqm)}/m²` : "Sur mesure"}
                 </Text>
                 <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 2 }}>
-                  {livePrice != null
-                    ? `Prix pour ${customWidth}×${customHeight} cm${
-                        hasOpeningTypes && openingType ? ` · ${openingTypeLabel(openingType)}` : ""
-                      }`
-                    : "Indiquez vos dimensions pour voir le prix"}
+                  Prix calculé selon vos dimensions
                 </Text>
               </View>
             ) : product.price ? (
               <View>
-                <Text
-                  style={{
-                    fontSize: 28,
-                    fontFamily: "Manrope_800ExtraBold",
-                    color: COLORS.secondary,
-                  }}
-                >
-                  {formatPrice(livePrice ?? product.price)}
+                <Text style={{ fontSize: 28, fontFamily: "Manrope_800ExtraBold", color: COLORS.secondary }}>
+                  {hasConfiguration ? `À partir de ${formatPrice(product.price)}` : formatPrice(product.price)}
                 </Text>
                 <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 2 }}>
-                  Dès {formatPrice(Math.round((livePrice ?? product.price) / 4))}/mois en 4× sans frais
+                  Dès {formatPrice(Math.round(product.price / 4))}/mois en 4× sans frais
                 </Text>
               </View>
             ) : null}
           </View>
         </View>
 
-        {/* ── Tab content ──────────────────────────── */}
-        {activeTab === "overview" && (
-          <View>
+        {/* ── Swipeable tab content (Aperçu ⇆ Caractéristiques) ─── */}
+        <Animated.View style={[{ overflow: "hidden" }, pagerHeightStyle]}>
+          <Animated.ScrollView
+            ref={pagerRef}
+            horizontal
+            pagingEnabled
+            nestedScrollEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={onPagerScroll}
+            scrollEventThrottle={16}
+          >
+            <View
+              style={{ width: W }}
+              onLayout={(e) => {
+                page0H.value = e.nativeEvent.layout.height;
+              }}
+            >
             <Section title="À propos">
               <Text
                 style={{
@@ -394,194 +390,18 @@ export default function ProductDetailScreen() {
               </Text>
             </Section>
 
-            {/* Made-to-measure dimensions */}
-            {needsDimensions && (
-              <Section title="Vos dimensions souhaitées">
-                <View style={{ flexDirection: "row", gap: 12 }}>
-                  <View style={{ flex: 1 }}>
-                    <Input
-                      label="LARGEUR"
-                      value={customWidth}
-                      onChangeText={setCustomWidth}
-                      keyboardType="numeric"
-                      suffix="cm"
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Input
-                      label="HAUTEUR"
-                      value={customHeight}
-                      onChangeText={setCustomHeight}
-                      keyboardType="numeric"
-                      suffix="cm"
-                    />
-                  </View>
-                </View>
-                {isPerSqm && product.pricePerSqm != null && (
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontFamily: "Inter_500Medium",
-                      color: COLORS.secondary,
-                      marginTop: 8,
-                    }}
-                  >
-                    {formatPrice(product.pricePerSqm)}/m²
-                    {product.minDimensions && product.maxDimensions
-                      ? ` · de ${product.minDimensions.width}×${product.minDimensions.height} à ${product.maxDimensions.width}×${product.maxDimensions.height} cm`
-                      : ""}
-                  </Text>
-                )}
-                {!isPerSqm && product.dimensions && (
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      fontFamily: "Inter_400Regular",
-                      color: COLORS.outline,
-                      marginTop: 6,
-                    }}
-                  >
-                    Référence : {product.dimensions.width}×{product.dimensions.height}{" "}
-                    {product.dimensions.unit}
-                  </Text>
-                )}
-              </Section>
-            )}
+            {/* Read-only showcase of the options (colors, shapes, accessories…). */}
+            <ProductOptionsPreview blocks={configBlocks} />
 
-            {/* Opening type selector */}
-            {hasOpeningTypes && (
-              <Section title="Type d'ouverture">
-                {(() => {
-                  const diagram = diagramForTypes(openingTypes.map((o) => o.type));
-                  return diagram ? (
-                    <Image
-                      source={diagram}
-                      style={{
-                        width: "100%",
-                        height: 150,
-                        borderRadius: 12,
-                        marginBottom: 12,
-                        backgroundColor: COLORS.surfaceContainer,
-                      }}
-                      resizeMode="contain"
-                    />
-                  ) : null;
-                })()}
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                  {openingTypes.map((opt) => {
-                    const active = openingType === opt.type;
-                    return (
-                      <TouchableOpacity
-                        key={opt.type}
-                        onPress={() => {
-                          Haptics.selectionAsync();
-                          setOpeningType(opt.type);
-                        }}
-                        style={{
-                          paddingHorizontal: 14,
-                          paddingVertical: 9,
-                          borderRadius: 9999,
-                          backgroundColor: active ? COLORS.primary : "transparent",
-                          borderWidth: 1,
-                          borderColor: active ? COLORS.primary : COLORS.outlineVariant,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 13,
-                            fontFamily: active ? "Inter_600SemiBold" : "Inter_500Medium",
-                            color: active ? COLORS.onPrimary : COLORS.onSurface,
-                          }}
-                        >
-                          {openingTypeLabel(opt.type)}
-                          {opt.surcharge > 0 ? ` +${formatPrice(opt.surcharge)}` : ""}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </Section>
-            )}
+            </View>
 
-            {/* Category configuration blocks (kitchens, sofas, accessories…) */}
-            <ProductConfigBlocks
-              blocks={configBlocks}
-              value={configState}
-              onChange={setConfigState}
-            />
-
-            {/* Delivery */}
-            <Section title="Livraison estimée">
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-                {TERRITORIES.map((t) => {
-                  const active = territory === t.value;
-                  return (
-                    <TouchableOpacity
-                      key={t.value}
-                      onPress={() => setTerritory(t.value as Territory)}
-                      style={{
-                        paddingHorizontal: 10,
-                        paddingVertical: 6,
-                        borderRadius: 9999,
-                        backgroundColor: active ? COLORS.primary : "#fff",
-                        borderWidth: 1,
-                        borderColor: active ? COLORS.primary : COLORS.outlineVariant,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          fontFamily: active ? "Inter_600SemiBold" : "Inter_500Medium",
-                          color: active ? "#fff" : COLORS.onSurface,
-                        }}
-                      >
-                        {t.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: 12,
-                  borderRadius: 10,
-                  backgroundColor: "#fff",
-                }}
-              >
-                <View
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 8,
-                    backgroundColor: `${COLORS.primary}15`,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Icon
-                    name={territory === "metropole" ? "truck-outline" : "ferry"}
-                    size={20}
-                    color={COLORS.primary}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>
-                    {territoryEta}
-                  </Text>
-                  <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: COLORS.outline }}>
-                    Livraison à domicile · suivi en temps réel
-                  </Text>
-                </View>
-              </View>
-            </Section>
-          </View>
-        )}
-
-        {activeTab === "specs" && (
-          <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+            <View
+              style={{ width: W }}
+              onLayout={(e) => {
+                page1H.value = e.nativeEvent.layout.height;
+              }}
+            >
+              <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
             <SpecRow label="Catégorie" value={product.category.name} />
             {product.dimensions && (
               <SpecRow
@@ -594,8 +414,10 @@ export default function ProductDetailScreen() {
             <SpecRow label="Métropole" value={product.deliveryEstimates.metropole} />
             <SpecRow label="Outre-mer" value={product.deliveryEstimates.outreMer} />
             <SpecRow label="Référence" value={product.id.toUpperCase()} last />
-          </View>
-        )}
+              </View>
+            </View>
+          </Animated.ScrollView>
+        </Animated.View>
 
         {/* ── Related products ─────────────────────── */}
         <View style={{ marginTop: 16 }}>
@@ -683,40 +505,38 @@ export default function ProductDetailScreen() {
           </Animated.View>
         )}
 
-        {/* Inline hint explaining why the button is disabled. */}
-        {missingHint && (
-          <Animated.View entering={FadeInDown.duration(220)} style={{ marginBottom: 8, paddingHorizontal: 4 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <Icon name="information-outline" size={14} color={COLORS.outline} />
-              <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.outline }}>
-                {missingHint}
-              </Text>
-            </View>
-          </Animated.View>
-        )}
+        {/* Stacked full-width CTAs: devis (yellow) then commander (blue). */}
+        <TouchableOpacity
+          onPress={() => setDevisOpen(true)}
+          activeOpacity={0.85}
+          style={{
+            backgroundColor: "#F4B400",
+            borderRadius: 14,
+            paddingVertical: 15,
+            alignItems: "center",
+            justifyContent: "center",
+            flexDirection: "row",
+            gap: 8,
+            marginBottom: 10,
+          }}
+        >
+          <Icon name="file-document-outline" size={18} color={COLORS.onSurface} />
+          <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}>
+            Demander un devis
+          </Text>
+        </TouchableOpacity>
 
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <FooterIconButton
-            icon={isFavorited ? "heart" : "heart-outline"}
-            color={isFavorited ? "#E74040" : COLORS.onSurface}
-            label="Favoris"
-            onPress={handleFavorite}
-          />
-          <FooterIconButton
-            icon="message-outline"
-            color={COLORS.onSurface}
-            label="Contact"
-            onPress={() => setContactOpen(true)}
-          />
-          <View style={{ flex: 1 }}>
-            <Button
-              label={justAdded ? "Ajouté ✓" : "Ajouter au panier"}
-              onPress={handleAddToCart}
-              size="md"
-              disabled={!canAddToCart}
-            />
-          </View>
-        </View>
+        <Button
+          label={
+            justAdded
+              ? "Ajouté ✓"
+              : hasConfiguration
+                ? "Configurer & commander"
+                : "Ajouter au panier"
+          }
+          onPress={handlePrimaryAction}
+          size="lg"
+        />
       </View>
 
       <Toast
@@ -733,12 +553,32 @@ export default function ProductDetailScreen() {
           onClose={() => setContactOpen(false)}
         />
       )}
+
+      <DevisRequestSheet
+        productId={product.id}
+        productName={product.name}
+        visible={devisOpen}
+        onClose={() => setDevisOpen(false)}
+        onSubmitted={() =>
+          setToast({ visible: true, message: "Demande de devis envoyée ✓", type: "success" })
+        }
+      />
+
+      <FloatingContactButton onPress={() => setContactOpen(true)} />
     </View>
   );
 }
 
 // ─── Sub-components ──────────────────────────────────────
-function CircleButton({ icon, onPress }: { icon: any; onPress: () => void }) {
+function CircleButton({
+  icon,
+  onPress,
+  color = COLORS.onSurface,
+}: {
+  icon: any;
+  onPress: () => void;
+  color?: string;
+}) {
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -752,8 +592,50 @@ function CircleButton({ icon, onPress }: { icon: any; onPress: () => void }) {
         justifyContent: "center",
       }}
     >
-      <Icon name={icon} size={20} color={COLORS.onSurface} />
+      <Icon name={icon} size={20} color={color} />
     </TouchableOpacity>
+  );
+}
+
+/** Messenger-style floating contact bubble with a gentle pulse. */
+function FloatingContactButton({ onPress }: { onPress: () => void }) {
+  const pulse = useSharedValue(1);
+  useEffect(() => {
+    pulse.value = withRepeat(withTiming(1.1, { duration: 1200 }), -1, true);
+  }, [pulse]);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
+  return (
+    <Animated.View
+      entering={FadeInUp.springify().damping(14)}
+      style={[
+        {
+          position: "absolute",
+          right: 18,
+          bottom: 168,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.22,
+          shadowRadius: 8,
+          elevation: 8,
+        },
+        style,
+      ]}
+    >
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.85}
+        style={{
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          backgroundColor: COLORS.primary,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Icon name="message-text" size={26} color={COLORS.onPrimary} />
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -826,27 +708,3 @@ function SpecRow({ label, value, last }: { label: string; value: string; last?: 
   );
 }
 
-function FooterIconButton({
-  icon,
-  color,
-  label,
-  onPress,
-}: {
-  icon: any;
-  color: string;
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.85}
-      style={{ width: 56, alignItems: "center", justifyContent: "center", paddingVertical: 6 }}
-    >
-      <Icon name={icon} size={22} color={color} />
-      <Text style={{ fontSize: 9, fontFamily: "Inter_500Medium", color: COLORS.outline, marginTop: 2 }}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-}

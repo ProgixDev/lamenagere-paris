@@ -66,6 +66,7 @@ export interface OrderRow {
   ship_city: string | null;
   ship_country: string | null;
   ship_territory: ShippingZone | null;
+  ship_phone: string | null;
   carrier: string | null;
   tracking_number: string | null;
   tracking_url: string | null;
@@ -178,6 +179,7 @@ function shippingAddress(row: OrderRow): AddressDto {
     city: row.ship_city ?? '',
     country: row.ship_country ?? 'France',
     territory: row.ship_territory ?? row.territory,
+    phone: row.ship_phone ?? undefined,
   };
 }
 

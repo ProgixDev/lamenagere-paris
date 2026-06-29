@@ -16,6 +16,7 @@ import { getProductImage } from "../../../lib/mock-data";
 import { useOrders } from "../../../features/orders/hooks";
 import { ORDER_STATUS_LABELS } from "../../../features/orders/store";
 import { useQuoteRequests } from "../../../features/quotes/hooks";
+import { useCartStore } from "../../../features/cart/store";
 import type { QuoteStatus } from "../../../lib/types";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -47,6 +48,7 @@ export default function OrdersScreen() {
   const [tab, setTab] = useState<Tab>("orders");
   const { data: orders = [], isLoading: ordersLoading } = useOrders();
   const { data: quotes = [], isLoading: quotesLoading } = useQuoteRequests();
+  const addQuoteItem = useCartStore((s) => s.addQuoteItem);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
@@ -184,42 +186,65 @@ export default function OrdersScreen() {
           quotes.map((quote) => {
             const img = getProductImage(quote.product.images[0]);
             const statusColor = QUOTE_STATUS_COLORS[quote.status] ?? COLORS.secondary;
+            const canAddToCart =
+              quote.quotedPrice != null &&
+              (quote.status === "devis_envoye" || quote.status === "devis_accepte");
             return (
-              <TouchableOpacity
+              <View
                 key={quote.id}
-                activeOpacity={0.9}
-                style={{
-                  backgroundColor: "#ffffff",
-                  borderRadius: 14,
-                  padding: 14,
-                  flexDirection: "row",
-                  gap: 14,
-                }}
+                style={{ backgroundColor: "#ffffff", borderRadius: 14, padding: 14 }}
               >
-                {img && (
-                  <Image source={img} style={{ width: 72, height: 72, borderRadius: 10 }} resizeMode="cover" />
-                )}
-                <View style={{ flex: 1, justifyContent: "space-between" }}>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                    <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }} numberOfLines={1}>
-                      {quote.product.name}
-                    </Text>
-                    <View style={{ backgroundColor: `${statusColor}18`, borderRadius: 9999, paddingHorizontal: 8, paddingVertical: 2 }}>
-                      <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: statusColor }}>
-                        {QUOTE_STATUS_LABELS[quote.status]}
-                      </Text>
-                    </View>
-                  </View>
-                  {quote.quotedPrice != null && (
-                    <Text style={{ fontSize: 14, fontFamily: "Manrope_700Bold", color: COLORS.secondary }}>
-                      {formatPrice(quote.quotedPrice)}
-                    </Text>
+                <View style={{ flexDirection: "row", gap: 14 }}>
+                  {img && (
+                    <Image source={img} style={{ width: 72, height: 72, borderRadius: 10 }} resizeMode="cover" />
                   )}
-                  <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: COLORS.outline }}>
-                    {formatDate(quote.createdAt)}
-                  </Text>
+                  <View style={{ flex: 1, justifyContent: "space-between" }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }} numberOfLines={1}>
+                        {quote.product.name}
+                      </Text>
+                      <View style={{ backgroundColor: `${statusColor}18`, borderRadius: 9999, paddingHorizontal: 8, paddingVertical: 2 }}>
+                        <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: statusColor }}>
+                          {QUOTE_STATUS_LABELS[quote.status]}
+                        </Text>
+                      </View>
+                    </View>
+                    {quote.quotedPrice != null && (
+                      <Text style={{ fontSize: 14, fontFamily: "Manrope_700Bold", color: COLORS.secondary }}>
+                        {formatPrice(quote.quotedPrice)}
+                      </Text>
+                    )}
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: COLORS.outline }}>
+                      {formatDate(quote.createdAt)}
+                    </Text>
+                  </View>
                 </View>
-              </TouchableOpacity>
+
+                {canAddToCart && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      addQuoteItem(quote.product, quote.quotedPrice as number, quote.id);
+                      router.push("/(tabs)/cart");
+                    }}
+                    activeOpacity={0.85}
+                    style={{
+                      marginTop: 12,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      backgroundColor: COLORS.primary,
+                      borderRadius: 10,
+                      paddingVertical: 11,
+                    }}
+                  >
+                    <MaterialCommunityIcons name="cart-plus" size={18} color={COLORS.onPrimary} />
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onPrimary }}>
+                      Ajouter au panier
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             );
           })
         ) : (

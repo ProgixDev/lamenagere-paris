@@ -1,6 +1,15 @@
 import { AccountType, ShippingZone } from '../../common/serialization/status-labels';
 
 /** DB row shapes (snake_case) for profiles + addresses. */
+export interface DeliveryAddress {
+  firstName: string;
+  lastName: string;
+  street: string;
+  postalCode: string;
+  city: string;
+  phone?: string;
+}
+
 export interface ProfileRow {
   id: string;
   email: string;
@@ -10,6 +19,7 @@ export interface ProfileRow {
   company: string | null;
   siret: string | null;
   onboarded: boolean;
+  delivery_address: DeliveryAddress | null;
   created_at: string;
 }
 
@@ -35,6 +45,7 @@ export interface AddressDto {
   city: string;
   country: string;
   territory: ShippingZone;
+  phone?: string;
   isDefault?: boolean;
 }
 
@@ -49,6 +60,8 @@ export interface UserDto {
   siret?: string;
   onboarded: boolean;
   addresses: AddressDto[];
+  /** Remembered checkout delivery form (pre-fills the next order). */
+  deliveryAddress?: DeliveryAddress;
   createdAt: string;
 }
 
@@ -80,6 +93,7 @@ export function toUserDto(
     siret: profile.siret ?? undefined,
     onboarded: profile.onboarded,
     addresses: addresses.map(toAddressDto),
+    deliveryAddress: profile.delivery_address ?? undefined,
     createdAt: profile.created_at,
   };
 }

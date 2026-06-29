@@ -6,9 +6,8 @@ interface CheckoutStepsProps {
 }
 
 const steps = [
-  { label: "ÉTAPE 01", title: "Adresse" },
-  { label: "ÉTAPE 02", title: "Livraison" },
-  { label: "ÉTAPE 03", title: "Paiement" },
+  { label: "ÉTAPE 01", title: "Livraison" },
+  { label: "ÉTAPE 02", title: "Paiement" },
 ];
 
 export default function CheckoutSteps({ currentStep }: CheckoutStepsProps) {
@@ -16,7 +15,7 @@ export default function CheckoutSteps({ currentStep }: CheckoutStepsProps) {
   return (
     <Stepper
       currentStep={currentStep}
-      totalSteps={3}
+      totalSteps={2}
       label={step.label}
       title={step.title}
     />

@@ -33,6 +33,15 @@ export interface User {
   /** False until the user completes the onboarding flow (mainly OAuth sign-ups). */
   onboarded: boolean;
   addresses: Address[];
+  /** Remembered checkout delivery form (pre-fills the next order). */
+  deliveryAddress?: {
+    firstName: string;
+    lastName: string;
+    street: string;
+    postalCode: string;
+    city: string;
+    phone?: string;
+  };
   createdAt: string;
 }
 
@@ -173,6 +182,8 @@ export interface CartItem {
   openingType?: string;
   /** Captured selections for the category's config blocks. */
   configuration?: ItemConfiguration;
+  /** When set, this line comes from an admin-priced devis (fixed price). */
+  quoteId?: string;
   calculatedPrice?: number;
 }
 

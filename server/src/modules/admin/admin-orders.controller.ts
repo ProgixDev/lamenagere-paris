@@ -15,6 +15,7 @@ import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { AuthUser } from '../../common/auth/auth-user';
 import { AdminOrdersService } from './admin-orders.service';
 import {
+  AcceptRefundDto,
   AddOrderNoteDto,
   OrderListQuery,
   RejectRefundDto,
@@ -72,8 +73,8 @@ export class AdminOrdersController {
 
   @Post(':id/refund/accept')
   @HttpCode(200)
-  acceptRefund(@Param('id') id: string) {
-    return this.orders.acceptRefund(id);
+  acceptRefund(@Param('id') id: string, @Body() dto: AcceptRefundDto) {
+    return this.orders.acceptRefund(id, dto.amountCents);
   }
 
   @Post(':id/refund/reject')

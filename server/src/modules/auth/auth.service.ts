@@ -162,6 +162,9 @@ export class AuthService {
     if (dto.company !== undefined) patch.company = dto.company;
     if (dto.siret !== undefined) patch.siret = dto.siret;
     if (dto.onboarded !== undefined) patch.onboarded = dto.onboarded;
+    if (dto.deliveryAddress !== undefined) {
+      patch.delivery_address = dto.deliveryAddress;
+    }
 
     if (Object.keys(patch).length > 0) {
       const { error } = await this.supabase.client
@@ -180,7 +183,7 @@ export class AuthService {
     const { data: profile, error } = await this.supabase.client
       .from('profiles')
       .select(
-        'id, email, full_name, phone, account_type, company, siret, onboarded, created_at',
+        'id, email, full_name, phone, account_type, company, siret, onboarded, delivery_address, created_at',
       )
       .eq('id', userId)
       .single<ProfileRow>();

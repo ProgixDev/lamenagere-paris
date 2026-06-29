@@ -36,6 +36,8 @@ export class OrderItemInputDto {
   @IsOptional() @IsString() openingType?: string;
   /** Captured config-block selections (re-priced server-side). */
   @IsOptional() @IsArray() configuration?: ConfigSelectionEntry[];
+  /** When set, this line is an admin-priced devis; its quoted price is used. */
+  @IsOptional() @IsString() quoteId?: string;
 }
 
 const ATTACHMENT_TYPES = ['image', 'video'] as const;
@@ -45,15 +47,32 @@ export class OrderAttachmentDto {
   @IsEnum(ATTACHMENT_TYPES) type!: 'image' | 'video';
 }
 
+export class ShippingAddressInputDto {
+  @IsString() firstName!: string;
+  @IsString() lastName!: string;
+  @IsString() street!: string;
+  @IsString() postalCode!: string;
+  @IsString() city!: string;
+  @IsOptional() @IsString() phone?: string;
+  @IsOptional() @IsString() country?: string;
+  @IsOptional() @IsEnum(ZONES) territory?: ShippingZone;
+}
+
 export class CreateOrderDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => OrderItemInputDto)
   items!: OrderItemInputDto[];
 
-  @IsString() shippingAddressId!: string;
+  /** Either a saved address id OR an inline delivery form (one is required). */
+  @IsOptional() @IsString() shippingAddressId?: string;
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ShippingAddressInputDto)
+  shippingAddress?: ShippingAddressInputDto;
+
   @IsString() shippingMethod!: string;
-  @IsEnum(ZONES) territory!: ShippingZone;
+  @IsOptional() @IsEnum(ZONES) territory?: ShippingZone;
 
   /** Optional free-text note from the buyer describing their order. */
   @IsOptional() @IsString() customerNote?: string;

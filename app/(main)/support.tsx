@@ -14,6 +14,8 @@ import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { COLORS } from "../../lib/constants";
+import { formatDate } from "../../lib/utils";
+import { useOrders } from "../../features/orders/hooks";
 import {
   listTicketsApi,
   getTicketApi,
@@ -123,9 +125,11 @@ function NewTicketForm({ onCreated }: { onCreated: () => void }) {
   const [subject, setSubject] = useState("");
   const [category, setCategory] = useState("commande");
   const [description, setDescription] = useState("");
+  const [orderId, setOrderId] = useState<string | undefined>(undefined);
+  const { data: orders = [] } = useOrders();
 
   const mutation = useMutation({
-    mutationFn: () => createTicketApi({ subject, category, description }),
+    mutationFn: () => createTicketApi({ subject, category, description, orderId }),
     onSuccess: onCreated,
   });
 
@@ -152,6 +156,42 @@ function NewTicketForm({ onCreated }: { onCreated: () => void }) {
             );
           })}
         </View>
+
+        {orders.length > 0 && (
+          <>
+            <Text style={[labelStyle, { marginTop: 18 }]}>COMMANDE CONCERNÉE (FACULTATIF)</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingVertical: 8 }}
+            >
+              {orders.map((o) => {
+                const active = orderId === o.id;
+                return (
+                  <TouchableOpacity
+                    key={o.id}
+                    onPress={() => setOrderId(active ? undefined : o.id)}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      borderRadius: 12,
+                      backgroundColor: active ? COLORS.primary : COLORS.surfaceContainerLowest,
+                      borderWidth: 1,
+                      borderColor: active ? COLORS.primary : COLORS.outlineVariant + "60",
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: active ? "#fff" : COLORS.onSurface }}>
+                      {o.orderNumber}
+                    </Text>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: active ? "#ffffffcc" : COLORS.outline, marginTop: 2 }}>
+                      {formatDate(o.createdAt)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </>
+        )}
 
         <Text style={[labelStyle, { marginTop: 18 }]}>DESCRIPTION</Text>
         <TextInput

@@ -4,6 +4,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Min,
   MinLength,
 } from 'class-validator';
 import { OrderStatus } from '../../../common/serialization/status-labels';
@@ -37,6 +38,11 @@ export class UpdateOrderDto {
 
 export class RejectRefundDto {
   @IsOptional() @IsString() note?: string;
+}
+
+export class AcceptRefundDto {
+  /** Partial-refund amount in cents; omit for a full refund. */
+  @IsOptional() @IsInt() @Min(1) amountCents?: number;
 }
 
 export class OrderListQuery {

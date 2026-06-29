@@ -25,6 +25,7 @@ interface OrderRefundRow {
   payment_status: string;
   stripe_payment_intent_id: string | null;
   stripe_refund_id: string | null;
+  refund_amount_cents: number | null;
 }
 
 // True when Stripe reports the object doesn't exist under the current key
@@ -167,20 +168,26 @@ export class PaymentsService implements OnModuleInit {
    */
   async refundOrder(
     orderId: string,
-  ): Promise<{ refundId: string; amountCents: number }> {
+    amountCents?: number,
+  ): Promise<{ refundId: string; amountCents: number; partial: boolean }> {
     const { data: order } = await this.supabase.client
       .from('orders')
       .select(
-        'id, total_cents, payment_status, stripe_payment_intent_id, stripe_refund_id',
+        'id, total_cents, payment_status, stripe_payment_intent_id, stripe_refund_id, refund_amount_cents',
       )
       .eq('id', orderId)
       .maybeSingle<OrderRefundRow>();
 
     if (!order) throw new NotFoundException('Commande introuvable');
 
-    // Already refunded → return the existing refund (idempotent).
+    // Already refunded → return the existing refund (idempotent, one per order).
     if (order.stripe_refund_id) {
-      return { refundId: order.stripe_refund_id, amountCents: order.total_cents };
+      const done = order.refund_amount_cents ?? order.total_cents;
+      return {
+        refundId: order.stripe_refund_id,
+        amountCents: done,
+        partial: done < order.total_cents,
+      };
     }
     if (order.payment_status !== 'paid') {
       throw new BadRequestException(
@@ -193,10 +200,23 @@ export class PaymentsService implements OnModuleInit {
       );
     }
 
+    // Resolve the amount: a partial refund must be > 0 and ≤ the order total.
+    let resolved = order.total_cents;
+    if (amountCents != null) {
+      if (amountCents <= 0 || amountCents > order.total_cents) {
+        throw new BadRequestException(
+          'Le montant du remboursement doit être compris entre 1 et le total de la commande',
+        );
+      }
+      resolved = Math.round(amountCents);
+    }
+    const partial = resolved < order.total_cents;
+
     let refund: StripeNs.Refund;
     try {
       refund = await this.stripe.refunds.create({
         payment_intent: order.stripe_payment_intent_id,
+        ...(partial ? { amount: resolved } : {}),
       });
     } catch (err) {
       const message =
@@ -209,10 +229,14 @@ export class PaymentsService implements OnModuleInit {
 
     await this.supabase.client
       .from('orders')
-      .update({ stripe_refund_id: refund.id, payment_status: 'refunded' })
+      .update({
+        stripe_refund_id: refund.id,
+        // A partial refund leaves the order "paid" (partially refunded).
+        payment_status: partial ? 'paid' : 'refunded',
+      })
       .eq('id', order.id);
 
-    return { refundId: refund.id, amountCents: order.total_cents };
+    return { refundId: refund.id, amountCents: resolved, partial };
   }
 
   /**

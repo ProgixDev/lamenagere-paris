@@ -38,7 +38,7 @@ export default function CheckoutPaymentScreen() {
   const queryClient = useQueryClient();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const { items, subtotal, clearCart } = useCart();
-  const { shippingAddressId, territory, shippingMethod, setLastOrderNumber } =
+  const { address, territory, shippingMethod, setLastOrderNumber } =
     useCheckoutStore();
   const [loading, setLoading] = useState(false);
   const [note, setNote] = useState("");
@@ -61,10 +61,10 @@ export default function CheckoutPaymentScreen() {
   };
 
   const handlePayment = async () => {
-    if (!shippingAddressId) {
+    if (!address) {
       Alert.alert(
         "Adresse manquante",
-        "Veuillez sélectionner une adresse de livraison.",
+        "Veuillez renseigner votre adresse de livraison.",
       );
       return;
     }
@@ -85,8 +85,9 @@ export default function CheckoutPaymentScreen() {
           customDimensions: item.customDimensions,
           openingType: item.openingType,
           configuration: item.configuration,
+          quoteId: item.quoteId,
         })),
-        shippingAddressId,
+        shippingAddress: { ...address, territory },
         shippingMethod,
         territory,
         customerNote: note.trim() || undefined,
@@ -159,7 +160,7 @@ export default function CheckoutPaymentScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40 }}>
-        <CheckoutSteps currentStep={3} />
+        <CheckoutSteps currentStep={2} />
 
         <View className="rounded-xl p-6 mb-6 flex-row items-center gap-3" style={{ backgroundColor: COLORS.surfaceContainerLow }}>
           <MaterialCommunityIcons name="credit-card-outline" size={24} color={COLORS.secondary} />

@@ -169,32 +169,37 @@ export class AdminOrdersService {
    * order refunded, records an audit note and notifies the customer. Works
    * whether or not the customer filed a request first (admin-initiated refund).
    */
-  async acceptRefund(idOrNumber: string): Promise<AdminOrderDto> {
+  async acceptRefund(
+    idOrNumber: string,
+    amountCents?: number,
+  ): Promise<AdminOrderDto> {
     const row = await this.loadByIdOrNumber(idOrNumber);
     if (row.refund_status === 'refunded') {
       return toAdminOrderDto(row); // already done — no-op
     }
 
-    const { refundId, amountCents } = await this.payments.refundOrder(row.id);
+    const { refundId, amountCents: refunded, partial } =
+      await this.payments.refundOrder(row.id, amountCents);
+    const kind = partial ? 'partiel' : 'total';
 
     await this.supabase.client
       .from('orders')
       .update({
         refund_status: 'refunded',
-        refund_amount_cents: amountCents,
+        refund_amount_cents: refunded,
         refund_decided_at: new Date().toISOString(),
       })
       .eq('id', row.id);
 
     await this.supabase.client.from('order_notes').insert({
       order_id: row.id,
-      body: `Remboursement accepté et traité (Stripe ${refundId}, ${formatEURFromCents(amountCents)}).`,
+      body: `Remboursement ${kind} accepté et traité (Stripe ${refundId}, ${formatEURFromCents(refunded)}).`,
     });
 
     await this.notifyCustomer(
       row.profile_id,
       'Remboursement accepté',
-      `Votre remboursement de ${formatEURFromCents(amountCents)} pour la commande ${row.order_number} a été traité.`,
+      `Votre remboursement ${kind} de ${formatEURFromCents(refunded)} pour la commande ${row.order_number} a été traité.`,
       row.id,
     );
 

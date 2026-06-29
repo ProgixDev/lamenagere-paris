@@ -21,6 +21,8 @@ interface CartStore {
     openingType?: string,
     extra?: AddItemExtra,
   ) => void;
+  /** Adds an admin-priced devis to the cart as a fixed-price line. */
+  addQuoteItem: (product: Product, quotedPrice: number, quoteId: string) => void;
   removeItem: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
@@ -81,6 +83,20 @@ export const useCartStore = create<CartStore>()(
           };
           set({ items: [...items, newItem], lastUpdated: Date.now() });
         }
+      },
+
+      addQuoteItem: (product, quotedPrice, quoteId) => {
+        const { items } = get();
+        // A given devis can only be added once.
+        if (items.some((it) => it.quoteId === quoteId)) return;
+        const newItem: CartItem = {
+          id: `quote-${quoteId}`,
+          product,
+          quantity: 1,
+          quoteId,
+          calculatedPrice: quotedPrice,
+        };
+        set({ items: [...items, newItem], lastUpdated: Date.now() });
       },
 
       removeItem: (itemId) => {
