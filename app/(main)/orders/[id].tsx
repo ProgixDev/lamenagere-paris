@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../../lib/constants";
+import { TYPE, FONTS } from "../../../lib/typography";
 import { formatDate, formatPrice } from "../../../lib/utils";
 import Skeleton from "../../../components/ui/Skeleton";
 import OrderTimeline from "../../../components/order/OrderTimeline";
@@ -41,7 +42,7 @@ const REFUND_BANNER: Record<
   refunded: {
     icon: "check-circle-outline",
     title: "Remboursement effectué",
-    tone: "#1B873F",
+    tone: COLORS.success,
   },
   rejected: {
     icon: "close-circle-outline",
@@ -151,17 +152,17 @@ export default function OrderDetailScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
       <View className="px-6 py-4 flex-row items-center">
-        <TouchableOpacity onPress={() => router.back()} className="mr-3">
+        <TouchableOpacity onPress={() => router.back()} className="mr-3" accessibilityLabel="Retour">
           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.primary} />
         </TouchableOpacity>
-        <Text className="text-lg font-semibold" style={{ color: COLORS.primaryContainer, fontFamily: "Manrope_700Bold" }}>
+        <Text style={TYPE.screenTitle}>
           Détails de la commande
         </Text>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40, gap: 24 }}>
         <View>
-          <Text className="text-lg" style={{ color: COLORS.onSurface, fontFamily: "Manrope_700Bold" }}>
+          <Text style={TYPE.sectionTitle}>
             {order.orderNumber}
           </Text>
           <Text className="text-xs mt-1" style={{ color: COLORS.outline }}>
@@ -211,7 +212,7 @@ export default function OrderDetailScreen() {
 
         {/* Items */}
         <Card padding="lg">
-          <Text className="text-sm font-semibold mb-3" style={{ color: COLORS.onSurface }}>Articles</Text>
+          <Text className="mb-3" style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 20 }}>Articles</Text>
           {order.items.map((item) => {
             const summary = item.configuration?.length
               ? summarizeConfiguration(item.configuration)
@@ -230,7 +231,7 @@ export default function OrderDetailScreen() {
                       </Text>
                     ) : null}
                   </View>
-                  <Text className="text-sm" style={{ color: COLORS.secondary }}>
+                  <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 16 }}>
                     {formatPrice(item.price * item.quantity)}
                   </Text>
                 </View>
@@ -270,7 +271,7 @@ export default function OrderDetailScreen() {
 
         {/* Address */}
         <Card padding="lg">
-          <Text className="text-sm font-semibold mb-3" style={{ color: COLORS.onSurface }}>Adresse de livraison</Text>
+          <Text className="mb-3" style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 20 }}>Adresse de livraison</Text>
           <Text className="text-sm" style={{ color: COLORS.onSurfaceVariant }}>
             {order.shippingAddress.firstName} {order.shippingAddress.lastName}
           </Text>
@@ -292,9 +293,9 @@ export default function OrderDetailScreen() {
             <Text className="text-sm" style={{ color: COLORS.outline }}>Livraison</Text>
             <Text className="text-sm" style={{ color: COLORS.outline }}>{formatPrice(order.shippingCost)}</Text>
           </View>
-          <View className="flex-row justify-between mt-2 pt-2" style={{ borderTopWidth: 1, borderTopColor: COLORS.surfaceContainerLow }}>
-            <Text className="font-bold" style={{ color: COLORS.primary, fontFamily: "Manrope_800ExtraBold" }}>Total</Text>
-            <Text className="text-lg font-bold" style={{ color: COLORS.secondary, fontFamily: "Manrope_700Bold" }}>{formatPrice(order.total)}</Text>
+          <View className="flex-row justify-between items-center mt-2 pt-3" style={{ borderTopWidth: 1, borderTopColor: COLORS.outlineVariant }}>
+            <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 20 }}>Total</Text>
+            <Text style={[TYPE.priceLarge, { fontSize: 24 }]}>{formatPrice(order.total)}</Text>
           </View>
         </Card>
 
@@ -336,10 +337,10 @@ export default function OrderDetailScreen() {
             paddingHorizontal: 24,
           }}
         >
-          <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: 20 }}>
+          <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 20 }}>
             <Text
-              className="text-base font-semibold mb-2"
-              style={{ color: COLORS.onSurface, fontFamily: "Manrope_700Bold" }}
+              className="mb-2"
+              style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 22 }}
             >
               Demander un remboursement
             </Text>
@@ -404,10 +405,10 @@ export default function OrderDetailScreen() {
             paddingHorizontal: 24,
           }}
         >
-          <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: 20 }}>
+          <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 20 }}>
             <Text
-              className="text-base font-semibold mb-1"
-              style={{ color: COLORS.onSurface, fontFamily: "Manrope_700Bold" }}
+              className="mb-1"
+              style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 22 }}
             >
               Noter ce produit
             </Text>

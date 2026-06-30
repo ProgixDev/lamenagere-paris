@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import Icon from "../../components/ui/Icon";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../lib/constants";
+import { FONTS, TYPE } from "../../lib/typography";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import Toast from "../../components/ui/Toast";
@@ -88,23 +89,17 @@ export default function EditProfileScreen() {
             gap: 12,
             paddingHorizontal: 20,
             paddingTop: 8,
-            paddingBottom: 12,
+            paddingBottom: 16,
           }}
         >
-          <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={8} accessibilityLabel="Retour">
             <Icon
               name="chevron-left"
               size={26}
               color={COLORS.onSurface}
             />
           </TouchableOpacity>
-          <Text
-            style={{
-              fontSize: 18,
-              fontFamily: "Manrope_700Bold",
-              color: COLORS.onSurface,
-            }}
-          >
+          <Text style={TYPE.screenTitle}>
             Modifier le profil
           </Text>
         </View>
@@ -140,14 +135,7 @@ export default function EditProfileScreen() {
 
             <View>
               <Text
-                style={{
-                  fontSize: 10,
-                  textTransform: "uppercase",
-                  letterSpacing: 2,
-                  fontFamily: "Inter_600SemiBold",
-                  color: COLORS.outline,
-                  marginBottom: 8,
-                }}
+                style={[TYPE.overline, { marginBottom: 8 }]}
               >
                 TYPE DE COMPTE
               </Text>
@@ -158,20 +146,21 @@ export default function EditProfileScreen() {
                     onPress={() => setAccountType(type)}
                     style={{
                       flex: 1,
-                      paddingVertical: 12,
+                      paddingVertical: 13,
                       borderRadius: 9999,
                       alignItems: "center",
                       backgroundColor:
-                        accountType === type ? COLORS.primary : "transparent",
+                        accountType === type ? COLORS.primary : COLORS.surfaceContainerLow,
                       borderWidth: accountType === type ? 0 : 1,
-                      borderColor: `${COLORS.outlineVariant}33`,
+                      borderColor: COLORS.outlineVariant,
                     }}
                   >
                     <Text
                       style={{
                         fontSize: 13,
-                        fontFamily: "Inter_600SemiBold",
+                        fontFamily: FONTS.bodySemibold,
                         textTransform: "uppercase",
+                        letterSpacing: 0.5,
                         color:
                           accountType === type ? COLORS.onPrimary : COLORS.onSurface,
                       }}

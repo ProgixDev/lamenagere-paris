@@ -11,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../lib/constants";
+import { FONTS, TYPE, SPACE, SHADOW } from "../../lib/typography";
 import {
   useAddresses,
   useCreateAddress,
@@ -117,11 +118,11 @@ export default function AddressesScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
       {/* Header */}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 }}>
-        <TouchableOpacity onPress={() => router.back()}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 }}>
+        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Retour">
           <MaterialCommunityIcons name="chevron-left" size={26} color={COLORS.onSurface} />
         </TouchableOpacity>
-        <Text style={{ fontSize: 18, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}>
+        <Text style={TYPE.screenTitle}>
           Mes Adresses
         </Text>
       </View>
@@ -130,22 +131,23 @@ export default function AddressesScreen() {
         {/* Add button */}
         <TouchableOpacity
           onPress={openCreate}
+          accessibilityLabel="Ajouter une adresse"
           style={{
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "center",
             gap: 8,
-            backgroundColor: "#ffffff",
-            borderRadius: 14,
-            paddingVertical: 16,
+            backgroundColor: COLORS.surfaceContainerLowest,
+            borderRadius: 16,
+            paddingVertical: 17,
             borderWidth: 1,
             borderStyle: "dashed",
-            borderColor: `${COLORS.outlineVariant}66`,
-            marginBottom: 16,
+            borderColor: COLORS.outlineVariant,
+            marginBottom: SPACE.lg,
           }}
         >
-          <MaterialCommunityIcons name="plus" size={20} color={COLORS.secondary} />
-          <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: COLORS.secondary }}>
+          <MaterialCommunityIcons name="plus" size={20} color={COLORS.primary} />
+          <Text style={{ fontSize: 15, fontFamily: FONTS.bodyMedium, color: COLORS.primary }}>
             Ajouter une adresse
           </Text>
         </TouchableOpacity>
@@ -156,10 +158,10 @@ export default function AddressesScreen() {
           </View>
         ) : isError ? (
           <View style={{ alignItems: "center", paddingTop: 40 }}>
-            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#f0ebe6", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: COLORS.surfaceContainer, alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
               <MaterialCommunityIcons name="alert-circle-outline" size={28} color={COLORS.error} />
             </View>
-            <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: COLORS.onSurface, marginBottom: 4 }}>
+            <Text style={[TYPE.sectionTitle, { marginBottom: 4 }]}>
               Erreur de chargement
             </Text>
             <TouchableOpacity onPress={() => refetch()} style={{ marginTop: 8 }}>
@@ -173,38 +175,39 @@ export default function AddressesScreen() {
             <View
               key={addr.id}
               style={{
-                backgroundColor: "#ffffff",
-                borderRadius: 14,
-                padding: 16,
+                backgroundColor: COLORS.surfaceContainerLowest,
+                borderRadius: 16,
+                padding: SPACE.lg,
                 marginBottom: 12,
+                ...SHADOW.card,
               }}
             >
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface, marginBottom: 4 }}>
+                  <Text style={{ fontSize: 15, fontFamily: FONTS.bodySemibold, color: COLORS.onSurface, marginBottom: 4 }}>
                     {addr.firstName} {addr.lastName}
                   </Text>
-                  <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.onSurfaceVariant, lineHeight: 20 }}>
+                  <Text style={{ fontSize: 13, fontFamily: FONTS.body, color: COLORS.onSurfaceVariant, lineHeight: 20 }}>
                     {addr.street}{"\n"}{addr.postalCode} {addr.city}
                   </Text>
                   {addr.isDefault ? (
-                    <View style={{ marginTop: 8, alignSelf: "flex-start", backgroundColor: `${COLORS.primary}12`, borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 3 }}>
-                      <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: COLORS.primary }}>Par défaut</Text>
+                    <View style={{ marginTop: 10, alignSelf: "flex-start", backgroundColor: `${COLORS.primary}12`, borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 3 }}>
+                      <Text style={{ fontSize: 10, fontFamily: FONTS.bodySemibold, color: COLORS.primary }}>Par défaut</Text>
                     </View>
                   ) : (
-                    <TouchableOpacity onPress={() => handleSetDefault(addr)} style={{ marginTop: 8, alignSelf: "flex-start" }}>
-                      <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: COLORS.secondary }}>
+                    <TouchableOpacity onPress={() => handleSetDefault(addr)} style={{ marginTop: 10, alignSelf: "flex-start" }}>
+                      <Text style={{ fontSize: 11, fontFamily: FONTS.bodySemibold, color: COLORS.primary }}>
                         Définir par défaut
                       </Text>
                     </TouchableOpacity>
                   )}
                 </View>
                 <View style={{ flexDirection: "row", gap: 8 }}>
-                  <TouchableOpacity style={{ padding: 4 }} onPress={() => openEdit(addr)}>
+                  <TouchableOpacity style={{ padding: 4 }} onPress={() => openEdit(addr)} accessibilityLabel="Modifier l'adresse">
                     <MaterialCommunityIcons name="pencil-outline" size={18} color={COLORS.outline} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={{ padding: 4 }} onPress={() => confirmDelete(addr)}>
-                    <MaterialCommunityIcons name="trash-can-outline" size={18} color="#dc3545" />
+                  <TouchableOpacity style={{ padding: 4 }} onPress={() => confirmDelete(addr)} accessibilityLabel="Supprimer l'adresse">
+                    <MaterialCommunityIcons name="trash-can-outline" size={18} color={COLORS.error} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -212,13 +215,13 @@ export default function AddressesScreen() {
           ))
         ) : (
           <View style={{ alignItems: "center", paddingTop: 40 }}>
-            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#f0ebe6", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
-              <MaterialCommunityIcons name="map-marker-outline" size={28} color={COLORS.secondary} />
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: COLORS.surfaceContainer, alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+              <MaterialCommunityIcons name="map-marker-outline" size={28} color={COLORS.primary} />
             </View>
-            <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: COLORS.onSurface, marginBottom: 4 }}>
+            <Text style={[TYPE.sectionTitle, { marginBottom: 4 }]}>
               Aucune adresse
             </Text>
-            <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.onSurfaceVariant, textAlign: "center" }}>
+            <Text style={{ fontSize: 13, fontFamily: FONTS.body, color: COLORS.onSurfaceVariant, textAlign: "center" }}>
               Ajoutez une adresse de livraison{"\n"}pour accélérer vos commandes
             </Text>
           </View>

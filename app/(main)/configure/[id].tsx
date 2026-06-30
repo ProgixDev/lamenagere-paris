@@ -9,6 +9,7 @@ import Input from "../../../components/ui/Input";
 import Button from "../../../components/ui/Button";
 import ProductConfigBlocks from "../../../components/product/ProductConfigBlocks";
 import { COLORS, PRODUCT_TYPES, PRICE_MODES } from "../../../lib/constants";
+import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import { formatPrice } from "../../../lib/utils";
 import { computeConfiguredPrice } from "../../../lib/pricing";
 import { openingTypeLabel, diagramForTypes } from "../../../lib/opening-types";
@@ -151,7 +152,7 @@ export default function ConfigureScreen() {
               <StepTitle title="Vos mesures" subtitle="Indiquez les dimensions souhaitées." />
               {needsDims && (
                 <View style={{ paddingHorizontal: 16 }}>
-                  <View style={{ backgroundColor: "#fff", borderRadius: 12, padding: 14 }}>
+                  <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, ...SHADOW.card }}>
                     <View style={{ flexDirection: "row", gap: 12 }}>
                       <View style={{ flex: 1 }}>
                         <Input label="LARGEUR" value={customWidth} onChangeText={setCustomWidth} keyboardType="numeric" suffix="cm" />
@@ -180,10 +181,10 @@ export default function ConfigureScreen() {
               <StepTitle title="Vos options" subtitle="Personnalisez votre produit." />
               {hasOpening && (
                 <View style={{ paddingHorizontal: 16, marginTop: 4 }}>
-                  <Text style={{ fontSize: 14, fontFamily: "Manrope_700Bold", color: COLORS.onSurface, marginBottom: 10 }}>
+                  <Text style={{ fontSize: 18, fontFamily: FONTS.serif, color: COLORS.onSurface, marginBottom: 12 }}>
                     Type d&apos;ouverture
                   </Text>
-                  <View style={{ backgroundColor: "#fff", borderRadius: 12, padding: 14 }}>
+                  <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, ...SHADOW.card }}>
                     {(() => {
                       const diagram = diagramForTypes(openingTypes.map((o) => o.type));
                       return diagram ? (
@@ -232,8 +233,8 @@ export default function ConfigureScreen() {
             <View style={{ paddingTop: 6 }}>
               <StepTitle title="Récapitulatif" subtitle="Vérifiez votre configuration avant de l'ajouter au panier." />
               <View style={{ paddingHorizontal: 16, gap: 12 }}>
-                <View style={{ backgroundColor: "#fff", borderRadius: 12, padding: 16 }}>
-                  <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: COLORS.onSurface, marginBottom: 8 }}>
+                <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, ...SHADOW.card }}>
+                  <Text style={{ fontSize: 20, fontFamily: FONTS.serif, color: COLORS.onSurface, marginBottom: 10 }}>
                     {product.name}
                   </Text>
                   {dims && <SummaryRow label="Dimensions" value={`${dims.width} × ${dims.height} cm`} />}
@@ -243,7 +244,7 @@ export default function ConfigureScreen() {
                 </View>
 
                 {/* Quantity stepper */}
-                <View style={{ backgroundColor: "#fff", borderRadius: 12, padding: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between", ...SHADOW.card }}>
                   <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>Quantité</Text>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 18 }}>
                     <TouchableOpacity onPress={() => setQuantity((q) => Math.max(1, q - 1))} hitSlop={8}>
@@ -256,9 +257,9 @@ export default function ConfigureScreen() {
                   </View>
                 </View>
 
-                <View style={{ backgroundColor: COLORS.surfaceContainerLow, borderRadius: 12, padding: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>Total</Text>
-                  <Text style={{ fontSize: 22, fontFamily: "Manrope_800ExtraBold", color: COLORS.secondary }}>
+                <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "center", ...SHADOW.card }}>
+                  <Text style={{ fontSize: 20, fontFamily: FONTS.serif, color: COLORS.onSurface }}>Total</Text>
+                  <Text style={[TYPE.priceLarge, { color: COLORS.primary }]}>
                     {total != null ? formatPrice(total * quantity) : "Sur mesure"}
                   </Text>
                 </View>
@@ -288,9 +289,9 @@ export default function ConfigureScreen() {
 
 function StepTitle({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
-      <Text style={{ fontSize: 20, fontFamily: "Manrope_800ExtraBold", color: COLORS.onSurface }}>{title}</Text>
-      <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 2 }}>{subtitle}</Text>
+    <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+      <Text style={[TYPE.screenTitle]}>{title}</Text>
+      <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 4 }}>{subtitle}</Text>
     </View>
   );
 }

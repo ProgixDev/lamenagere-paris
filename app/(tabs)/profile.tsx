@@ -12,6 +12,7 @@ import Icon from "../../components/ui/Icon";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { COLORS } from "../../lib/constants";
+import { FONTS, TYPE, SPACE, SHADOW } from "../../lib/typography";
 import { useAuthStore } from "../../features/auth/store";
 import { getNameInitials } from "../../lib/utils";
 import LogoHeader from "../../components/layout/LogoHeader";
@@ -64,18 +65,14 @@ export default function ProfileScreen() {
       <LogoHeader />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Profile header card */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 16, marginBottom: 24 }}>
+        <View style={{ paddingHorizontal: 20, paddingTop: 16, marginBottom: SPACE.xxl }}>
           <View
             style={{
-              backgroundColor: "#ffffff",
+              backgroundColor: COLORS.surfaceContainerLowest,
               borderRadius: 16,
-              padding: 20,
+              padding: SPACE.xl,
               alignItems: "center",
-              shadowColor: "rgba(0,0,0,0.05)",
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 1,
-              shadowRadius: 12,
-              elevation: 2,
+              ...SHADOW.card,
             }}
           >
             {/* Avatar */}
@@ -97,23 +94,23 @@ export default function ProfileScreen() {
               </Text>
             </LinearGradient>
 
-            <Text style={{ fontSize: 18, fontFamily: "Manrope_700Bold", color: COLORS.onSurface, marginBottom: 2 }}>
+            <Text style={[TYPE.sectionTitle, { marginBottom: 2 }]}>
               {user?.fullName?.trim() ? user.fullName : "Utilisateur"}
             </Text>
-            <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.outline, marginBottom: 8 }}>
+            <Text style={{ fontSize: 13, fontFamily: FONTS.body, color: COLORS.outline, marginBottom: 8 }}>
               {user?.email || ""}
             </Text>
 
             {user?.accountType === "professionnel" && (
               <View
                 style={{
-                  backgroundColor: "#fef3e7",
+                  backgroundColor: COLORS.surfaceContainer,
                   borderRadius: 9999,
                   paddingHorizontal: 12,
                   paddingVertical: 4,
                 }}
               >
-                <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: COLORS.secondary }}>
+                <Text style={[TYPE.overline, { color: COLORS.primary }]}>
                   Compte Professionnel
                 </Text>
               </View>
@@ -122,15 +119,16 @@ export default function ProfileScreen() {
             {/* Quick edit */}
             <TouchableOpacity
               onPress={() => router.push("/(main)/edit-profile")}
+              accessibilityLabel="Modifier le profil"
               style={{
-                marginTop: 14,
+                marginTop: 16,
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 4,
               }}
             >
-              <Icon name="pencil-outline" size={14} color={COLORS.secondary} />
-              <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.secondary }}>
+              <Icon name="pencil-outline" size={14} color={COLORS.primary} />
+              <Text style={{ fontSize: 12, fontFamily: FONTS.bodyMedium, color: COLORS.primary }}>
                 Modifier le profil
               </Text>
             </TouchableOpacity>
@@ -139,26 +137,25 @@ export default function ProfileScreen() {
 
         {/* Menu sections */}
         {MENU_SECTIONS.map((section) => (
-          <View key={section.title} style={{ marginBottom: 20 }}>
+          <View key={section.title} style={{ marginBottom: SPACE.xl }}>
             <Text
-              style={{
-                fontSize: 10,
-                fontFamily: "Inter_600SemiBold",
-                color: COLORS.outline,
-                textTransform: "uppercase",
-                letterSpacing: 2,
-                paddingHorizontal: 20,
-                marginBottom: 8,
-              }}
+              style={[
+                TYPE.overline,
+                {
+                  paddingHorizontal: 20,
+                  marginBottom: SPACE.md,
+                },
+              ]}
             >
               {section.title}
             </Text>
             <View
               style={{
                 marginHorizontal: 20,
-                backgroundColor: "#ffffff",
-                borderRadius: 14,
+                backgroundColor: COLORS.surfaceContainerLowest,
+                borderRadius: 16,
                 overflow: "hidden",
+                ...SHADOW.card,
               }}
             >
               {section.items.map((item, idx) => (
@@ -170,18 +167,18 @@ export default function ProfileScreen() {
                     flexDirection: "row",
                     alignItems: "center",
                     paddingHorizontal: 16,
-                    paddingVertical: 14,
+                    paddingVertical: 15,
                     gap: 14,
                     borderBottomWidth: idx < section.items.length - 1 ? 1 : 0,
-                    borderBottomColor: "#f5f5f5",
+                    borderBottomColor: COLORS.outlineVariant,
                   }}
                 >
                   <View
                     style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 10,
-                      backgroundColor: "#f8f6f3",
+                      width: 38,
+                      height: 38,
+                      borderRadius: 11,
+                      backgroundColor: COLORS.surfaceContainer,
                       alignItems: "center",
                       justifyContent: "center",
                     }}
@@ -195,8 +192,8 @@ export default function ProfileScreen() {
                   <Text
                     style={{
                       flex: 1,
-                      fontSize: 14,
-                      fontFamily: "Inter_500Medium",
+                      fontSize: 15,
+                      fontFamily: FONTS.bodyMedium,
                       color: COLORS.onSurface,
                     }}
                   >
@@ -210,22 +207,23 @@ export default function ProfileScreen() {
         ))}
 
         {/* Logout */}
-        <View style={{ paddingHorizontal: 20, marginTop: 4 }}>
+        <View style={{ paddingHorizontal: 20, marginTop: SPACE.xs }}>
           <TouchableOpacity
             onPress={handleLogout}
             activeOpacity={0.7}
+            accessibilityLabel="Se déconnecter"
             style={{
               flexDirection: "row",
               alignItems: "center",
               gap: 12,
-              paddingVertical: 14,
+              paddingVertical: 15,
               paddingHorizontal: 16,
-              backgroundColor: "#fff5f5",
-              borderRadius: 14,
+              backgroundColor: COLORS.error + "0F",
+              borderRadius: 16,
             }}
           >
-            <Icon name="logout" size={20} color="#dc3545" />
-            <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: "#dc3545" }}>
+            <Icon name="logout" size={20} color={COLORS.error} />
+            <Text style={{ fontSize: 15, fontFamily: FONTS.bodyMedium, color: COLORS.error }}>
               Se déconnecter
             </Text>
           </TouchableOpacity>
@@ -235,10 +233,10 @@ export default function ProfileScreen() {
         <Text
           style={{
             fontSize: 11,
-            fontFamily: "Inter_400Regular",
+            fontFamily: FONTS.body,
             color: COLORS.surfaceDim,
             textAlign: "center",
-            marginTop: 24,
+            marginTop: SPACE.xl,
           }}
         >
           La Ménagère Paris — v1.0.0

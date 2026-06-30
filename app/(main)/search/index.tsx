@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../../lib/constants";
+import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import {
   PRODUCT_IMAGES,
   getProductImage,
@@ -117,9 +118,10 @@ export default function SearchScreen() {
             alignItems: "center",
             gap: 8,
             paddingHorizontal: 14,
-            paddingVertical: 10,
+            paddingVertical: 12,
             borderRadius: 9999,
-            backgroundColor: "#fff",
+            backgroundColor: COLORS.surfaceContainerLowest,
+            ...SHADOW.soft,
           }}
         >
           <MaterialCommunityIcons name="magnify" size={18} color={COLORS.outline} />
@@ -134,7 +136,7 @@ export default function SearchScreen() {
             style={{
               flex: 1,
               fontSize: 14,
-              fontFamily: "Inter_400Regular",
+              fontFamily: FONTS.body,
               color: COLORS.onSurface,
             }}
           />
@@ -174,14 +176,15 @@ export default function SearchScreen() {
                       alignItems: "center",
                       gap: 6,
                       paddingLeft: 12,
-                      paddingRight: 10,
-                      paddingVertical: 7,
+                      paddingRight: 12,
+                      paddingVertical: 9,
                       borderRadius: 9999,
-                      backgroundColor: "#fff",
+                      backgroundColor: COLORS.surfaceContainerLowest,
+                      ...SHADOW.soft,
                     }}
                   >
                     <MaterialCommunityIcons name="history" size={12} color={COLORS.outline} />
-                    <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: COLORS.onSurface }}>
+                    <Text style={{ fontSize: 13, fontFamily: FONTS.bodyMedium, color: COLORS.onSurface }}>
                       {q}
                     </Text>
                   </TouchableOpacity>
@@ -201,12 +204,13 @@ export default function SearchScreen() {
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
-                    gap: 6,
+                    gap: 7,
                     paddingLeft: 10,
-                    paddingRight: 12,
-                    paddingVertical: 7,
+                    paddingRight: 14,
+                    paddingVertical: 9,
                     borderRadius: 9999,
-                    backgroundColor: "#fff",
+                    backgroundColor: COLORS.surfaceContainerLowest,
+                    ...SHADOW.soft,
                   }}
                 >
                   <View
@@ -214,7 +218,7 @@ export default function SearchScreen() {
                       width: 18,
                       height: 18,
                       borderRadius: 9,
-                      backgroundColor: i < 3 ? COLORS.secondary : COLORS.surfaceContainer,
+                      backgroundColor: i < 3 ? COLORS.primary : COLORS.surfaceContainer,
                       alignItems: "center",
                       justifyContent: "center",
                     }}
@@ -222,14 +226,14 @@ export default function SearchScreen() {
                     <Text
                       style={{
                         fontSize: 10,
-                        fontFamily: "Inter_700Bold",
+                        fontFamily: FONTS.bodySemibold,
                         color: i < 3 ? "#fff" : COLORS.outline,
                       }}
                     >
                       {i + 1}
                     </Text>
                   </View>
-                  <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: COLORS.onSurface }}>
+                  <Text style={{ fontSize: 13, fontFamily: FONTS.bodyMedium, color: COLORS.onSurface }}>
                     {q}
                   </Text>
                 </TouchableOpacity>
@@ -262,17 +266,18 @@ export default function SearchScreen() {
                       width: CAT_W,
                       flexDirection: "row",
                       alignItems: "center",
-                      gap: 10,
-                      padding: 8,
-                      backgroundColor: "#fff",
-                      borderRadius: 12,
+                      gap: 12,
+                      padding: 10,
+                      backgroundColor: COLORS.surfaceContainerLowest,
+                      borderRadius: 16,
+                      ...SHADOW.soft,
                     }}
                   >
                     <View
                       style={{
                         width: 52,
                         height: 52,
-                        borderRadius: 10,
+                        borderRadius: 12,
                         overflow: "hidden",
                         backgroundColor: COLORS.surfaceContainer,
                       }}
@@ -284,15 +289,15 @@ export default function SearchScreen() {
                     <View style={{ flex: 1 }}>
                       <Text
                         style={{
-                          fontSize: 13,
-                          fontFamily: "Inter_600SemiBold",
+                          fontSize: 14,
+                          fontFamily: FONTS.bodySemibold,
                           color: COLORS.onSurface,
                         }}
                         numberOfLines={1}
                       >
                         {cat.name}
                       </Text>
-                      <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: COLORS.outline }}>
+                      <Text style={{ fontSize: 11, fontFamily: FONTS.body, color: COLORS.outline, marginTop: 2 }}>
                         {count} article{count > 1 ? "s" : ""}
                       </Text>
                     </View>
@@ -326,33 +331,27 @@ export default function SearchScreen() {
                       <View
                         style={{
                           width: 140,
-                          height: 140,
-                          borderRadius: 12,
+                          height: 175,
+                          borderRadius: 16,
                           overflow: "hidden",
                           backgroundColor: COLORS.surfaceContainer,
-                          marginBottom: 6,
+                          marginBottom: 8,
+                          ...SHADOW.card,
                         }}
                       >
                         {img && <Image source={img} style={{ width: "100%", height: "100%" }} resizeMode="cover" />}
                       </View>
                       <Text
                         style={{
-                          fontSize: 12,
-                          fontFamily: "Inter_500Medium",
+                          fontSize: 13,
+                          fontFamily: FONTS.bodyMedium,
                           color: COLORS.onSurface,
                         }}
                         numberOfLines={1}
                       >
                         {p.name}
                       </Text>
-                      <Text
-                        style={{
-                          fontSize: 13,
-                          fontFamily: "Manrope_700Bold",
-                          color: COLORS.secondary,
-                          marginTop: 1,
-                        }}
-                      >
+                      <Text style={[TYPE.price, { fontSize: 18, marginTop: 2 }]}>
                         {priceTagLabel(p)}
                       </Text>
                     </TouchableOpacity>
@@ -387,15 +386,15 @@ export default function SearchScreen() {
               >
                 <MaterialCommunityIcons name="magnify-close" size={26} color={COLORS.outline} />
               </View>
-              <Text style={{ fontSize: 14, color: COLORS.onSurface, fontFamily: "Inter_600SemiBold" }}>
+              <Text style={[TYPE.sectionTitle, { fontSize: 20, lineHeight: 24, textAlign: "center" }]}>
                 Aucun résultat pour « {query} »
               </Text>
               <Text
                 style={{
                   fontSize: 12,
                   color: COLORS.outline,
-                  fontFamily: "Inter_400Regular",
-                  marginTop: 4,
+                  fontFamily: FONTS.body,
+                  marginTop: 6,
                   textAlign: "center",
                   paddingHorizontal: 32,
                 }}
@@ -414,20 +413,21 @@ export default function SearchScreen() {
                     flexDirection: "row",
                     gap: 12,
                     padding: 12,
-                    backgroundColor: "#fff",
-                    borderRadius: 12,
-                    marginBottom: 8,
+                    backgroundColor: COLORS.surfaceContainerLowest,
+                    borderRadius: 16,
+                    marginBottom: 10,
+                    ...SHADOW.soft,
                   }}
                 >
-                  {img && <Image source={img} style={{ width: 56, height: 56, borderRadius: 8 }} resizeMode="cover" />}
+                  {img && <Image source={img} style={{ width: 64, height: 64, borderRadius: 12, backgroundColor: COLORS.surfaceContainer }} resizeMode="cover" />}
                   <View style={{ flex: 1, justifyContent: "center" }}>
-                    <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }} numberOfLines={1}>
+                    <Text style={{ fontSize: 14, fontFamily: FONTS.bodyMedium, color: COLORS.onSurface }} numberOfLines={1}>
                       {item.name}
                     </Text>
-                    <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: COLORS.outline }}>
+                    <Text style={{ fontSize: 11, fontFamily: FONTS.body, color: COLORS.outline, marginTop: 2 }}>
                       {item.category.name}
                     </Text>
-                    <Text style={{ fontSize: 13, fontFamily: "Manrope_700Bold", color: COLORS.secondary, marginTop: 2 }}>
+                    <Text style={[TYPE.price, { fontSize: 17, marginTop: 3 }]}>
                       {priceTagLabel(item)}
                     </Text>
                   </View>
@@ -466,20 +466,10 @@ function SectionHeader({
         marginBottom: 10,
       }}
     >
-      <Text
-        style={{
-          fontSize: 12,
-          fontFamily: "Inter_600SemiBold",
-          color: COLORS.outline,
-          textTransform: "uppercase",
-          letterSpacing: 1.5,
-        }}
-      >
-        {title}
-      </Text>
+      <Text style={TYPE.overline}>{title}</Text>
       {actionLabel && onAction && (
         <TouchableOpacity onPress={onAction}>
-          <Text style={{ fontSize: 12, color: COLORS.secondary, fontFamily: "Inter_500Medium" }}>
+          <Text style={{ fontSize: 12, color: COLORS.primary, fontFamily: FONTS.bodySemibold }}>
             {actionLabel}
           </Text>
         </TouchableOpacity>

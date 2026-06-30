@@ -16,6 +16,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useStripe } from "@stripe/stripe-react-native";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../../lib/constants";
+import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import { formatPrice } from "../../../lib/utils";
 import Button from "../../../components/ui/Button";
 import CheckoutSteps from "../../../components/cart/CheckoutSteps";
@@ -151,10 +152,14 @@ export default function CheckoutPaymentScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
       <View className="px-6 py-4 flex-row items-center">
-        <TouchableOpacity onPress={() => router.back()} className="mr-3">
+        <TouchableOpacity
+          onPress={() => router.back()}
+          className="mr-3"
+          accessibilityLabel="Retour"
+        >
           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.primary} />
         </TouchableOpacity>
-        <Text className="text-lg font-semibold" style={{ color: COLORS.primary, fontFamily: "Manrope_700Bold" }}>
+        <Text style={[TYPE.screenTitle, { color: COLORS.primary }]}>
           Paiement
         </Text>
       </View>
@@ -162,28 +167,26 @@ export default function CheckoutPaymentScreen() {
       <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40 }}>
         <CheckoutSteps currentStep={2} />
 
-        <View className="rounded-xl p-6 mb-6 flex-row items-center gap-3" style={{ backgroundColor: COLORS.surfaceContainerLow }}>
-          <MaterialCommunityIcons name="credit-card-outline" size={24} color={COLORS.secondary} />
-          <Text className="flex-1 text-sm" style={{ color: COLORS.primary, fontFamily: "Inter_500Medium" }}>
+        <View className="flex-row items-center gap-3" style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, marginBottom: 24, ...SHADOW.card }}>
+          <MaterialCommunityIcons name="credit-card-outline" size={24} color={COLORS.primary} />
+          <Text className="flex-1 text-sm" style={{ color: COLORS.onSurfaceVariant, fontFamily: "Inter_500Medium", lineHeight: 20 }}>
             Vous renseignerez vos informations de carte en toute sécurité à
             l'étape suivante.
           </Text>
         </View>
 
-        <View className="rounded-xl p-6 mb-8" style={{ backgroundColor: COLORS.surfaceContainerLow }}>
-          <View className="flex-row justify-between">
-            <Text className="font-bold" style={{ color: COLORS.primary, fontFamily: "Manrope_800ExtraBold" }}>Total à payer</Text>
-            <Text className="text-lg font-bold" style={{ color: COLORS.secondary, fontFamily: "Manrope_700Bold" }}>
-              {formatPrice(subtotal)}
-            </Text>
-          </View>
+        <View className="flex-row justify-between items-center" style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 20, marginBottom: 32, ...SHADOW.card }}>
+          <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 20 }}>Total à payer</Text>
+          <Text style={[TYPE.priceLarge, { color: COLORS.primary }]}>
+            {formatPrice(subtotal)}
+          </Text>
         </View>
 
         {/* Note + attachments — let the buyer describe their order and join photos. */}
-        <View className="rounded-xl p-5 mb-8" style={{ backgroundColor: COLORS.surfaceContainerLow }}>
+        <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, marginBottom: 32, ...SHADOW.card }}>
           <View className="flex-row items-center gap-2 mb-3">
-            <MaterialCommunityIcons name="note-text-outline" size={20} color={COLORS.secondary} />
-            <Text className="text-sm font-semibold" style={{ color: COLORS.primary, fontFamily: "Manrope_700Bold" }}>
+            <MaterialCommunityIcons name="note-text-outline" size={20} color={COLORS.primary} />
+            <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 18 }}>
               Note pour votre commande
             </Text>
           </View>

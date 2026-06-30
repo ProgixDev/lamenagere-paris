@@ -6,6 +6,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import Icon from "../../components/ui/Icon";
 import { COLORS } from "../../lib/constants";
+import { FONTS, TYPE, SHADOW } from "../../lib/typography";
 import { buildDeepLinkFromTarget } from "../../lib/notifications";
 import { useNotifInboxStore, type InboxItem } from "../../features/notifications/inbox";
 
@@ -67,16 +68,14 @@ export default function NotificationsScreen() {
           paddingBottom: 12,
         }}
       >
-        <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={8} accessibilityLabel="Retour">
           <Icon name="chevron-left" size={26} color={COLORS.onSurface} />
         </TouchableOpacity>
-        <Text style={{ fontSize: 18, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}>
-          Notifications
-        </Text>
+        <Text style={[TYPE.screenTitle]}>Notifications</Text>
         <View style={{ flex: 1 }} />
         {items.length > 0 && (
           <TouchableOpacity onPress={() => clear()} hitSlop={8}>
-            <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: COLORS.secondary }}>
+            <Text style={{ fontSize: 12, fontFamily: FONTS.bodySemibold, color: COLORS.primary }}>
               Effacer
             </Text>
           </TouchableOpacity>
@@ -86,7 +85,7 @@ export default function NotificationsScreen() {
       {items.length > 0 ? (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40, gap: 10 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40, gap: 12 }}
         >
           {items.map((item, idx) => (
             <Animated.View key={item.id} entering={FadeInDown.delay(Math.min(idx, 10) * 40).springify().damping(18)}>
@@ -95,20 +94,19 @@ export default function NotificationsScreen() {
                 onPress={() => onPressItem(item)}
                 style={{
                   flexDirection: "row",
-                  gap: 12,
-                  padding: 14,
-                  borderRadius: 8,
-                  backgroundColor: item.read ? COLORS.surfaceContainerLowest : "#fff",
-                  borderWidth: 1,
-                  borderColor: item.read ? COLORS.outlineVariant + "55" : COLORS.primary + "22",
+                  gap: 14,
+                  padding: 16,
+                  borderRadius: 16,
+                  backgroundColor: COLORS.surfaceContainerLowest,
+                  ...SHADOW.soft,
                 }}
               >
                 {/* Icon tile */}
                 <View
                   style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 8,
+                    width: 46,
+                    height: 46,
+                    borderRadius: 14,
                     backgroundColor: item.read ? COLORS.surfaceContainer : COLORS.primary + "12",
                     alignItems: "center",
                     justifyContent: "center",
@@ -121,22 +119,23 @@ export default function NotificationsScreen() {
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                     <Text
-                      style={{ flex: 1, fontSize: 14, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}
+                      style={{ flex: 1, fontSize: 15, fontFamily: item.read ? FONTS.bodyMedium : FONTS.bodySemibold, color: COLORS.onSurface }}
                       numberOfLines={1}
                     >
                       {item.title}
                     </Text>
                     {!item.read && (
-                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.secondary }} />
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.primary }} />
                     )}
                   </View>
                   {!!item.body && (
                     <Text
                       style={{
-                        fontSize: 12,
-                        fontFamily: "Inter_400Regular",
+                        fontSize: 13,
+                        lineHeight: 19,
+                        fontFamily: FONTS.body,
                         color: COLORS.onSurfaceVariant,
-                        marginTop: 2,
+                        marginTop: 3,
                       }}
                       numberOfLines={2}
                     >
@@ -144,7 +143,7 @@ export default function NotificationsScreen() {
                     </Text>
                   )}
                   <Text
-                    style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 4 }}
+                    style={{ fontSize: 11, fontFamily: FONTS.body, color: COLORS.outline, marginTop: 6 }}
                   >
                     {relativeTime(item.receivedAt)}
                   </Text>
@@ -159,23 +158,24 @@ export default function NotificationsScreen() {
             style={{
               width: 72,
               height: 72,
-              borderRadius: 20,
-              backgroundColor: "#f0ebe6",
+              borderRadius: 36,
+              backgroundColor: COLORS.surfaceContainer,
               alignItems: "center",
               justifyContent: "center",
-              marginBottom: 16,
+              marginBottom: 20,
             }}
           >
-            <Icon name="bell-outline" size={32} color={COLORS.secondary} />
+            <Icon name="bell-outline" size={32} color={COLORS.outline} />
           </View>
-          <Text style={{ fontSize: 16, fontFamily: "Manrope_700Bold", color: COLORS.onSurface, marginBottom: 6 }}>
+          <Text style={{ fontFamily: FONTS.serif, fontSize: 22, color: COLORS.onSurface, marginBottom: 8, textAlign: "center" }}>
             Aucune notification
           </Text>
           <Text
             style={{
-              fontSize: 13,
-              fontFamily: "Inter_400Regular",
-              color: COLORS.onSurfaceVariant,
+              fontSize: 14,
+              lineHeight: 21,
+              fontFamily: FONTS.body,
+              color: COLORS.outline,
               textAlign: "center",
             }}
           >

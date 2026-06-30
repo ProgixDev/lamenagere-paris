@@ -17,11 +17,14 @@ import { getProductImage } from "../lib/mock-data";
 import { priceTagLabel } from "../lib/pricing";
 import { usePopularProducts } from "../features/products/hooks";
 import { useHeroSlides, type HeroSlide } from "../features/featured/store";
+import { FONTS } from "../lib/typography";
 
 const { width: W } = Dimensions.get("window");
-const HERO_W = W;
-const HERO_H = 200;
-const AUTO_ADVANCE_MS = 4000;
+const HERO_W = W; // paging width (full screen); the card itself is inset
+const HERO_MARGIN = 16;
+const CARD_W = W - HERO_MARGIN * 2;
+const HERO_H = 240;
+const AUTO_ADVANCE_MS = 4500;
 
 /**
  * Auto-advancing hero carousel driven by the admin's curated slides
@@ -89,63 +92,62 @@ export default function HeroCarousel() {
         {slides.map((slide) => {
           const source = getProductImage(slide.src);
           return (
-            <TouchableOpacity
-              key={slide.id}
-              activeOpacity={0.95}
-              onPress={() => openSlide(slide)}
-              style={{ width: HERO_W, height: HERO_H }}
-            >
-              {source ? (
-                <Image
-                  source={source}
-                  style={{ width: HERO_W, height: HERO_H }}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View
-                  style={{
-                    width: HERO_W,
-                    height: HERO_H,
-                    backgroundColor: COLORS.surfaceContainer,
-                  }}
-                />
-              )}
-
-              <LinearGradient
-                colors={["transparent", "rgba(0,36,68,0.7)"]}
+            <View key={slide.id} style={{ width: HERO_W, height: HERO_H, paddingHorizontal: HERO_MARGIN }}>
+              <TouchableOpacity
+                activeOpacity={0.95}
+                onPress={() => openSlide(slide)}
                 style={{
-                  position: "absolute",
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: 120,
-                  justifyContent: "flex-end",
-                  padding: 18,
+                  width: CARD_W,
+                  height: HERO_H,
+                  borderRadius: 22,
+                  overflow: "hidden",
+                  backgroundColor: COLORS.surfaceContainer,
                 }}
-                pointerEvents="none"
               >
-                {slide.subtitle ? (
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      color: "rgba(255,255,255,0.85)",
-                      fontFamily: "Inter_600SemiBold",
-                      letterSpacing: 2,
-                      textTransform: "uppercase",
-                      marginBottom: 4,
-                    }}
-                  >
-                    {slide.subtitle}
-                  </Text>
+                {source ? (
+                  <Image
+                    source={source}
+                    style={{ width: CARD_W, height: HERO_H }}
+                    resizeMode="cover"
+                  />
                 ) : null}
-                <Text
-                  numberOfLines={1}
-                  style={{ fontSize: 20, color: "#fff", fontFamily: "Manrope_700Bold" }}
+
+                <LinearGradient
+                  colors={["transparent", "rgba(0,36,68,0.78)"]}
+                  style={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: 140,
+                    justifyContent: "flex-end",
+                    padding: 20,
+                  }}
+                  pointerEvents="none"
                 >
-                  {slide.title}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
+                  {slide.subtitle ? (
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        color: "rgba(255,255,255,0.85)",
+                        fontFamily: FONTS.bodySemibold,
+                        letterSpacing: 2,
+                        textTransform: "uppercase",
+                        marginBottom: 6,
+                      }}
+                    >
+                      {slide.subtitle}
+                    </Text>
+                  ) : null}
+                  <Text
+                    numberOfLines={2}
+                    style={{ fontSize: 26, lineHeight: 28, color: "#fff", fontFamily: FONTS.serifBold }}
+                  >
+                    {slide.title}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           );
         })}
       </ScrollView>

@@ -14,6 +14,7 @@ import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { COLORS } from "../../lib/constants";
+import { FONTS, TYPE, SHADOW } from "../../lib/typography";
 import { formatDate } from "../../lib/utils";
 import { useOrders } from "../../features/orders/hooks";
 import {
@@ -78,17 +79,17 @@ export default function SupportScreen() {
               <TouchableOpacity
                 key={t.id}
                 onPress={() => setSelectedId(t.id)}
-                style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: COLORS.outlineVariant + "40" }}
+                style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, marginBottom: 12, ...SHADOW.card }}
               >
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface, flex: 1 }} numberOfLines={1}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                  <Text style={{ fontSize: 15, fontFamily: FONTS.bodySemibold, color: COLORS.onSurface, flex: 1 }} numberOfLines={1}>
                     {t.subject}
                   </Text>
                   <View style={{ backgroundColor: (STATUS_COLOR[t.status] ?? COLORS.outline) + "1a", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
-                    <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: STATUS_COLOR[t.status] ?? COLORS.outline }}>{t.statusLabel}</Text>
+                    <Text style={{ fontSize: 11, fontFamily: FONTS.bodySemibold, color: STATUS_COLOR[t.status] ?? COLORS.outline }}>{t.statusLabel}</Text>
                   </View>
                 </View>
-                <Text style={{ fontSize: 12, color: COLORS.outline, marginTop: 4, fontFamily: "Inter_400Regular" }}>
+                <Text style={{ fontSize: 12, color: COLORS.outline, marginTop: 4, fontFamily: FONTS.body }}>
                   #{t.ticketNumber} · {t.categoryLabel}
                 </Text>
               </TouchableOpacity>
@@ -112,11 +113,11 @@ export default function SupportScreen() {
 
 function Header({ title, onBack }: { title: string; onBack: () => void }) {
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 }}>
-      <TouchableOpacity onPress={onBack}>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 }}>
+      <TouchableOpacity onPress={onBack} accessibilityLabel="Retour">
         <MaterialCommunityIcons name="chevron-left" size={26} color={COLORS.onSurface} />
       </TouchableOpacity>
-      <Text style={{ fontSize: 18, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}>{title}</Text>
+      <Text style={[TYPE.screenTitle, { flex: 1 }]} numberOfLines={1}>{title}</Text>
     </View>
   );
 }
@@ -243,11 +244,11 @@ function TicketThread({ id, onBack }: { id: string; onBack: () => void }) {
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 20 }}>
           {t && (
-            <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 14, padding: 16, marginBottom: 16 }}>
-              <Text style={{ fontSize: 12, color: COLORS.outline, fontFamily: "Inter_400Regular" }}>
+            <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, marginBottom: 16, ...SHADOW.card }}>
+              <Text style={{ fontSize: 12, color: COLORS.outline, fontFamily: FONTS.body }}>
                 #{t.ticketNumber} · {t.categoryLabel} · {t.statusLabel}
               </Text>
-              <Text style={{ fontSize: 14, color: COLORS.onSurface, marginTop: 8, fontFamily: "Inter_400Regular", lineHeight: 20 }}>
+              <Text style={{ fontSize: 14, color: COLORS.onSurface, marginTop: 8, fontFamily: FONTS.body, lineHeight: 20 }}>
                 {t.description}
               </Text>
             </View>
@@ -272,6 +273,7 @@ function TicketThread({ id, onBack }: { id: string; onBack: () => void }) {
             <TouchableOpacity
               disabled={!reply.trim() || replyM.isPending}
               onPress={() => replyM.mutate()}
+              accessibilityLabel="Envoyer"
               style={{ backgroundColor: reply.trim() ? COLORS.primary : COLORS.outlineVariant, borderRadius: 12, padding: 12 }}
             >
               <MaterialCommunityIcons name="send" size={18} color="#fff" />
@@ -285,19 +287,20 @@ function TicketThread({ id, onBack }: { id: string; onBack: () => void }) {
 
 const labelStyle = {
   fontSize: 11,
-  letterSpacing: 1,
-  fontFamily: "Inter_600SemiBold" as const,
+  letterSpacing: 1.6,
+  textTransform: "uppercase" as const,
+  fontFamily: FONTS.bodySemibold,
   color: COLORS.outline,
 };
 const inputStyle = {
-  backgroundColor: COLORS.surfaceContainerLowest,
+  backgroundColor: COLORS.surfaceContainerLow,
   borderRadius: 12,
   borderWidth: 1,
-  borderColor: COLORS.outlineVariant + "60",
+  borderColor: COLORS.outlineVariant,
   paddingHorizontal: 14,
-  paddingVertical: 12,
+  paddingVertical: 13,
   fontSize: 15,
-  fontFamily: "Inter_400Regular" as const,
+  fontFamily: FONTS.body,
   color: COLORS.onSurface,
   marginTop: 8,
 };

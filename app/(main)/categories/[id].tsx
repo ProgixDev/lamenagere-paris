@@ -17,13 +17,13 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../../lib/constants";
+import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import { priceTagLabel } from "../../../lib/pricing";
 import type { Product } from "../../../lib/types";
 import EmptyState from "../../../components/ui/EmptyState";
 import {
   getProductImage,
   PRODUCT_IMAGES,
-  CATEGORY_BG,
 } from "../../../lib/mock-data";
 import { useFavoritesStore } from "../../../features/favorites/store";
 import {
@@ -53,64 +53,71 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
 
   return (
     <TouchableOpacity
-      activeOpacity={0.92}
+      activeOpacity={0.95}
       onPress={() => router.push(`/(main)/products/${product.id}`)}
       style={{
         width: CARD_W,
-        borderRadius: 14,
+        borderRadius: 16,
         overflow: "hidden",
-        backgroundColor: CATEGORY_BG[index % CATEGORY_BG.length],
+        backgroundColor: COLORS.surfaceContainerLowest,
         marginBottom: 12,
+        ...SHADOW.card,
       }}
     >
-      {/* Favorite */}
-      <TouchableOpacity
-        onPress={async () => {
-          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          toggleFav(product.id);
-        }}
-        style={{
-          position: "absolute",
-          top: 8,
-          right: 8,
-          zIndex: 2,
-          width: 30,
-          height: 30,
-          borderRadius: 15,
-          backgroundColor: "rgba(255,255,255,0.7)",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <MaterialCommunityIcons
-          name={isFav ? "heart" : "heart-outline"}
-          size={14}
-          color={isFav ? "#E74040" : COLORS.onSurfaceVariant}
-        />
-      </TouchableOpacity>
+      {/* Image — consistent 4:5 portrait */}
+      <View style={{ width: "100%", height: CARD_W * 1.25, backgroundColor: COLORS.surfaceContainer }}>
+        {imgSource && (
+          <Image
+            source={imgSource}
+            style={{ width: "100%", height: "100%" }}
+            resizeMode="cover"
+          />
+        )}
+        {/* Favorite */}
+        <TouchableOpacity
+          onPress={async () => {
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            toggleFav(product.id);
+          }}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={isFav ? "Retirer des favoris" : "Ajouter aux favoris"}
+          style={{
+            position: "absolute",
+            top: 10,
+            right: 10,
+            zIndex: 2,
+            width: 34,
+            height: 34,
+            borderRadius: 17,
+            backgroundColor: "rgba(255,255,255,0.92)",
+            alignItems: "center",
+            justifyContent: "center",
+            ...SHADOW.soft,
+          }}
+        >
+          <MaterialCommunityIcons
+            name={isFav ? "heart" : "heart-outline"}
+            size={16}
+            color={isFav ? "#C0392B" : COLORS.onSurfaceVariant}
+          />
+        </TouchableOpacity>
+      </View>
 
-      {imgSource && (
-        <Image
-          source={imgSource}
-          style={{ width: "100%", height: CARD_W * 0.85 }}
-          resizeMode="cover"
-        />
-      )}
-
-      <View style={{ padding: 10 }}>
+      <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 14 }}>
         <Text
-          style={{ fontSize: 13, fontFamily: "Manrope_700Bold", color: COLORS.onSurface, marginBottom: 2 }}
+          style={{ fontSize: 13, lineHeight: 18, fontFamily: FONTS.bodyMedium, color: COLORS.onSurface, marginBottom: 3 }}
           numberOfLines={1}
         >
           {product.name}
         </Text>
         <Text
-          style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: COLORS.onSurfaceVariant, marginBottom: 4 }}
+          style={{ fontSize: 11, fontFamily: FONTS.body, color: COLORS.onSurfaceVariant, marginBottom: 6 }}
           numberOfLines={1}
         >
           par La Ménagère Paris
         </Text>
-        <Text style={{ fontSize: 14, fontFamily: "Manrope_700Bold", color: COLORS.secondary }}>
+        <Text style={[TYPE.price, { fontSize: 19 }]}>
           {priceTagLabel(product)}
         </Text>
       </View>
@@ -134,7 +141,7 @@ function SelectionRail({ products }: { products: Product[] }) {
         }}
       >
         <MaterialCommunityIcons name="star" size={16} color={COLORS.primary} />
-        <Text style={{ fontSize: 18, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}>
+        <Text style={[TYPE.sectionTitle, { fontSize: 20, lineHeight: 24 }]}>
           Notre sélection
         </Text>
       </View>
@@ -155,10 +162,11 @@ function SelectionRail({ products }: { products: Product[] }) {
               <View
                 style={{
                   width: 150,
-                  height: 150,
-                  borderRadius: 12,
+                  height: 188,
+                  borderRadius: 16,
                   overflow: "hidden",
                   backgroundColor: COLORS.surfaceContainer,
+                  ...SHADOW.card,
                 }}
               >
                 {source && (
@@ -167,13 +175,11 @@ function SelectionRail({ products }: { products: Product[] }) {
               </View>
               <Text
                 numberOfLines={2}
-                style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.onSurface, marginTop: 6 }}
+                style={{ fontSize: 13, fontFamily: FONTS.bodyMedium, color: COLORS.onSurface, marginTop: 8 }}
               >
                 {product.name}
               </Text>
-              <Text
-                style={{ fontSize: 15, fontFamily: "Manrope_800ExtraBold", color: COLORS.secondary, marginTop: 2 }}
-              >
+              <Text style={[TYPE.price, { fontSize: 18, marginTop: 3 }]}>
                 {priceTagLabel(product)}
               </Text>
             </TouchableOpacity>
@@ -267,10 +273,10 @@ export default function CategoryProductsScreen() {
 
           {/* Category title overlay */}
           <View style={{ position: "absolute", bottom: 16, left: 20, right: 20 }}>
-            <Text style={{ fontSize: 24, fontFamily: "Manrope_700Bold", color: "#fff" }}>
+            <Text style={{ fontSize: 30, lineHeight: 34, fontFamily: FONTS.serifBold, color: "#fff" }}>
               {category?.name || "Produits"}
             </Text>
-            <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.8)", marginTop: 2 }}>
+            <Text style={{ fontSize: 12, fontFamily: FONTS.body, color: "rgba(255,255,255,0.85)", marginTop: 4 }}>
               {products.length} article{products.length !== 1 ? "s" : ""}
             </Text>
           </View>

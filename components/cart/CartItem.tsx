@@ -52,7 +52,7 @@ export default function CartItem({
             height: 88,
             borderRadius: 10,
             overflow: "hidden",
-            backgroundColor: "#F5E6DC",
+            backgroundColor: COLORS.surfaceContainer,
           }}
         >
           {imgSource ? (

@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../../lib/constants";
+import { FONTS, SHADOW } from "../../../lib/typography";
 import { priceTagLabel } from "../../../lib/pricing";
 import MessageBubble from "../../../components/messaging/MessageBubble";
 import MessageInput from "../../../components/messaging/MessageInput";
@@ -81,16 +82,19 @@ export default function ConversationScreen() {
 
   if (!conversation) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background, alignItems: "center", justifyContent: "center" }}>
-        <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: COLORS.onSurfaceVariant }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background, alignItems: "center", justifyContent: "center", paddingHorizontal: 40 }}>
+        <Text style={{ fontFamily: FONTS.serif, fontSize: 22, color: COLORS.onSurface, marginBottom: 8, textAlign: "center" }}>
           Conversation introuvable
+        </Text>
+        <Text style={{ fontSize: 14, lineHeight: 21, fontFamily: FONTS.body, color: COLORS.outline, textAlign: "center" }}>
+          Cet échange n'est plus disponible.
         </Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#f5f5f5" }} edges={["top"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }} edges={["top"]}>
       {/* Header */}
       <View
         style={{
@@ -98,22 +102,22 @@ export default function ConversationScreen() {
           alignItems: "center",
           gap: 12,
           paddingHorizontal: 16,
-          paddingVertical: 10,
-          backgroundColor: "#ffffff",
+          paddingVertical: 12,
+          backgroundColor: COLORS.surfaceContainerLowest,
           borderBottomWidth: 1,
-          borderBottomColor: "#f0f0f0",
+          borderBottomColor: COLORS.outlineVariant + "88",
         }}
       >
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Retour">
           <MaterialCommunityIcons name="chevron-left" size={26} color={COLORS.onSurface} />
         </TouchableOpacity>
 
         {/* Vendor avatar */}
         <View
           style={{
-            width: 36,
-            height: 36,
-            borderRadius: 12,
+            width: 40,
+            height: 40,
+            borderRadius: 14,
             backgroundColor: COLORS.primary,
             alignItems: "center",
             justifyContent: "center",
@@ -123,15 +127,15 @@ export default function ConversationScreen() {
         </View>
 
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>
+          <Text style={{ fontFamily: FONTS.serifBold, fontSize: 20, lineHeight: 24, color: COLORS.onSurface }}>
             {conversation.vendorName}
           </Text>
-          <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: COLORS.outline }}>
+          <Text style={{ fontSize: 11, fontFamily: FONTS.body, color: COLORS.outline, marginTop: 1 }}>
             Répond généralement en 2h
           </Text>
         </View>
 
-        <TouchableOpacity>
+        <TouchableOpacity accessibilityLabel="Appeler le vendeur">
           <MaterialCommunityIcons name="phone-outline" size={22} color={COLORS.onSurface} />
         </TouchableOpacity>
       </View>
@@ -155,35 +159,31 @@ export default function ConversationScreen() {
               style={{
                 flexDirection: "row",
                 alignItems: "center",
-                gap: 10,
-                backgroundColor: "#ffffff",
-                borderRadius: 12,
-                padding: 10,
+                gap: 12,
+                backgroundColor: COLORS.surfaceContainerLowest,
+                borderRadius: 16,
+                padding: 12,
                 marginBottom: 16,
                 alignSelf: "center",
                 maxWidth: "90%",
-                shadowColor: "rgba(0,0,0,0.04)",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 1,
-                shadowRadius: 8,
-                elevation: 1,
+                ...SHADOW.soft,
               }}
             >
               {productImg && (
                 <Image
                   source={productImg}
-                  style={{ width: 44, height: 44, borderRadius: 8 }}
+                  style={{ width: 46, height: 46, borderRadius: 12 }}
                   resizeMode="cover"
                 />
               )}
               <View style={{ flex: 1 }}>
                 <Text
-                  style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}
+                  style={{ fontSize: 13, fontFamily: FONTS.bodySemibold, color: COLORS.onSurface }}
                   numberOfLines={1}
                 >
                   {conversation.product.name}
                 </Text>
-                <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: COLORS.secondary }}>
+                <Text style={{ fontSize: 13, fontFamily: FONTS.serif, color: COLORS.onSurface, marginTop: 1 }}>
                   {priceTagLabel(conversation.product)}
                 </Text>
               </View>
@@ -194,7 +194,7 @@ export default function ConversationScreen() {
           {/* Messages */}
           {messagesLoading && messages.length === 0 ? (
             <View style={{ alignItems: "center", justifyContent: "center", paddingTop: 60 }}>
-              <ActivityIndicator color={COLORS.secondary} />
+              <ActivityIndicator color={COLORS.primary} />
             </View>
           ) : (
             messages.map((msg, idx) => {
@@ -208,7 +208,7 @@ export default function ConversationScreen() {
         </ScrollView>
 
         {/* Input */}
-        <SafeAreaView edges={["bottom"]} style={{ backgroundColor: "#ffffff" }}>
+        <SafeAreaView edges={["bottom"]} style={{ backgroundColor: COLORS.surfaceContainerLowest }}>
           <MessageInput onSend={handleSend} disabled={sendMessage.isPending} />
         </SafeAreaView>
       </KeyboardAvoidingView>
