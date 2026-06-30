@@ -18,14 +18,7 @@ import Animated, {
   FadeInUp,
   FadeOut,
   useSharedValue,
-  useAnimatedRef,
-  useAnimatedScrollHandler,
   useAnimatedStyle,
-  interpolate,
-  interpolateColor,
-  scrollTo,
-  runOnJS,
-  runOnUI,
   withRepeat,
   withTiming,
 } from "react-native-reanimated";
@@ -33,13 +26,13 @@ import * as Haptics from "expo-haptics";
 import { COLORS, PRODUCT_TYPES, PRICE_MODES } from "../../../lib/constants";
 import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import { formatPrice } from "../../../lib/utils";
-import { priceTagLabel } from "../../../lib/pricing";
+import { priceTagLabel, computeConfiguredPrice } from "../../../lib/pricing";
 import Button from "../../../components/ui/Button";
+import Input from "../../../components/ui/Input";
 import PressableScale from "../../../components/ui/PressableScale";
 import Toast from "../../../components/ui/Toast";
 import ContactSellerSheet from "../../../components/product/ContactSellerSheet";
 import DevisRequestSheet from "../../../components/product/DevisRequestSheet";
-import ProductOptionsPreview from "../../../components/product/ProductOptionsPreview";
 import ProductVideo from "../../../components/product/ProductVideo";
 import { getProductImage } from "../../../lib/mock-data";
 import { useCartStore } from "../../../features/cart/store";
@@ -65,54 +58,18 @@ export default function ProductDetailScreen() {
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
 
   const [galleryIndex, setGalleryIndex] = useState(0);
-  const [activeIndex, setActiveIndex] = useState(0);
   const [contactOpen, setContactOpen] = useState(false);
   const [devisOpen, setDevisOpen] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
+  // Inline made-to-measure inputs (cm) for per-m² products.
+  const [customWidth, setCustomWidth] = useState("");
+  const [customHeight, setCustomHeight] = useState("");
   const [toast, setToast] = useState({
     visible: false,
     message: "",
     type: "success" as "success" | "error",
   });
   const galleryRef = useRef<ScrollView>(null);
-
-  // Swipeable Aperçu ⇆ Caractéristiques tabs (reanimated paged view).
-  const pagerRef = useAnimatedRef<Animated.ScrollView>();
-  const scrollX = useSharedValue(0);
-  const page0H = useSharedValue(0);
-  const page1H = useSharedValue(0);
-  const TAB_W = W / 2;
-
-  const onPagerScroll = useAnimatedScrollHandler({
-    onScroll: (e) => {
-      scrollX.value = e.contentOffset.x;
-    },
-    onMomentumEnd: (e) => {
-      runOnJS(setActiveIndex)(Math.round(e.contentOffset.x / W));
-    },
-  });
-  const goToTab = (i: number) => {
-    setActiveIndex(i);
-    runOnUI(() => {
-      "worklet";
-      scrollTo(pagerRef, i * W, 0, true);
-    })();
-  };
-  const indicatorStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: interpolate(scrollX.value, [0, W], [0, TAB_W]) }],
-  }));
-  const label0Style = useAnimatedStyle(() => ({
-    color: interpolateColor(scrollX.value, [0, W], [COLORS.onSurface, COLORS.outline]),
-  }));
-  const label1Style = useAnimatedStyle(() => ({
-    color: interpolateColor(scrollX.value, [0, W], [COLORS.outline, COLORS.onSurface]),
-  }));
-  const pagerHeightStyle = useAnimatedStyle(() => {
-    const h0 = page0H.value;
-    const h1 = page1H.value;
-    if (h0 <= 0 || h1 <= 0) return {};
-    return { height: interpolate(scrollX.value, [0, W], [h0, h1]) };
-  });
 
   if (isLoading) {
     return (
@@ -159,7 +116,38 @@ export default function ProductDetailScreen() {
   const hasConfiguration =
     needsDimensions || hasOpeningTypes || configBlocks.length > 0;
 
+  // Pure made-to-measure (priced by area, no extra options): the customer
+  // enters width × height right here and we price + add it to the cart inline.
+  const optionBlocks = configBlocks.filter((b) => b.type !== "measurements");
+  const inlineSqm = isPerSqm && !hasOpeningTypes && optionBlocks.length === 0;
+  const dims =
+    customWidth && customHeight
+      ? { width: parseFloat(customWidth), height: parseFloat(customHeight) }
+      : undefined;
+  const validDims =
+    !!dims &&
+    Number.isFinite(dims.width) &&
+    Number.isFinite(dims.height) &&
+    dims.width > 0 &&
+    dims.height > 0;
+  const livePrice =
+    inlineSqm && validDims ? computeConfiguredPrice(product, dims) : undefined;
+
   const handlePrimaryAction = async () => {
+    // Pure per-m² product → price & add inline using the entered dimensions.
+    if (inlineSqm) {
+      if (!validDims || livePrice == null) {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        setToast({ visible: true, message: "Renseignez la largeur et la hauteur", type: "error" });
+        return;
+      }
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      addItem(product, 1, dims);
+      setJustAdded(true);
+      setTimeout(() => setJustAdded(false), 1500);
+      setToast({ visible: true, message: "Ajouté au panier", type: "success" });
+      return;
+    }
     if (hasConfiguration) {
       await Haptics.selectionAsync();
       router.push(`/(main)/configure/${product.id}`);
@@ -188,7 +176,6 @@ export default function ProductDetailScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 190 }}
-        stickyHeaderIndices={[2]}
       >
         {/* ── Gallery ──────────────────────────────── */}
         <View style={{ width: W, height: GALLERY_H, backgroundColor: COLORS.surfaceContainer }}>
@@ -278,53 +265,6 @@ export default function ProductDetailScreen() {
           <TrustItem icon="message-text-outline" label="Conseils dédiés" />
         </View>
 
-        {/* ── Sticky swipeable tab bar ─────────────── */}
-        <View
-          style={{
-            backgroundColor: COLORS.background,
-            borderBottomWidth: 1,
-            borderBottomColor: `${COLORS.outlineVariant}66`,
-            paddingTop: 8,
-          }}
-        >
-          <View style={{ flexDirection: "row" }}>
-            {(["Aperçu", "Caractéristiques"] as const).map((label, i) => (
-              <TouchableOpacity
-                key={label}
-                onPress={() => goToTab(i)}
-                activeOpacity={0.7}
-                style={{ flex: 1, alignItems: "center", paddingVertical: 10 }}
-              >
-                <Animated.Text
-                  style={[
-                    {
-                      fontSize: 14,
-                      fontFamily: i === activeIndex ? "Manrope_700Bold" : "Inter_500Medium",
-                    },
-                    i === 0 ? label0Style : label1Style,
-                  ]}
-                >
-                  {label}
-                </Animated.Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <Animated.View
-            style={[
-              {
-                position: "absolute",
-                bottom: 0,
-                left: TAB_W / 2 - 24,
-                width: 48,
-                height: 3,
-                borderRadius: 2,
-                backgroundColor: COLORS.primary,
-              },
-              indicatorStyle,
-            ]}
-          />
-        </View>
-
         {/* ── Title + price block ──────────────────── */}
         <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>
           <Text style={[TYPE.overline, { marginBottom: 6 }]}>
@@ -356,22 +296,26 @@ export default function ProductDetailScreen() {
             </View>
           ) : null}
 
-          {/* Price — starting price; the full total is computed in the configure flow. */}
+          {/* Price — live total for made-to-measure once dimensions are set. */}
           <View style={{ marginTop: 16, marginBottom: 4 }}>
             {isPerSqm ? (
               <View>
-                <Text style={[TYPE.priceLarge, { fontSize: 30 }]}>
-                  {product.pricePerSqm != null ? `${formatPrice(product.pricePerSqm)}/m²` : "Sur mesure"}
+                <Text style={[TYPE.priceLarge, { fontSize: 32 }]}>
+                  {livePrice != null
+                    ? formatPrice(livePrice)
+                    : product.pricePerSqm != null
+                      ? `${formatPrice(product.pricePerSqm)}/m²`
+                      : "Sur mesure"}
                 </Text>
                 <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 4 }}>
-                  Prix calculé selon vos dimensions
+                  {livePrice != null && dims
+                    ? `Soit ${formatPrice(product.pricePerSqm ?? 0)}/m² · ${dims.width} × ${dims.height} cm`
+                    : "Indiquez vos dimensions ci-dessous pour obtenir le prix"}
                 </Text>
               </View>
             ) : product.price ? (
               <View>
-                <Text style={[TYPE.priceLarge, { fontSize: 30 }]}>
-                  {hasConfiguration ? `À partir de ${formatPrice(product.price)}` : formatPrice(product.price)}
-                </Text>
+                <Text style={[TYPE.priceLarge, { fontSize: 32 }]}>{formatPrice(product.price)}</Text>
                 <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 2 }}>
                   Dès {formatPrice(Math.round(product.price / 4))}/mois en 4× sans frais
                 </Text>
@@ -380,64 +324,58 @@ export default function ProductDetailScreen() {
           </View>
         </View>
 
-        {/* ── Swipeable tab content (Aperçu ⇆ Caractéristiques) ─── */}
-        <Animated.View style={[{ overflow: "hidden" }, pagerHeightStyle]}>
-          <Animated.ScrollView
-            ref={pagerRef}
-            horizontal
-            pagingEnabled
-            nestedScrollEnabled
-            showsHorizontalScrollIndicator={false}
-            onScroll={onPagerScroll}
-            scrollEventThrottle={16}
-          >
-            <View
-              style={{ width: W }}
-              onLayout={(e) => {
-                page0H.value = e.nativeEvent.layout.height;
-              }}
-            >
-            <Section title="À propos">
-              <Text
+        {/* ── Made-to-measure calculator (per-m² products) ─── */}
+        {inlineSqm && (
+          <View style={{ paddingHorizontal: 16, marginTop: 20 }}>
+            <Text style={{ fontSize: 20, fontFamily: FONTS.serif, color: COLORS.onSurface, marginBottom: 4 }}>
+              Vos dimensions
+            </Text>
+            <Text style={{ fontSize: 13, fontFamily: FONTS.body, color: COLORS.outline, marginBottom: 12 }}>
+              Entrez la largeur et la hauteur souhaitées — le prix se calcule automatiquement.
+            </Text>
+            <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, ...SHADOW.card }}>
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Input label="LARGEUR" value={customWidth} onChangeText={setCustomWidth} keyboardType="numeric" suffix="cm" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Input label="HAUTEUR" value={customHeight} onChangeText={setCustomHeight} keyboardType="numeric" suffix="cm" />
+                </View>
+              </View>
+              {product.minDimensions && product.maxDimensions && (
+                <Text style={{ fontSize: 12, fontFamily: FONTS.body, color: COLORS.outline, marginTop: 4 }}>
+                  De {product.minDimensions.width}×{product.minDimensions.height} à{" "}
+                  {product.maxDimensions.width}×{product.maxDimensions.height} cm
+                </Text>
+              )}
+              <View
                 style={{
-                  fontSize: 13,
-                  fontFamily: "Inter_400Regular",
-                  color: COLORS.onSurface,
-                  lineHeight: 20,
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginTop: 14,
+                  paddingTop: 14,
+                  borderTopWidth: 1,
+                  borderTopColor: COLORS.outlineVariant,
                 }}
               >
-                {product.description}
-              </Text>
-            </Section>
-
-            {/* Read-only showcase of the options (colors, shapes, accessories…). */}
-            <ProductOptionsPreview blocks={configBlocks} />
-
-            </View>
-
-            <View
-              style={{ width: W }}
-              onLayout={(e) => {
-                page1H.value = e.nativeEvent.layout.height;
-              }}
-            >
-              <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-            <SpecRow label="Catégorie" value={product.category.name} />
-            {product.dimensions && (
-              <SpecRow
-                label="Dimensions"
-                value={`${product.dimensions.width}×${product.dimensions.height}${product.dimensions.depth ? `×${product.dimensions.depth}` : ""} ${product.dimensions.unit}`}
-              />
-            )}
-            <SpecRow label="Sur mesure" value={product.customizable ? "Oui" : "Non"} />
-            <SpecRow label="Type de produit" value={needsDimensions ? "Sur mesure" : "Standard"} />
-            <SpecRow label="Métropole" value={product.deliveryEstimates.metropole} />
-            <SpecRow label="Outre-mer" value={product.deliveryEstimates.outreMer} />
-            <SpecRow label="Référence" value={product.id.toUpperCase()} last />
+                <Text style={{ fontSize: 14, fontFamily: FONTS.bodySemibold, color: COLORS.onSurfaceVariant }}>
+                  {validDims ? "Prix estimé" : "Prix"}
+                </Text>
+                <Text style={[TYPE.price, { fontSize: 24 }]}>
+                  {livePrice != null ? formatPrice(livePrice) : "—"}
+                </Text>
               </View>
             </View>
-          </Animated.ScrollView>
-        </Animated.View>
+          </View>
+        )}
+
+        {/* ── À propos ─────────────────────────────── */}
+        <Section title="À propos">
+          <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.onSurface, lineHeight: 20 }}>
+            {product.description}
+          </Text>
+        </Section>
 
         {/* ── Customer reviews ─────────────────────── */}
         {reviews.length > 0 && (
@@ -586,7 +524,7 @@ export default function ProductDetailScreen() {
           label={
             justAdded
               ? "Ajouté ✓"
-              : hasConfiguration
+              : hasConfiguration && !inlineSqm
                 ? "Configurer & commander"
                 : "Ajouter au panier"
           }
@@ -746,23 +684,4 @@ function Section({
   );
 }
 
-function SpecRow({ label, value, last }: { label: string; value: string; last?: boolean }) {
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingVertical: 12,
-        borderBottomWidth: last ? 0 : 1,
-        borderBottomColor: `${COLORS.outlineVariant}55`,
-      }}
-    >
-      <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: COLORS.outline }}>{label}</Text>
-      <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface, maxWidth: "60%", textAlign: "right" }}>
-        {value}
-      </Text>
-    </View>
-  );
-}
 

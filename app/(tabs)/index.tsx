@@ -40,6 +40,7 @@ import {
 import HeroCarousel from "../../components/HeroCarousel";
 import SearchBar from "../../components/SearchBar";
 import LogoHeader from "../../components/layout/LogoHeader";
+import GreetingHeader from "../../components/home/GreetingHeader";
 import SortFilterSheet from "../../components/home/SortFilterSheet";
 import {
   DEFAULT_FILTERS,
@@ -602,8 +603,8 @@ export default function HomeScreen() {
         scrollEventThrottle={64}
       >
         <LogoHeader />
+        <GreetingHeader />
         <SearchBar
-          showNotifications
           onFilterPress={() => setSheetOpen(true)}
           filterActive={isNonDefault(filters)}
         />

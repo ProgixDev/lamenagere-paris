@@ -20,9 +20,7 @@ import { useHeroSlides, type HeroSlide } from "../features/featured/store";
 import { FONTS } from "../lib/typography";
 
 const { width: W } = Dimensions.get("window");
-const HERO_W = W; // paging width (full screen); the card itself is inset
-const HERO_MARGIN = 16;
-const CARD_W = W - HERO_MARGIN * 2;
+const HERO_W = W; // full-bleed, edge-to-edge slides
 const HERO_H = 240;
 const AUTO_ADVANCE_MS = 4500;
 
@@ -92,14 +90,13 @@ export default function HeroCarousel() {
         {slides.map((slide) => {
           const source = getProductImage(slide.src);
           return (
-            <View key={slide.id} style={{ width: HERO_W, height: HERO_H, paddingHorizontal: HERO_MARGIN }}>
+            <View key={slide.id} style={{ width: HERO_W, height: HERO_H }}>
               <TouchableOpacity
                 activeOpacity={0.95}
                 onPress={() => openSlide(slide)}
                 style={{
-                  width: CARD_W,
+                  width: HERO_W,
                   height: HERO_H,
-                  borderRadius: 22,
                   overflow: "hidden",
                   backgroundColor: COLORS.surfaceContainer,
                 }}
@@ -107,7 +104,7 @@ export default function HeroCarousel() {
                 {source ? (
                   <Image
                     source={source}
-                    style={{ width: CARD_W, height: HERO_H }}
+                    style={{ width: HERO_W, height: HERO_H }}
                     resizeMode="cover"
                   />
                 ) : null}
@@ -141,7 +138,7 @@ export default function HeroCarousel() {
                   ) : null}
                   <Text
                     numberOfLines={2}
-                    style={{ fontSize: 26, lineHeight: 28, color: "#fff", fontFamily: FONTS.serifBold }}
+                    style={{ fontSize: 32, lineHeight: 35, color: "#fff", fontFamily: FONTS.serifBold }}
                   >
                     {slide.title}
                   </Text>
@@ -151,22 +148,6 @@ export default function HeroCarousel() {
           );
         })}
       </ScrollView>
-
-      {slides.length > 1 && (
-        <View style={{ flexDirection: "row", justifyContent: "center", gap: 6, marginTop: 10 }}>
-          {slides.map((_, i) => (
-            <View
-              key={i}
-              style={{
-                width: i === index ? 18 : 6,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: i === index ? COLORS.primary : COLORS.outlineVariant,
-              }}
-            />
-          ))}
-        </View>
-      )}
     </View>
   );
 }
