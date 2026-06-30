@@ -14,8 +14,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import { COLORS } from "../../lib/constants";
 import { FONTS, TYPE, SPACE, SHADOW } from "../../lib/typography";
 import { useAuthStore } from "../../features/auth/store";
+import { useGuestStore } from "../../features/auth/guest";
 import { getNameInitials } from "../../lib/utils";
 import LogoHeader from "../../components/layout/LogoHeader";
+import GuestGate from "../../components/GuestGate";
 
 const MENU_SECTIONS = [
   {
@@ -45,9 +47,20 @@ const MENU_SECTIONS = [
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, logout } = useAuthStore();
+  const { user, logout, isAuthenticated } = useAuthStore();
+  const isGuest = useGuestStore((s) => s.isGuest);
 
   const initials = user ? getNameInitials(user.fullName) : "?";
+
+  if (isGuest && !isAuthenticated) {
+    return (
+      <GuestGate
+        icon="account-outline"
+        title="Votre espace personnel"
+        message="Connectez-vous ou créez un compte pour accéder à votre profil, vos commandes et vos favoris."
+      />
+    );
+  }
 
   const handleLogout = () => {
     Alert.alert(

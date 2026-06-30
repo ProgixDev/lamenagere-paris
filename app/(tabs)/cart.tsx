@@ -17,11 +17,31 @@ import CartSummary from "../../components/cart/CartSummary";
 import Button from "../../components/ui/Button";
 import LogoHeader from "../../components/layout/LogoHeader";
 import { useAuthStore } from "../../features/auth/store";
+import { useGuestStore } from "../../features/auth/guest";
 
 export default function CartScreen() {
   const router = useRouter();
   const { items, itemCount, subtotal, removeItem, updateQuantity, clearCart } = useCart();
   const isB2b = useAuthStore((s) => s.user?.accountType === "professionnel");
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isGuest = useGuestStore((s) => s.isGuest);
+
+  // Browsing & building a cart is open to guests, but checkout ("buy") requires
+  // an account — prompt them to authenticate before proceeding.
+  const handleCheckout = () => {
+    if (isGuest && !isAuthenticated) {
+      Alert.alert(
+        "Connexion requise",
+        "Connectez-vous ou créez un compte pour finaliser votre commande.",
+        [
+          { text: "Annuler", style: "cancel" },
+          { text: "Se connecter", onPress: () => router.push("/(auth)/login") },
+        ],
+      );
+      return;
+    }
+    router.push("/(main)/checkout");
+  };
 
   const handleClear = () => {
     Alert.alert(
@@ -160,8 +180,8 @@ export default function CartScreen() {
         }}
       >
         <Button
-          label="Passer la commande"
-          onPress={() => router.push("/(main)/checkout")}
+          label={isGuest && !isAuthenticated ? "Se connecter pour commander" : "Passer la commande"}
+          onPress={handleCheckout}
           size="md"
         />
       </View>

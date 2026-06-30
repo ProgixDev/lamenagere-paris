@@ -14,6 +14,9 @@ import { FONTS, TYPE, SHADOW } from "../../lib/typography";
 import ConversationItem from "../../components/messaging/ConversationItem";
 import { useConversations, useMarkAsRead } from "../../features/messaging/hooks";
 import LogoHeader from "../../components/layout/LogoHeader";
+import GuestGate from "../../components/GuestGate";
+import { useAuthStore } from "../../features/auth/store";
+import { useGuestStore } from "../../features/auth/guest";
 
 export default function MessagesScreen() {
   const [search, setSearch] = useState("");
@@ -22,6 +25,18 @@ export default function MessagesScreen() {
   const conversations = data ?? [];
   const totalUnread = conversations.reduce((s, c) => s + c.unreadCount, 0);
   const markAsRead = useMarkAsRead();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isGuest = useGuestStore((s) => s.isGuest);
+
+  if (isGuest && !isAuthenticated) {
+    return (
+      <GuestGate
+        icon="message-outline"
+        title="Vos échanges"
+        message="Connectez-vous pour contacter nos conseillers et suivre vos conversations."
+      />
+    );
+  }
 
   const handleMarkAllRead = () => {
     conversations

@@ -15,8 +15,10 @@ import { Text as RNText, TextInput as RNTextInput } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { useAuthStore } from "../features/auth/store";
+import { useGuestStore } from "../features/auth/guest";
 import { useOnboardingStore } from "../features/onboarding/store";
 import AnimatedSplash from "../components/AnimatedSplash";
+import GuestModeChrome from "../components/GuestModeChrome";
 import {
   buildDeepLinkFromTarget,
   registerForPushNotifications,
@@ -117,6 +119,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, loadSession, user } = useAuthStore();
   const hasSeenOnboarding = useOnboardingStore((s) => s.hasSeen);
   const onboardingHydrated = useOnboardingStore((s) => s.hydrated);
+  const isGuest = useGuestStore((s) => s.isGuest);
+  const guestHydrated = useGuestStore((s) => s.hydrated);
+  const exitGuest = useGuestStore((s) => s.exitGuest);
   const segments = useSegments();
   const router = useRouter();
 
@@ -124,8 +129,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     loadSession();
   }, [loadSession]);
 
+  // Authentication supersedes guest mode — once signed in, drop the flag.
   useEffect(() => {
-    if (isLoading || !onboardingHydrated) return;
+    if (isAuthenticated && isGuest) exitGuest();
+  }, [isAuthenticated, isGuest, exitGuest]);
+
+  useEffect(() => {
+    if (isLoading || !onboardingHydrated || !guestHydrated) return;
 
     const seg = segments as string[];
     const inAuthGroup = seg[0] === "(auth)";
@@ -140,8 +150,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // First-launch marketing intro — only for visitors who aren't signed in.
-    if (!hasSeenOnboarding && !isAuthenticated) {
+    // First-launch marketing intro — only for visitors who aren't signed in
+    // and haven't chosen to browse as a guest.
+    if (!hasSeenOnboarding && !isAuthenticated && !isGuest) {
       if (!inOnboarding || onCompleteProfile) router.replace("/(onboarding)");
       return;
     }
@@ -150,6 +161,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       if (inAuthGroup || inOnboarding) {
         router.replace("/(tabs)");
       }
+      return;
+    }
+
+    // Guests roam the tabs/main app freely and may visit (auth) to sign in;
+    // just don't leave them stranded on the onboarding intro.
+    if (isGuest) {
+      if (inOnboarding) router.replace("/(tabs)");
       return;
     }
 
@@ -163,6 +181,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     router,
     hasSeenOnboarding,
     onboardingHydrated,
+    guestHydrated,
+    isGuest,
     user,
   ]);
 
@@ -214,21 +234,23 @@ export default function RootLayout() {
             <AuthGate>
               <NotificationRouter />
               <PushRegistrar />
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen
-                  name="(onboarding)"
-                  options={{ animation: "none" }}
-                />
-                <Stack.Screen
-                  name="(auth)"
-                  options={{ animation: "none" }}
-                />
-                <Stack.Screen
-                  name="(tabs)"
-                  options={{ animation: "none" }}
-                />
-                <Stack.Screen name="(main)" />
-              </Stack>
+              <GuestModeChrome>
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen
+                    name="(onboarding)"
+                    options={{ animation: "none" }}
+                  />
+                  <Stack.Screen
+                    name="(auth)"
+                    options={{ animation: "none" }}
+                  />
+                  <Stack.Screen
+                    name="(tabs)"
+                    options={{ animation: "none" }}
+                  />
+                  <Stack.Screen name="(main)" />
+                </Stack>
+              </GuestModeChrome>
               {showSplash && <AnimatedSplash onFinish={handleSplashFinish} />}
             </AuthGate>
           </StripeGate>

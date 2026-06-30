@@ -21,6 +21,7 @@ import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import Toast from "../../components/ui/Toast";
 import { useAuthStore } from "../../features/auth/store";
+import { useGuestStore } from "../../features/auth/guest";
 
 const { width: W, height: H } = Dimensions.get("window");
 const isSmall = H < 700;
@@ -35,6 +36,13 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function LoginScreen() {
   const router = useRouter();
   const { login, loginWithGoogle, isLoading, error, clearError } = useAuthStore();
+  const enterGuest = useGuestStore((s) => s.enterGuest);
+
+  const continueAsGuest = async () => {
+    await Haptics.selectionAsync();
+    enterGuest();
+    router.replace("/(tabs)");
+  };
   const [toast, setToast] = useState({
     visible: false,
     message: "",
@@ -246,6 +254,18 @@ export default function LoginScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Guest / ghost mode */}
+        <TouchableOpacity
+          onPress={continueAsGuest}
+          accessibilityRole="button"
+          accessibilityLabel="Continuer sans compte"
+          style={{ alignItems: "center", marginTop: isSmall ? 12 : 16 }}
+        >
+          <Text style={{ fontSize: 13, color: COLORS.outline, fontFamily: "Inter_500Medium" }}>
+            Continuer sans compte
+          </Text>
+        </TouchableOpacity>
       </KeyboardAvoidingView>
 
       <Toast

@@ -132,6 +132,11 @@ export default function ProductDetailScreen() {
     dims.height > 0;
   const livePrice =
     inlineSqm && validDims ? computeConfiguredPrice(product, dims) : undefined;
+  // Estimate shown by the standalone calculator below "À propos". Covers every
+  // per-m² product (even configurable ones); it's informational only — the
+  // guided configure flow stays authoritative for products with extra options.
+  const estimatePrice =
+    isPerSqm && validDims ? computeConfiguredPrice(product, dims) : undefined;
 
   const handlePrimaryAction = async () => {
     // Pure per-m² product → price & add inline using the entered dimensions.
@@ -324,11 +329,18 @@ export default function ProductDetailScreen() {
           </View>
         </View>
 
+        {/* ── À propos ─────────────────────────────── */}
+        <Section title="À propos">
+          <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.onSurface, lineHeight: 20 }}>
+            {product.description}
+          </Text>
+        </Section>
+
         {/* ── Made-to-measure calculator (per-m² products) ─── */}
-        {inlineSqm && (
+        {isPerSqm && (
           <View style={{ paddingHorizontal: 16, marginTop: 20 }}>
             <Text style={{ fontSize: 20, fontFamily: FONTS.serif, color: COLORS.onSurface, marginBottom: 4 }}>
-              Vos dimensions
+              Calculez votre prix
             </Text>
             <Text style={{ fontSize: 13, fontFamily: FONTS.body, color: COLORS.outline, marginBottom: 12 }}>
               Entrez la largeur et la hauteur souhaitées — le prix se calcule automatiquement.
@@ -348,6 +360,24 @@ export default function ProductDetailScreen() {
                   {product.maxDimensions.width}×{product.maxDimensions.height} cm
                 </Text>
               )}
+              {validDims && dims && (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginTop: 12,
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontFamily: FONTS.body, color: COLORS.outline }}>
+                    Surface
+                  </Text>
+                  <Text style={{ fontSize: 13, fontFamily: FONTS.bodySemibold, color: COLORS.onSurfaceVariant }}>
+                    {((dims.width / 100) * (dims.height / 100)).toFixed(2)} m²
+                    {product.pricePerSqm != null ? ` · ${formatPrice(product.pricePerSqm)}/m²` : ""}
+                  </Text>
+                </View>
+              )}
               <View
                 style={{
                   flexDirection: "row",
@@ -363,19 +393,12 @@ export default function ProductDetailScreen() {
                   {validDims ? "Prix estimé" : "Prix"}
                 </Text>
                 <Text style={[TYPE.price, { fontSize: 24 }]}>
-                  {livePrice != null ? formatPrice(livePrice) : "—"}
+                  {estimatePrice != null ? formatPrice(estimatePrice) : "—"}
                 </Text>
               </View>
             </View>
           </View>
         )}
-
-        {/* ── À propos ─────────────────────────────── */}
-        <Section title="À propos">
-          <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.onSurface, lineHeight: 20 }}>
-            {product.description}
-          </Text>
-        </Section>
 
         {/* ── Customer reviews ─────────────────────── */}
         {reviews.length > 0 && (

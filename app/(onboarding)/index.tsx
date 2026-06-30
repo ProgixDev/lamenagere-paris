@@ -15,6 +15,7 @@ import * as Haptics from "expo-haptics";
 import { COLORS } from "../../lib/constants";
 import { PRODUCT_IMAGES } from "../../lib/mock-data";
 import { useOnboardingStore } from "../../features/onboarding/store";
+import { useGuestStore } from "../../features/auth/guest";
 
 const { width: W, height: H } = Dimensions.get("window");
 
@@ -55,6 +56,7 @@ const FADE_MS = 700;
 export default function OnboardingIntro() {
   const router = useRouter();
   const markSeen = useOnboardingStore((s) => s.markSeen);
+  const enterGuest = useGuestStore((s) => s.enterGuest);
   const [active, setActive] = useState(0);
   // `displayed` lags `active` so the old text can fade out before the new
   // text fades in (the background images crossfade on `active` directly).
@@ -122,6 +124,13 @@ export default function OnboardingIntro() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     markSeen();
     router.replace("/(auth)/login");
+  };
+
+  const continueAsGuest = () => {
+    Haptics.selectionAsync();
+    markSeen();
+    enterGuest();
+    router.replace("/(tabs)");
   };
 
   const next = async () => {
@@ -300,17 +309,31 @@ export default function OnboardingIntro() {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={finish} style={{ alignItems: "center", marginTop: 14 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                fontFamily: "Inter_500Medium",
-                color: "rgba(255,255,255,0.65)",
-              }}
-            >
-              J'ai déjà un compte
-            </Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 14, marginTop: 14 }}>
+            <TouchableOpacity onPress={finish}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontFamily: "Inter_500Medium",
+                  color: "rgba(255,255,255,0.65)",
+                }}
+              >
+                J'ai déjà un compte
+              </Text>
+            </TouchableOpacity>
+            <View style={{ width: 1, height: 12, backgroundColor: "rgba(255,255,255,0.3)" }} />
+            <TouchableOpacity onPress={continueAsGuest} accessibilityRole="button" accessibilityLabel="Explorer en tant qu'invité">
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontFamily: "Inter_600SemiBold",
+                  color: "rgba(255,255,255,0.92)",
+                }}
+              >
+                Explorer en invité
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </SafeAreaView>
     </View>
