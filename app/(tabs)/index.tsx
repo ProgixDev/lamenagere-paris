@@ -20,13 +20,14 @@ import Animated, {
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "../../components/ui/Icon";
+import { ProductGridSkeleton } from "../../components/ui/Skeleton";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../lib/constants";
+import { FONTS, TYPE, SPACE, SHADOW } from "../../lib/typography";
 import { getProductImage } from "../../lib/mock-data";
 import { priceTagLabel } from "../../lib/pricing";
 import type { Product } from "../../lib/types";
 import { useFavoritesStore } from "../../features/favorites/store";
-import { useCartStore } from "../../features/cart/store";
 import {
   useFeaturedProducts,
   usePromoBanners,
@@ -48,8 +49,12 @@ import {
 } from "../../features/products/filter-types";
 
 const { width: W } = Dimensions.get("window");
-const GUTTER = 8;
-const COL_W = (W - 12 * 2 - GUTTER) / 2;
+const H_PAD = 16;
+const GUTTER = 14;
+const COL_W = (W - H_PAD * 2 - GUTTER) / 2;
+// Consistent, curated 4:5 portrait imagery (replaces the chaotic random-height
+// "masonry" that read as a discount marketplace).
+const IMG_H = Math.round(COL_W * 1.25);
 
 // ─── Top category rail (icon tiles + labels) ──────────────
 function TopCategoryTabs({
@@ -66,7 +71,7 @@ function TopCategoryTabs({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: 14, gap: 12, paddingTop: 6, paddingBottom: 10 }}
+      contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 14, paddingTop: 6, paddingBottom: 12 }}
     >
       {cats.map((cat) => {
         const isActive = cat.id === active;
@@ -78,34 +83,33 @@ function TopCategoryTabs({
               onSelect(cat.id);
             }}
             activeOpacity={0.85}
-            style={{ alignItems: "center", width: 66 }}
+            style={{ alignItems: "center", width: 64 }}
           >
             <View
               style={{
                 width: 60,
                 height: 60,
-                borderRadius: 18,
+                borderRadius: 20,
                 alignItems: "center",
                 justifyContent: "center",
                 backgroundColor: isActive ? COLORS.primary : COLORS.surfaceContainerLowest,
-                borderWidth: 1,
-                borderColor: isActive ? COLORS.primary : COLORS.outlineVariant,
+                ...(isActive ? SHADOW.soft : SHADOW.soft),
               }}
             >
               <Icon
                 name={cat.icon || "view-grid"}
-                size={26}
+                size={25}
                 color={isActive ? "#fff" : COLORS.primary}
               />
             </View>
             <Text
               numberOfLines={1}
               style={{
-                marginTop: 6,
+                marginTop: 7,
                 fontSize: 11,
-                fontFamily: isActive ? "Manrope_700Bold" : "Inter_500Medium",
+                fontFamily: isActive ? FONTS.bodySemibold : FONTS.bodyMedium,
                 color: isActive ? COLORS.onSurface : COLORS.outline,
-                maxWidth: 66,
+                maxWidth: 64,
                 textAlign: "center",
               }}
             >
@@ -118,20 +122,11 @@ function TopCategoryTabs({
   );
 }
 
-// ─── Product card (Temu-style) ────────────────────────────
-function ProductCardTemu({
-  product,
-  imgHeight,
-  index,
-}: {
-  product: Product;
-  imgHeight: number;
-  index: number;
-}) {
+// ─── Product card (premium / boutique) ────────────────────
+function ProductCard({ product, index }: { product: Product; index: number }) {
   const router = useRouter();
   const isFav = useFavoritesStore((s) => s.favorites.includes(product.id));
   const toggleFav = useFavoritesStore((s) => s.toggleFavorite);
-  const addItem = useCartStore((s) => s.addItem);
   const imgSource = getProductImage(product.images[0]);
 
   const scale = useSharedValue(1);
@@ -144,140 +139,96 @@ function ProductCardTemu({
     toggleFav(product.id);
   };
 
-  // Per-m² products need dimensions before they can be priced/ordered, so the
-  // quick-add button sends the customer to the product page instead.
-  const needsDimensions =
-    product.priceMode === "per_sqm" || product.productType === "configurable";
-
-  const handleAdd = async () => {
-    if (needsDimensions) {
-      router.push(`/(main)/products/${product.id}`);
-      return;
-    }
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    addItem(product, 1);
-  };
-
   return (
     <Animated.View
-      entering={FadeInDown.delay(Math.min(index, 12) * 45)
+      entering={FadeInDown.delay(Math.min(index, 10) * 60)
+        .duration(420)
         .springify()
-        .damping(18)}
-      style={[{ marginBottom: GUTTER }, cardStyle]}
+        .damping(20)}
+      style={[{ marginBottom: GUTTER, width: COL_W }, cardStyle]}
     >
-    <TouchableOpacity
-      activeOpacity={0.92}
-      onPress={() => router.push(`/(main)/products/${product.id}`)}
-      onPressIn={() => {
-        scale.value = withTiming(0.97, { duration: 90 });
-      }}
-      onPressOut={() => {
-        scale.value = withTiming(1, { duration: 150 });
-      }}
-      style={{
-        width: COL_W,
-        backgroundColor: "#fff",
-        borderRadius: 8,
-        overflow: "hidden",
-        borderWidth: 1,
-        borderColor: COLORS.outlineVariant + "44",
-      }}
-    >
-      {/* Image */}
-      <View style={{ width: "100%", height: imgHeight, backgroundColor: COLORS.surfaceContainer }}>
-        {imgSource && (
-          <Image
-            source={imgSource}
-            style={{ width: "100%", height: "100%" }}
-            resizeMode="cover"
-          />
-        )}
-        <TouchableOpacity
-          onPress={handleFav}
-          hitSlop={8}
-          style={{
-            position: "absolute",
-            top: 8,
-            right: 8,
-            width: 28,
-            height: 28,
-            borderRadius: 14,
-            backgroundColor: "rgba(255,255,255,0.85)",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Icon
-            name={isFav ? "heart" : "heart-outline"}
-            size={14}
-            color={isFav ? "#E74040" : COLORS.onSurface}
-          />
-        </TouchableOpacity>
-      </View>
-
-      {/* Content */}
-      <View style={{ padding: 8 }}>
-        <Text
-          style={{
-            fontSize: 12,
-            fontFamily: "Inter_500Medium",
-            color: COLORS.onSurface,
-            marginBottom: 4,
-          }}
-          numberOfLines={2}
-        >
-          {product.name}
-        </Text>
-
-        {product.ratingCount ? (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginBottom: 4 }}>
-            <Icon name="star" size={11} color={COLORS.secondary} />
-            <Text style={{ fontSize: 11, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}>
-              {(product.ratingAvg ?? 0).toFixed(1)}
-            </Text>
-            <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: COLORS.outline }}>
-              ({product.ratingCount})
-            </Text>
-          </View>
-        ) : null}
-
-        {/* Price + add */}
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <View>
-            <Text
-              style={{
-                fontSize: 17,
-                fontFamily: "Manrope_800ExtraBold",
-                color: COLORS.secondary,
-              }}
-            >
-              {priceTagLabel(product)}
-            </Text>
-          </View>
-
+      <TouchableOpacity
+        activeOpacity={0.95}
+        onPress={() => router.push(`/(main)/products/${product.id}`)}
+        onPressIn={() => {
+          scale.value = withTiming(0.98, { duration: 140 });
+        }}
+        onPressOut={() => {
+          scale.value = withTiming(1, { duration: 220 });
+        }}
+        style={{
+          width: COL_W,
+          backgroundColor: COLORS.surfaceContainerLowest,
+          borderRadius: 16,
+          overflow: "hidden",
+          ...SHADOW.card,
+        }}
+      >
+        {/* Image — consistent 4:5 portrait */}
+        <View style={{ width: "100%", height: IMG_H, backgroundColor: COLORS.surfaceContainer }}>
+          {imgSource && (
+            <Image
+              source={imgSource}
+              style={{ width: "100%", height: "100%" }}
+              resizeMode="cover"
+            />
+          )}
           <TouchableOpacity
-            onPress={handleAdd}
-            hitSlop={6}
+            onPress={handleFav}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={isFav ? "Retirer des favoris" : "Ajouter aux favoris"}
             style={{
-              width: 32,
-              height: 32,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: COLORS.outline,
+              position: "absolute",
+              top: 10,
+              right: 10,
+              width: 34,
+              height: 34,
+              borderRadius: 17,
+              backgroundColor: "rgba(255,255,255,0.92)",
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: "#fff",
+              ...SHADOW.soft,
             }}
           >
             <Icon
-              name={needsDimensions ? "ruler-square" : "cart-plus"}
+              name={isFav ? "heart" : "heart-outline"}
               size={16}
-              color={COLORS.onSurface}
+              color={isFav ? "#C0392B" : COLORS.onSurfaceVariant}
             />
           </TouchableOpacity>
         </View>
-      </View>
-    </TouchableOpacity>
+
+        {/* Content */}
+        <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 14 }}>
+          <Text
+            style={{
+              fontSize: 13,
+              lineHeight: 18,
+              fontFamily: FONTS.bodyMedium,
+              color: COLORS.onSurface,
+              marginBottom: 6,
+            }}
+            numberOfLines={2}
+          >
+            {product.name}
+          </Text>
+
+          {product.ratingCount ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 6 }}>
+              <Icon name="star" size={11} color={COLORS.primary} />
+              <Text style={{ fontSize: 11, fontFamily: FONTS.bodySemibold, color: COLORS.onSurfaceVariant }}>
+                {(product.ratingAvg ?? 0).toFixed(1)}
+              </Text>
+              <Text style={{ fontSize: 10, fontFamily: FONTS.body, color: COLORS.outline }}>
+                ({product.ratingCount})
+              </Text>
+            </View>
+          ) : null}
+
+          <Text style={[TYPE.price, { fontSize: 19 }]}>{priceTagLabel(product)}</Text>
+        </View>
+      </TouchableOpacity>
     </Animated.View>
   );
 }
@@ -287,44 +238,54 @@ function PromoBanners() {
   const banners = usePromoBanners();
   if (banners.length === 0) return null;
   return (
-    <View style={{ paddingHorizontal: 24, marginBottom: 24, gap: 10 }}>
+    <View style={{ paddingHorizontal: H_PAD, marginBottom: SPACE.xxl, gap: 12 }}>
       {banners.map((b) => (
         <View
           key={b.id}
           style={{
-            borderRadius: 16,
-            padding: 18,
+            borderRadius: 20,
+            paddingVertical: 22,
+            paddingHorizontal: 22,
             backgroundColor: COLORS.primary,
             flexDirection: "row",
             alignItems: "center",
-            gap: 14,
+            gap: 16,
+            ...SHADOW.card,
           }}
         >
           {b.badge ? (
             <View
               style={{
-                backgroundColor: "rgba(255,255,255,0.18)",
+                backgroundColor: "rgba(255,255,255,0.16)",
                 paddingHorizontal: 12,
                 paddingVertical: 6,
                 borderRadius: 999,
               }}
             >
-              <Text style={{ color: "#fff", fontFamily: "Manrope_700Bold", fontSize: 11 }}>
+              <Text
+                style={{
+                  color: "#fff",
+                  fontFamily: FONTS.bodySemibold,
+                  fontSize: 10,
+                  letterSpacing: 1,
+                  textTransform: "uppercase",
+                }}
+              >
                 {b.badge}
               </Text>
             </View>
           ) : null}
           <View style={{ flex: 1 }}>
-            <Text style={{ color: "#fff", fontFamily: "Manrope_700Bold", fontSize: 16 }}>
+            <Text style={{ color: "#fff", fontFamily: FONTS.serif, fontSize: 22, lineHeight: 25 }}>
               {b.title}
             </Text>
             {b.subtitle ? (
               <Text
                 style={{
-                  color: "rgba(255,255,255,0.85)",
-                  fontFamily: "Inter_400Regular",
-                  fontSize: 12,
-                  marginTop: 2,
+                  color: "rgba(255,255,255,0.82)",
+                  fontFamily: FONTS.body,
+                  fontSize: 13,
+                  marginTop: 3,
                 }}
               >
                 {b.subtitle}
@@ -342,42 +303,33 @@ function FeaturedRail({ products }: { products: Product[] }) {
   const router = useRouter();
   if (products.length === 0) return null;
   return (
-    <View style={{ marginBottom: 24 }}>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 6,
-          paddingHorizontal: 24,
-          marginBottom: 12,
-        }}
-      >
-        <Icon name="star" size={16} color={COLORS.primary} />
-        <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 18, color: COLORS.onSurface }}>
-          Notre sélection
-        </Text>
+    <View style={{ marginBottom: SPACE.xxl }}>
+      <View style={{ paddingHorizontal: H_PAD, marginBottom: 14 }}>
+        <Text style={TYPE.overline}>Curation</Text>
+        <Text style={[TYPE.sectionTitle, { marginTop: 2 }]}>Notre sélection</Text>
       </View>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 24, gap: 12 }}
+        contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 14 }}
       >
         {products.map((product) => {
           const source = getProductImage(product.images[0]);
           return (
             <TouchableOpacity
               key={product.id}
-              activeOpacity={0.92}
+              activeOpacity={0.95}
               onPress={() => router.push(`/(main)/products/${product.id}`)}
-              style={{ width: 150 }}
+              style={{ width: 168 }}
             >
               <View
                 style={{
-                  width: 150,
-                  height: 150,
-                  borderRadius: 8,
+                  width: 168,
+                  height: 200,
+                  borderRadius: 16,
                   overflow: "hidden",
                   backgroundColor: COLORS.surfaceContainer,
+                  ...SHADOW.card,
                 }}
               >
                 {source && (
@@ -387,22 +339,16 @@ function FeaturedRail({ products }: { products: Product[] }) {
               <Text
                 numberOfLines={2}
                 style={{
-                  fontSize: 12,
-                  fontFamily: "Inter_500Medium",
+                  fontSize: 13,
+                  lineHeight: 18,
+                  fontFamily: FONTS.bodyMedium,
                   color: COLORS.onSurface,
-                  marginTop: 6,
+                  marginTop: 10,
                 }}
               >
                 {product.name}
               </Text>
-              <Text
-                style={{
-                  fontSize: 15,
-                  fontFamily: "Manrope_800ExtraBold",
-                  color: COLORS.secondary,
-                  marginTop: 2,
-                }}
-              >
+              <Text style={[TYPE.price, { fontSize: 18, marginTop: 3 }]}>
                 {priceTagLabel(product)}
               </Text>
             </TouchableOpacity>
@@ -413,10 +359,10 @@ function FeaturedRail({ products }: { products: Product[] }) {
   );
 }
 
-// ─── Two-column masonry feed ──────────────────────────────
-type FeedItem = { key: string; product: Product; imgHeight: number };
+// ─── Two-column product grid (uniform, curated) ───────────
+type FeedItem = { key: string; product: Product };
 
-function MasonryFeed({ items }: { items: FeedItem[] }) {
+function ProductGrid({ items }: { items: FeedItem[] }) {
   const left: { it: FeedItem; index: number }[] = [];
   const right: { it: FeedItem; index: number }[] = [];
   items.forEach((it, i) => {
@@ -424,15 +370,15 @@ function MasonryFeed({ items }: { items: FeedItem[] }) {
   });
 
   return (
-    <View style={{ flexDirection: "row", paddingHorizontal: 12, gap: GUTTER }}>
+    <View style={{ flexDirection: "row", paddingHorizontal: H_PAD, gap: GUTTER }}>
       <View style={{ flex: 1 }}>
         {left.map(({ it, index }) => (
-          <ProductCardTemu key={it.key} product={it.product} imgHeight={it.imgHeight} index={index} />
+          <ProductCard key={it.key} product={it.product} index={index} />
         ))}
       </View>
       <View style={{ flex: 1 }}>
         {right.map(({ it, index }) => (
-          <ProductCardTemu key={it.key} product={it.product} imgHeight={it.imgHeight + 30} index={index} />
+          <ProductCard key={it.key} product={it.product} index={index} />
         ))}
       </View>
     </View>
@@ -516,16 +462,12 @@ export default function HomeScreen() {
     return list;
   }, [baseProducts, filters, priceBounds]);
 
-  // Build the masonry feed from the real product list.
+  // Build the grid feed from the real product list.
   const feed = useMemo<FeedItem[]>(() => {
-    return products.map((product, i) => {
-      const variance = (product.id.charCodeAt(product.id.length - 1) % 5) * 18;
-      return {
-        key: `${product.id}-${i}`,
-        product,
-        imgHeight: 160 + variance,
-      };
-    });
+    return products.map((product, i) => ({
+      key: `${product.id}-${i}`,
+      product,
+    }));
   }, [products]);
 
   const onRefresh = useCallback(async () => {
@@ -557,22 +499,21 @@ export default function HomeScreen() {
   const categories = categoriesQuery.data ?? [];
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
-      <LogoHeader />
-      <SearchBar
-        showNotifications
-        onFilterPress={() => setSheetOpen(true)}
-        filterActive={isNonDefault(filters)}
-      />
-
+    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: COLORS.background }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        stickyHeaderIndices={[0]}
         onScroll={onScroll}
         scrollEventThrottle={64}
       >
+        <LogoHeader />
+        <SearchBar
+          showNotifications
+          onFilterPress={() => setSheetOpen(true)}
+          filterActive={isNonDefault(filters)}
+        />
+
         <View style={{ backgroundColor: COLORS.background }}>
           <TopCategoryTabs active={activeCategory} onSelect={setActiveCategory} categories={categories} />
         </View>
@@ -586,23 +527,43 @@ export default function HomeScreen() {
           </>
         )}
 
-        <MasonryFeed items={feed} />
-
-        {isLoading ? (
-          <View style={{ paddingVertical: 20, alignItems: "center" }}>
-            <ActivityIndicator size="small" color={COLORS.primary} />
-          </View>
+        {isLoading && feed.length === 0 ? (
+          <ProductGridSkeleton count={6} />
         ) : products.length === 0 ? (
-          <View style={{ alignItems: "center", paddingTop: 40 }}>
-            <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.outline }}>
-              Aucun produit trouvé.
+          <View style={{ alignItems: "center", paddingTop: 56, paddingHorizontal: 32 }}>
+            <Text style={[TYPE.sectionTitle, { fontSize: 20, textAlign: "center" }]}>
+              Aucun produit
+            </Text>
+            <Text
+              style={{
+                fontSize: 13,
+                fontFamily: FONTS.body,
+                color: COLORS.outline,
+                textAlign: "center",
+                marginTop: 6,
+              }}
+            >
+              Essayez une autre catégorie ou ajustez vos filtres.
             </Text>
           </View>
-        ) : (!isAll && categoryQuery.isFetchingNextPage) ? (
-          <View style={{ paddingVertical: 20, alignItems: "center" }}>
-            <ActivityIndicator size="small" color={COLORS.primary} />
-          </View>
-        ) : null}
+        ) : (
+          <>
+            <View style={{ paddingHorizontal: H_PAD, marginBottom: 14 }}>
+              <Text style={TYPE.overline}>{isAll ? "Catalogue" : "Sélection"}</Text>
+              <Text style={[TYPE.sectionTitle, { marginTop: 2 }]}>
+                {isAll
+                  ? "Tous nos produits"
+                  : categories.find((c) => c.id === activeCategory)?.name ?? "Produits"}
+              </Text>
+            </View>
+            <ProductGrid items={feed} />
+            {!isAll && categoryQuery.isFetchingNextPage ? (
+              <View style={{ paddingVertical: 24, alignItems: "center" }}>
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              </View>
+            ) : null}
+          </>
+        )}
       </ScrollView>
 
       <SortFilterSheet

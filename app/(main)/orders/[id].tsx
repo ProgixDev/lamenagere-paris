@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../../lib/constants";
+import { TYPE, FONTS } from "../../../lib/typography";
 import { formatDate, formatPrice } from "../../../lib/utils";
 import Skeleton from "../../../components/ui/Skeleton";
 import OrderTimeline from "../../../components/order/OrderTimeline";
@@ -41,7 +42,7 @@ const REFUND_BANNER: Record<
   refunded: {
     icon: "check-circle-outline",
     title: "Remboursement effectué",
-    tone: "#1B873F",
+    tone: COLORS.success,
   },
   rejected: {
     icon: "close-circle-outline",
@@ -151,10 +152,10 @@ export default function OrderDetailScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
       <View className="px-6 py-4 flex-row items-center">
-        <TouchableOpacity onPress={() => router.back()} className="mr-3">
+        <TouchableOpacity onPress={() => router.back()} className="mr-3" accessibilityLabel="Retour">
           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.primary} />
         </TouchableOpacity>
-        <Text className="text-lg font-semibold" style={{ color: COLORS.primaryContainer, fontFamily: "Manrope_700Bold" }}>
+        <Text style={TYPE.screenTitle}>
           Détails de la commande
         </Text>
       </View>

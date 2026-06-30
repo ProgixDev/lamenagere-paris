@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../../lib/constants";
+import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import { formatPrice, isOverseas } from "../../../lib/utils";
 import Button from "../../../components/ui/Button";
 import CheckoutSteps from "../../../components/cart/CheckoutSteps";
@@ -32,10 +33,14 @@ export default function CheckoutShippingScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
       <View className="px-6 py-4 flex-row items-center">
-        <TouchableOpacity onPress={() => router.back()} className="mr-3">
+        <TouchableOpacity
+          onPress={() => router.back()}
+          className="mr-3"
+          accessibilityLabel="Retour"
+        >
           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.primary} />
         </TouchableOpacity>
-        <Text className="text-lg font-semibold" style={{ color: COLORS.primary, fontFamily: "Manrope_700Bold" }}>
+        <Text style={[TYPE.screenTitle, { color: COLORS.primary }]}>
           Livraison
         </Text>
       </View>
@@ -44,15 +49,15 @@ export default function CheckoutShippingScreen() {
         <CheckoutSteps currentStep={2} />
 
         {overseas && (
-          <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start", marginBottom: 16, padding: 12, borderRadius: 10, backgroundColor: "#FFF7ED" }}>
-            <MaterialCommunityIcons name="information-outline" size={16} color={COLORS.warning} />
-            <Text style={{ flex: 1, fontSize: 12, color: COLORS.onSurface, fontFamily: "Inter_400Regular", lineHeight: 18 }}>
+          <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start", marginBottom: 24, padding: 14, borderRadius: 14, backgroundColor: COLORS.surfaceContainerLow }}>
+            <MaterialCommunityIcons name="information-outline" size={16} color={COLORS.primary} />
+            <Text style={{ flex: 1, fontSize: 12, color: COLORS.onSurfaceVariant, fontFamily: "Inter_400Regular", lineHeight: 18 }}>
               Livraison outre-mer : délais et frais spécifiques. La voie maritime est gratuite mais plus longue.
             </Text>
           </View>
         )}
 
-        <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: COLORS.outline, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 10 }}>
+        <Text style={[TYPE.overline, { marginBottom: 12 }]}>
           Mode de livraison
         </Text>
         <View className="gap-3 mb-8">
@@ -62,13 +67,13 @@ export default function CheckoutShippingScreen() {
             </View>
           ) : option ? (
             <View
-              className="flex-row items-center justify-between rounded-full px-6 py-4"
-              style={{ backgroundColor: COLORS.primary, borderWidth: 1, borderColor: COLORS.primary }}
+              className="flex-row items-center justify-between px-6 py-4"
+              style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, borderWidth: 1.5, borderColor: COLORS.primary, ...SHADOW.soft }}
             >
-              <Text style={{ color: COLORS.onPrimary }} className="text-sm font-semibold">
+              <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.bodySemibold, fontSize: 14 }}>
                 {option.delay}
               </Text>
-              <Text style={{ color: COLORS.onPrimary }} className="text-sm">
+              <Text style={[TYPE.price, { fontSize: 18, color: COLORS.primary }]}>
                 {option.fee === 0 ? "Gratuit" : `+${formatPrice(option.fee)}`}
               </Text>
             </View>
@@ -79,7 +84,7 @@ export default function CheckoutShippingScreen() {
           )}
         </View>
 
-        <View className="rounded-xl p-6 mb-8" style={{ backgroundColor: COLORS.surfaceContainerLow }}>
+        <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 20, marginBottom: 32, ...SHADOW.card }}>
           <View className="flex-row justify-between mb-2">
             <Text className="text-sm" style={{ color: COLORS.onSurface }}>Sous-total</Text>
             <Text className="text-sm" style={{ color: COLORS.onSurface }}>{formatPrice(subtotal)}</Text>
@@ -90,9 +95,9 @@ export default function CheckoutShippingScreen() {
               {shippingCost === 0 ? "Gratuit" : formatPrice(shippingCost)}
             </Text>
           </View>
-          <View className="flex-row justify-between mt-2 pt-2" style={{ borderTopWidth: 1, borderTopColor: COLORS.surfaceContainer }}>
-            <Text className="font-bold" style={{ color: COLORS.primary, fontFamily: "Manrope_800ExtraBold" }}>Total</Text>
-            <Text className="text-lg font-bold" style={{ color: COLORS.secondary, fontFamily: "Manrope_700Bold" }}>
+          <View className="flex-row justify-between items-center mt-3 pt-3" style={{ borderTopWidth: 1, borderTopColor: COLORS.outlineVariant }}>
+            <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 20 }}>Total</Text>
+            <Text style={[TYPE.priceLarge, { color: COLORS.primary }]}>
               {formatPrice(subtotal + shippingCost)}
             </Text>
           </View>

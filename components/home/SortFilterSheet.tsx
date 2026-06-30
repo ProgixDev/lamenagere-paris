@@ -5,6 +5,7 @@ import Button from "../ui/Button";
 import Icon from "../ui/Icon";
 import RangeSlider from "../ui/RangeSlider";
 import { COLORS } from "../../lib/constants";
+import { FONTS, TYPE, SHADOW } from "../../lib/typography";
 import { formatPrice } from "../../lib/utils";
 import {
   DEFAULT_FILTERS,
@@ -45,22 +46,21 @@ function Chip({
       style={{
         flexDirection: "row",
         alignItems: "center",
-        gap: 4,
+        gap: 5,
         paddingHorizontal: 16,
-        paddingVertical: 9,
+        paddingVertical: 10,
         borderRadius: 9999,
-        backgroundColor: active ? COLORS.primary : "transparent",
-        borderWidth: 1,
-        borderColor: active ? COLORS.primary : COLORS.outlineVariant + "66",
+        backgroundColor: active ? COLORS.primary : COLORS.surfaceContainerLowest,
+        ...SHADOW.soft,
       }}
     >
       {star && (
-        <Icon name="star" size={13} color={active ? "#fff" : COLORS.secondary} />
+        <Icon name="star" size={13} color={active ? "#fff" : COLORS.primary} />
       )}
       <Text
         style={{
           fontSize: 13,
-          fontFamily: active ? "Manrope_700Bold" : "Inter_500Medium",
+          fontFamily: active ? FONTS.bodySemibold : FONTS.bodyMedium,
           color: active ? COLORS.onPrimary : COLORS.onSurface,
         }}
       >
@@ -74,10 +74,11 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <Text
       style={{
-        fontSize: 13,
-        fontFamily: "Manrope_700Bold",
+        fontFamily: FONTS.serif,
+        fontSize: 20,
+        lineHeight: 24,
         color: COLORS.onSurface,
-        marginBottom: 10,
+        marginBottom: 12,
       }}
     >
       {children}
@@ -143,11 +144,11 @@ export default function SortFilterSheet({
             histogram={histogram}
             onChange={onPriceChange}
           />
-          <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
-            <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.onSurfaceVariant }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
+            <Text style={[TYPE.price, { fontSize: 17 }]}>
               {formatPrice(lo)}
             </Text>
-            <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.onSurfaceVariant }}>
+            <Text style={[TYPE.price, { fontSize: 17 }]}>
               {formatPrice(hi)}
             </Text>
           </View>

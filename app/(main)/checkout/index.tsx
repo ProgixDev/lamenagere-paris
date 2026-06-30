@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS, DELIVERY_ESTIMATES } from "../../../lib/constants";
+import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import {
   isOverseas,
   formatPrice,
@@ -66,10 +67,14 @@ export default function CheckoutAddressScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
       <View className="px-6 py-4 flex-row items-center">
-        <TouchableOpacity onPress={() => router.back()} className="mr-3">
+        <TouchableOpacity
+          onPress={() => router.back()}
+          className="mr-3"
+          accessibilityLabel="Retour"
+        >
           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.primary} />
         </TouchableOpacity>
-        <Text className="text-lg font-semibold" style={{ color: COLORS.primary, fontFamily: "Manrope_700Bold" }}>
+        <Text style={[TYPE.screenTitle, { color: COLORS.primary }]}>
           Livraison
         </Text>
       </View>
@@ -77,11 +82,11 @@ export default function CheckoutAddressScreen() {
       <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
         <CheckoutSteps currentStep={1} />
 
-        <Text className="text-sm font-semibold mb-4" style={{ color: COLORS.onSurface }}>
+        <Text style={{ fontFamily: FONTS.serif, fontSize: 20, color: COLORS.onSurface, marginBottom: 16, marginTop: 8 }}>
           Adresse de livraison
         </Text>
 
-        <View style={{ backgroundColor: "#fff", borderRadius: 14, padding: 16, gap: 14, marginBottom: 16 }}>
+        <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, gap: 14, marginBottom: 24, ...SHADOW.card }}>
           <View style={{ flexDirection: "row", gap: 12 }}>
             <View style={{ flex: 1 }}>
               <Input label="PRÉNOM" value={form.firstName} onChangeText={(t) => patch({ firstName: t })} />
@@ -115,7 +120,7 @@ export default function CheckoutAddressScreen() {
         )}
 
         {/* Summary */}
-        <View className="rounded-xl p-4 mb-6" style={{ backgroundColor: COLORS.surfaceContainer }}>
+        <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, marginBottom: 24, ...SHADOW.card }}>
           {items.map((item) => (
             <View key={item.id} className="flex-row justify-between mb-2">
               <Text className="text-xs flex-1" style={{ color: COLORS.onSurface }} numberOfLines={1}>
@@ -126,9 +131,9 @@ export default function CheckoutAddressScreen() {
               </Text>
             </View>
           ))}
-          <View className="flex-row justify-between mt-2 pt-2" style={{ borderTopWidth: 1, borderTopColor: COLORS.surfaceContainerLow }}>
-            <Text className="font-bold" style={{ color: COLORS.secondary, fontFamily: "Manrope_700Bold" }}>Total TTC</Text>
-            <Text className="font-bold" style={{ color: COLORS.secondary, fontFamily: "Manrope_700Bold" }}>{formatPrice(subtotal)}</Text>
+          <View className="flex-row justify-between items-center mt-3 pt-3" style={{ borderTopWidth: 1, borderTopColor: COLORS.outlineVariant }}>
+            <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 18 }}>Total TTC</Text>
+            <Text style={[TYPE.price, { color: COLORS.primary }]}>{formatPrice(subtotal)}</Text>
           </View>
         </View>
 

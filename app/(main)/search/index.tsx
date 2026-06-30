@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../../lib/constants";
+import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import {
   PRODUCT_IMAGES,
   getProductImage,
@@ -117,9 +118,10 @@ export default function SearchScreen() {
             alignItems: "center",
             gap: 8,
             paddingHorizontal: 14,
-            paddingVertical: 10,
+            paddingVertical: 12,
             borderRadius: 9999,
-            backgroundColor: "#fff",
+            backgroundColor: COLORS.surfaceContainerLowest,
+            ...SHADOW.soft,
           }}
         >
           <MaterialCommunityIcons name="magnify" size={18} color={COLORS.outline} />
@@ -134,7 +136,7 @@ export default function SearchScreen() {
             style={{
               flex: 1,
               fontSize: 14,
-              fontFamily: "Inter_400Regular",
+              fontFamily: FONTS.body,
               color: COLORS.onSurface,
             }}
           />
@@ -174,14 +176,15 @@ export default function SearchScreen() {
                       alignItems: "center",
                       gap: 6,
                       paddingLeft: 12,
-                      paddingRight: 10,
-                      paddingVertical: 7,
+                      paddingRight: 12,
+                      paddingVertical: 9,
                       borderRadius: 9999,
-                      backgroundColor: "#fff",
+                      backgroundColor: COLORS.surfaceContainerLowest,
+                      ...SHADOW.soft,
                     }}
                   >
                     <MaterialCommunityIcons name="history" size={12} color={COLORS.outline} />
-                    <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: COLORS.onSurface }}>
+                    <Text style={{ fontSize: 13, fontFamily: FONTS.bodyMedium, color: COLORS.onSurface }}>
                       {q}
                     </Text>
                   </TouchableOpacity>
@@ -201,12 +204,13 @@ export default function SearchScreen() {
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
-                    gap: 6,
+                    gap: 7,
                     paddingLeft: 10,
-                    paddingRight: 12,
-                    paddingVertical: 7,
+                    paddingRight: 14,
+                    paddingVertical: 9,
                     borderRadius: 9999,
-                    backgroundColor: "#fff",
+                    backgroundColor: COLORS.surfaceContainerLowest,
+                    ...SHADOW.soft,
                   }}
                 >
                   <View
@@ -214,7 +218,7 @@ export default function SearchScreen() {
                       width: 18,
                       height: 18,
                       borderRadius: 9,
-                      backgroundColor: i < 3 ? COLORS.secondary : COLORS.surfaceContainer,
+                      backgroundColor: i < 3 ? COLORS.primary : COLORS.surfaceContainer,
                       alignItems: "center",
                       justifyContent: "center",
                     }}
@@ -222,14 +226,14 @@ export default function SearchScreen() {
                     <Text
                       style={{
                         fontSize: 10,
-                        fontFamily: "Inter_700Bold",
+                        fontFamily: FONTS.bodySemibold,
                         color: i < 3 ? "#fff" : COLORS.outline,
                       }}
                     >
                       {i + 1}
                     </Text>
                   </View>
-                  <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: COLORS.onSurface }}>
+                  <Text style={{ fontSize: 13, fontFamily: FONTS.bodyMedium, color: COLORS.onSurface }}>
                     {q}
                   </Text>
                 </TouchableOpacity>

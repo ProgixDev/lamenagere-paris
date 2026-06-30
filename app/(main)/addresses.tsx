@@ -156,7 +156,7 @@ export default function AddressesScreen() {
           </View>
         ) : isError ? (
           <View style={{ alignItems: "center", paddingTop: 40 }}>
-            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#f0ebe6", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#dbe8f5", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
               <MaterialCommunityIcons name="alert-circle-outline" size={28} color={COLORS.error} />
             </View>
             <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: COLORS.onSurface, marginBottom: 4 }}>
@@ -212,7 +212,7 @@ export default function AddressesScreen() {
           ))
         ) : (
           <View style={{ alignItems: "center", paddingTop: 40 }}>
-            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#f0ebe6", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#dbe8f5", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
               <MaterialCommunityIcons name="map-marker-outline" size={28} color={COLORS.secondary} />
             </View>
             <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: COLORS.onSurface, marginBottom: 4 }}>

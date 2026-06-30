@@ -10,6 +10,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../lib/constants";
+import { TYPE } from "../../lib/typography";
 import { useCart } from "../../features/cart/hooks";
 import CartItemComponent from "../../components/cart/CartItem";
 import CartSummary from "../../components/cart/CartSummary";
@@ -45,21 +46,19 @@ export default function CartScreen() {
               width: 80,
               height: 80,
               borderRadius: 40,
-              backgroundColor: "#f0ebe6",
+              backgroundColor: COLORS.surfaceContainer,
               alignItems: "center",
               justifyContent: "center",
               marginBottom: 20,
             }}
           >
-            <MaterialCommunityIcons name="shopping-outline" size={36} color={COLORS.secondary} />
+            <MaterialCommunityIcons name="shopping-outline" size={36} color={COLORS.primary} />
           </View>
           <Text
-            style={{
-              fontSize: 18,
-              fontFamily: "Manrope_700Bold",
-              color: COLORS.onSurface,
-              marginBottom: 6,
-            }}
+            style={[
+              TYPE.sectionTitle,
+              { marginBottom: 8 },
+            ]}
           >
             Votre panier est vide
           </Text>
@@ -98,10 +97,10 @@ export default function CartScreen() {
           justifyContent: "space-between",
           paddingHorizontal: 20,
           paddingTop: 8,
-          paddingBottom: 12,
+          paddingBottom: 16,
         }}
       >
-        <Text style={{ fontSize: 20, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}>
+        <Text style={TYPE.screenTitle}>
           Mon Panier
         </Text>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
@@ -117,7 +116,11 @@ export default function CartScreen() {
               {itemCount}
             </Text>
           </View>
-          <TouchableOpacity onPress={handleClear} style={{ padding: 4, marginLeft: 8 }}>
+          <TouchableOpacity
+            onPress={handleClear}
+            style={{ padding: 4, marginLeft: 8 }}
+            accessibilityLabel="Vider le panier"
+          >
             <MaterialCommunityIcons name="trash-can-outline" size={20} color={COLORS.outline} />
           </TouchableOpacity>
         </View>
@@ -153,7 +156,7 @@ export default function CartScreen() {
           paddingTop: 12,
           paddingBottom: 100,
           borderTopWidth: 1,
-          borderTopColor: "#f0f0f0",
+          borderTopColor: COLORS.outlineVariant,
         }}
       >
         <Button

@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../../lib/constants";
+import { FONTS, TYPE } from "../../../lib/typography";
 import { formatDate } from "../../../lib/utils";
 import Button from "../../../components/ui/Button";
 import Card from "../../../components/ui/Card";
@@ -27,12 +28,12 @@ export default function CheckoutConfirmationScreen() {
       <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 40, alignItems: "center" }}>
         <View
           className="w-16 h-16 rounded-full items-center justify-center mb-6"
-          style={{ backgroundColor: COLORS.primary }}
+          style={{ backgroundColor: COLORS.success }}
         >
           <MaterialCommunityIcons name="check" size={32} color="#fff" />
         </View>
 
-        <Text className="text-2xl mb-2" style={{ color: COLORS.primaryContainer, fontFamily: "Manrope_700Bold" }}>
+        <Text style={[TYPE.hero, { color: COLORS.primary, marginBottom: 8, textAlign: "center" }]}>
           Commande confirmée !
         </Text>
         <Text className="text-sm mb-8" style={{ color: COLORS.onSurfaceVariant }}>
@@ -41,7 +42,7 @@ export default function CheckoutConfirmationScreen() {
 
         <Card padding="lg">
           <View className="gap-3 w-full">
-            <Text className="text-lg" style={{ color: COLORS.onSurface, fontFamily: "Manrope_700Bold" }}>
+            <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 22 }}>
               {orderNumber}
             </Text>
             <Text className="text-sm" style={{ color: COLORS.outline }}>

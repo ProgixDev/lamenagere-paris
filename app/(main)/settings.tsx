@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import Icon from "../../components/ui/Icon";
 import * as SecureStore from "expo-secure-store";
 import { COLORS } from "../../lib/constants";
+import { FONTS, TYPE, SPACE, SHADOW } from "../../lib/typography";
 import { PUSH_TOKEN_KEY } from "../../lib/storage";
 import { registerForPushNotifications } from "../../lib/notifications";
 import {
@@ -74,11 +75,11 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
       {/* Header */}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 }}>
-        <TouchableOpacity onPress={() => router.back()}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 }}>
+        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Retour">
           <Icon name="chevron-left" size={26} color={COLORS.onSurface} />
         </TouchableOpacity>
-        <Text style={{ fontSize: 18, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}>
+        <Text style={TYPE.screenTitle}>
           Paramètres
         </Text>
       </View>
@@ -107,21 +108,22 @@ export default function SettingsScreen() {
         </SettingsSection>
 
         {/* Danger */}
-        <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
+        <View style={{ paddingHorizontal: 20, marginTop: SPACE.xl }}>
           <TouchableOpacity
             onPress={handleDeleteAccount}
+            accessibilityLabel="Supprimer mon compte"
             style={{
               flexDirection: "row",
               alignItems: "center",
               gap: 10,
-              paddingVertical: 14,
+              paddingVertical: 15,
               paddingHorizontal: 16,
-              backgroundColor: "#fff5f5",
-              borderRadius: 14,
+              backgroundColor: COLORS.error + "0F",
+              borderRadius: 16,
             }}
           >
-            <Icon name="account-remove-outline" size={20} color="#dc3545" />
-            <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: "#dc3545" }}>
+            <Icon name="account-remove-outline" size={20} color={COLORS.error} />
+            <Text style={{ fontSize: 15, fontFamily: FONTS.bodyMedium, color: COLORS.error }}>
               Supprimer mon compte
             </Text>
           </TouchableOpacity>
@@ -133,11 +135,11 @@ export default function SettingsScreen() {
 
 function SettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <View style={{ marginBottom: 20 }}>
-      <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: COLORS.outline, textTransform: "uppercase", letterSpacing: 2, paddingHorizontal: 20, marginBottom: 8 }}>
+    <View style={{ marginBottom: SPACE.xl }}>
+      <Text style={[TYPE.overline, { paddingHorizontal: 20, marginBottom: SPACE.md }]}>
         {title}
       </Text>
-      <View style={{ marginHorizontal: 20, backgroundColor: "#ffffff", borderRadius: 14, overflow: "hidden" }}>
+      <View style={{ marginHorizontal: 20, backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, overflow: "hidden", ...SHADOW.card }}>
         {children}
       </View>
     </View>
@@ -156,18 +158,18 @@ function SettingsRow({ icon, label, value, onPress, rightComponent, last = false
         flexDirection: "row",
         alignItems: "center",
         paddingHorizontal: 16,
-        paddingVertical: 14,
+        paddingVertical: 15,
         gap: 14,
         borderBottomWidth: last ? 0 : 1,
-        borderBottomColor: "#f5f5f5",
+        borderBottomColor: COLORS.outlineVariant,
       }}
     >
       <Icon name={icon as any} size={20} color={COLORS.primary} />
-      <Text style={{ flex: 1, fontSize: 14, fontFamily: "Inter_500Medium", color: COLORS.onSurface }}>
+      <Text style={{ flex: 1, fontSize: 15, fontFamily: FONTS.bodyMedium, color: COLORS.onSurface }}>
         {label}
       </Text>
       {value && (
-        <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.outline, marginRight: 4 }}>
+        <Text style={{ fontSize: 13, fontFamily: FONTS.body, color: COLORS.outline, marginRight: 4 }}>
           {value}
         </Text>
       )}

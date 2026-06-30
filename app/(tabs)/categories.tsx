@@ -15,6 +15,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import Icon from "../../components/ui/Icon";
 import PressableScale from "../../components/ui/PressableScale";
 import { COLORS } from "../../lib/constants";
+import { FONTS, TYPE, SPACE, SHADOW } from "../../lib/typography";
 import {
   PRODUCT_IMAGES,
   getProductImage,
@@ -76,34 +77,15 @@ export default function CategoriesScreen() {
         contentContainerStyle={{ paddingBottom: 100 }}
       >
         {/* ── Editorial hero ───────────────────────── */}
-        <View style={{ paddingHorizontal: PAGE_PAD, marginTop: 8, marginBottom: 6 }}>
-          <Text
-            style={{
-              fontSize: 10,
-              fontFamily: "Inter_600SemiBold",
-              color: COLORS.outline,
-              letterSpacing: 2.5,
-              textTransform: "uppercase",
-              marginBottom: 4,
-            }}
-          >
-            Collection 2026
-          </Text>
-          <Text
-            style={{
-              fontSize: 24,
-              fontFamily: "Manrope_800ExtraBold",
-              color: COLORS.onSurface,
-            }}
-          >
-            Nos collections
-          </Text>
+        <View style={{ paddingHorizontal: PAGE_PAD, marginTop: SPACE.sm, marginBottom: SPACE.xs }}>
+          <Text style={[TYPE.overline, { marginBottom: 6 }]}>Collection 2026</Text>
+          <Text style={TYPE.screenTitle}>Nos collections</Text>
           <Text
             style={{
               fontSize: 13,
-              fontFamily: "Inter_400Regular",
+              fontFamily: FONTS.body,
               color: COLORS.onSurfaceVariant,
-              marginTop: 4,
+              marginTop: 6,
             }}
           >
             L'art du sur-mesure, livré chez vous.
@@ -166,8 +148,9 @@ export default function CategoriesScreen() {
               </View>
               <Text
                 style={{
-                  fontSize: 28,
-                  fontFamily: "Manrope_800ExtraBold",
+                  fontSize: 32,
+                  lineHeight: 36,
+                  fontFamily: FONTS.serifBold,
                   color: "#fff",
                 }}
               >
@@ -225,30 +208,13 @@ export default function CategoriesScreen() {
           }}
         >
           <View>
-            <Text
-              style={{
-                fontSize: 10,
-                fontFamily: "Inter_600SemiBold",
-                color: COLORS.outline,
-                letterSpacing: 2.5,
-                textTransform: "uppercase",
-                marginBottom: 2,
-              }}
-            >
-              Explorer
-            </Text>
-            <Text
-              style={{
-                fontSize: 18,
-                fontFamily: "Manrope_700Bold",
-                color: COLORS.onSurface,
-              }}
-            >
+            <Text style={[TYPE.overline, { marginBottom: 3 }]}>Explorer</Text>
+            <Text style={[TYPE.sectionTitle, { fontSize: 20, lineHeight: 24 }]}>
               Toutes les catégories
             </Text>
           </View>
           <TouchableOpacity onPress={() => router.push("/(main)/search")}>
-            <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: COLORS.secondary }}>
+            <Text style={{ fontSize: 12, fontFamily: FONTS.bodySemibold, color: COLORS.primary }}>
               Tout voir →
             </Text>
           </TouchableOpacity>
@@ -278,25 +244,8 @@ export default function CategoriesScreen() {
         {/* ── Editorial picks (horizontal) ─────────── */}
         <View style={{ marginTop: 28 }}>
           <View style={{ paddingHorizontal: PAGE_PAD, marginBottom: 14 }}>
-            <Text
-              style={{
-                fontSize: 10,
-                fontFamily: "Inter_600SemiBold",
-                color: COLORS.outline,
-                letterSpacing: 2.5,
-                textTransform: "uppercase",
-                marginBottom: 2,
-              }}
-            >
-              Sélection
-            </Text>
-            <Text
-              style={{
-                fontSize: 18,
-                fontFamily: "Manrope_700Bold",
-                color: COLORS.onSurface,
-              }}
-            >
+            <Text style={[TYPE.overline, { marginBottom: 3 }]}>Sélection</Text>
+            <Text style={[TYPE.sectionTitle, { fontSize: 20, lineHeight: 24 }]}>
               Coups de cœur de l'équipe
             </Text>
           </View>
@@ -385,8 +334,9 @@ function CategoryBentoCard({
           <Text
             style={{
               flex: 1,
-              fontSize: 16,
-              fontFamily: "Manrope_700Bold",
+              fontSize: 19,
+              lineHeight: 23,
+              fontFamily: FONTS.serif,
               color: "#fff",
             }}
             numberOfLines={1}
@@ -429,33 +379,28 @@ function EditorialCard({ product, onPress }: { product: Product; onPress: () => 
       <View
         style={{
           width: 168,
-          height: 200,
-          borderRadius: 14,
+          height: 210,
+          borderRadius: 16,
           overflow: "hidden",
           backgroundColor: COLORS.surfaceContainer,
-          marginBottom: 8,
+          marginBottom: 10,
+          ...SHADOW.card,
         }}
       >
         {img && <Image source={img} style={{ width: "100%", height: "100%" }} resizeMode="cover" />}
       </View>
       <Text
         style={{
-          fontSize: 12,
-          fontFamily: "Inter_500Medium",
+          fontSize: 13,
+          fontFamily: FONTS.bodyMedium,
           color: COLORS.onSurface,
-          marginBottom: 2,
+          marginBottom: 3,
         }}
         numberOfLines={1}
       >
         {product.name}
       </Text>
-      <Text
-        style={{
-          fontSize: 14,
-          fontFamily: "Manrope_800ExtraBold",
-          color: COLORS.secondary,
-        }}
-      >
+      <Text style={[TYPE.price, { fontSize: 18 }]}>
         {priceTagLabel(product)}
       </Text>
     </PressableScale>

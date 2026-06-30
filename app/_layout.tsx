@@ -6,6 +6,11 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
+import {
+  Cormorant_500Medium,
+  Cormorant_600SemiBold,
+  Cormorant_700Bold,
+} from "@expo-google-fonts/cormorant";
 import { Text as RNText, TextInput as RNTextInput } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
@@ -180,6 +185,11 @@ export default function RootLayout() {
     Inter_700Bold: futura,
     Manrope_700Bold: futura,
     Manrope_800ExtraBold: futura,
+    // Cormorant — the elegant high-contrast serif used for display headings,
+    // section titles and prices to give the catalog a premium "boutique" voice.
+    Cormorant_500Medium,
+    Cormorant_600SemiBold,
+    Cormorant_700Bold,
   });
 
   useEffect(() => {

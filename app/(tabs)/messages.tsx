@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../lib/constants";
+import { FONTS, TYPE, SHADOW } from "../../lib/typography";
 import ConversationItem from "../../components/messaging/ConversationItem";
 import { useConversations, useMarkAsRead } from "../../features/messaging/hooks";
 import LogoHeader from "../../components/layout/LogoHeader";
@@ -51,23 +52,21 @@ export default function MessagesScreen() {
           paddingBottom: 12,
         }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Text style={{ fontSize: 20, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}>
-            Messages
-          </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <Text style={[TYPE.screenTitle]}>Messages</Text>
           {totalUnread > 0 && (
             <View
               style={{
                 minWidth: 22,
                 height: 22,
                 borderRadius: 11,
-                backgroundColor: COLORS.secondary,
+                backgroundColor: COLORS.primary,
                 alignItems: "center",
                 justifyContent: "center",
                 paddingHorizontal: 6,
               }}
             >
-              <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: "#fff" }}>
+              <Text style={{ fontSize: 11, fontFamily: FONTS.bodyBold, color: "#fff" }}>
                 {totalUnread}
               </Text>
             </View>
@@ -77,6 +76,7 @@ export default function MessagesScreen() {
           onPress={handleMarkAllRead}
           disabled={totalUnread === 0}
           hitSlop={8}
+          accessibilityLabel="Tout marquer comme lu"
         >
           <MaterialCommunityIcons
             name="email-check-outline"
@@ -87,16 +87,17 @@ export default function MessagesScreen() {
       </View>
 
       {/* Search */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 8 }}>
+      <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
         <View
           style={{
             flexDirection: "row",
             alignItems: "center",
-            backgroundColor: "#ffffff",
-            borderRadius: 12,
-            paddingHorizontal: 12,
-            paddingVertical: 10,
+            backgroundColor: COLORS.surfaceContainerLowest,
+            borderRadius: 16,
+            paddingHorizontal: 14,
+            paddingVertical: 12,
             gap: 8,
+            ...SHADOW.soft,
           }}
         >
           <MaterialCommunityIcons name="magnify" size={18} color={COLORS.outline} />
@@ -104,11 +105,11 @@ export default function MessagesScreen() {
             value={search}
             onChangeText={setSearch}
             placeholder="Rechercher une conversation..."
-            placeholderTextColor={COLORS.surfaceDim}
+            placeholderTextColor={COLORS.outline}
             style={{
               flex: 1,
-              fontSize: 13,
-              fontFamily: "Inter_400Regular",
+              fontSize: 14,
+              fontFamily: FONTS.body,
               color: COLORS.onSurface,
               paddingVertical: 0,
             }}
@@ -125,36 +126,36 @@ export default function MessagesScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {isLoading && conversations.length === 0 ? (
           <View style={{ alignItems: "center", justifyContent: "center", paddingTop: 100 }}>
-            <ActivityIndicator color={COLORS.secondary} />
+            <ActivityIndicator color={COLORS.primary} />
           </View>
         ) : filtered.length > 0 ? (
           filtered.map((conv, idx) => (
             <View key={conv.id}>
               <ConversationItem conversation={conv} />
               {idx < filtered.length - 1 && (
-                <View style={{ height: 1, backgroundColor: "#f5f5f5", marginLeft: 82 }} />
+                <View style={{ height: 1, backgroundColor: COLORS.outlineVariant + "88", marginLeft: 84 }} />
               )}
             </View>
           ))
         ) : (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 80, paddingHorizontal: 40 }}>
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 96, paddingHorizontal: 40 }}>
             <View
               style={{
                 width: 72,
                 height: 72,
                 borderRadius: 36,
-                backgroundColor: "#f0ebe6",
+                backgroundColor: COLORS.surfaceContainer,
                 alignItems: "center",
                 justifyContent: "center",
-                marginBottom: 16,
+                marginBottom: 20,
               }}
             >
-              <MaterialCommunityIcons name="chat-outline" size={32} color={COLORS.secondary} />
+              <MaterialCommunityIcons name="chat-outline" size={32} color={COLORS.outline} />
             </View>
-            <Text style={{ fontSize: 16, fontFamily: "Manrope_700Bold", color: COLORS.onSurface, marginBottom: 6 }}>
+            <Text style={{ fontFamily: FONTS.serif, fontSize: 22, color: COLORS.onSurface, marginBottom: 8, textAlign: "center" }}>
               {search ? "Aucun résultat" : "Aucune conversation"}
             </Text>
-            <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.onSurfaceVariant, textAlign: "center" }}>
+            <Text style={{ fontSize: 14, lineHeight: 21, fontFamily: FONTS.body, color: COLORS.outline, textAlign: "center" }}>
               {search
                 ? "Essayez avec d'autres termes"
                 : "Vos échanges avec nos artisans apparaîtront ici"}

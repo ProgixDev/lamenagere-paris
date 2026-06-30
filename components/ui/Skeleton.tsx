@@ -6,6 +6,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from "react-native-reanimated";
+import { COLORS } from "../../lib/constants";
 
 interface SkeletonProps {
   width?: number | string;
@@ -41,7 +42,7 @@ export default function Skeleton({
           width: width as any,
           height,
           borderRadius,
-          backgroundColor: "#e0e0e0",
+          backgroundColor: COLORS.surfaceContainer,
         },
         animatedStyle,
         style,
@@ -68,6 +69,29 @@ export function SkeletonProductGrid() {
           <Skeleton height={220} borderRadius={8} />
           <Skeleton height={12} width="80%" />
           <Skeleton height={12} width="50%" />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/**
+ * Two-column skeleton that mirrors the premium product card (4:5 image, name,
+ * price). Shown on the home feed's first load instead of a bare spinner.
+ */
+export function ProductGridSkeleton({ count = 6 }: { count?: number }) {
+  const rows = Array.from({ length: Math.ceil(count / 2) });
+  return (
+    <View style={{ paddingHorizontal: 16 }}>
+      {rows.map((_, r) => (
+        <View key={r} style={{ flexDirection: "row", gap: 14, marginBottom: 14 }}>
+          {[0, 1].map((c) => (
+            <View key={c} style={{ flex: 1 }}>
+              <Skeleton height={210} borderRadius={14} />
+              <Skeleton height={13} width="80%" borderRadius={4} style={{ marginTop: 10 }} />
+              <Skeleton height={18} width="45%" borderRadius={4} style={{ marginTop: 8 }} />
+            </View>
+          ))}
         </View>
       ))}
     </View>

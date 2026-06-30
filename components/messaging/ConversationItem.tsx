@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../lib/constants";
+import { FONTS } from "../../lib/typography";
 import { relativeTime, truncate } from "../../lib/utils";
 import { getProductImage } from "../../lib/mock-data";
 import type { Conversation } from "../../lib/types";
@@ -25,20 +26,20 @@ export default function ConversationItem({ conversation }: ConversationItemProps
       style={{
         flexDirection: "row",
         alignItems: "center",
-        gap: 12,
-        paddingVertical: 14,
+        gap: 14,
+        paddingVertical: 16,
         paddingHorizontal: 20,
-        backgroundColor: hasUnread ? "#faf7f4" : "transparent",
+        backgroundColor: hasUnread ? COLORS.surfaceContainerLow : "transparent",
       }}
     >
       {/* Product thumbnail or avatar */}
       <View
         style={{
-          width: 50,
-          height: 50,
-          borderRadius: 14,
+          width: 52,
+          height: 52,
+          borderRadius: 16,
           overflow: "hidden",
-          backgroundColor: "#f0ebe6",
+          backgroundColor: COLORS.surfaceContainer,
           alignItems: "center",
           justifyContent: "center",
         }}
@@ -46,7 +47,7 @@ export default function ConversationItem({ conversation }: ConversationItemProps
         {productImg ? (
           <Image source={productImg} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
         ) : (
-          <MaterialCommunityIcons name="store-outline" size={22} color={COLORS.secondary} />
+          <MaterialCommunityIcons name="store-outline" size={22} color={COLORS.outline} />
         )}
       </View>
 
@@ -55,8 +56,8 @@ export default function ConversationItem({ conversation }: ConversationItemProps
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
           <Text
             style={{
-              fontSize: 14,
-              fontFamily: hasUnread ? "Inter_600SemiBold" : "Inter_500Medium",
+              fontSize: 15,
+              fontFamily: hasUnread ? FONTS.bodySemibold : FONTS.bodyMedium,
               color: COLORS.onSurface,
             }}
             numberOfLines={1}
@@ -66,8 +67,8 @@ export default function ConversationItem({ conversation }: ConversationItemProps
           <Text
             style={{
               fontSize: 11,
-              fontFamily: "Inter_400Regular",
-              color: hasUnread ? COLORS.secondary : COLORS.outline,
+              fontFamily: FONTS.body,
+              color: hasUnread ? COLORS.primary : COLORS.outline,
             }}
           >
             {relativeTime(conversation.lastMessageAt)}
@@ -77,9 +78,9 @@ export default function ConversationItem({ conversation }: ConversationItemProps
         <Text
           style={{
             fontSize: 12,
-            fontFamily: "Inter_500Medium",
+            fontFamily: FONTS.bodyMedium,
             color: COLORS.onSurfaceVariant,
-            marginBottom: 2,
+            marginBottom: 3,
           }}
           numberOfLines={1}
         >
@@ -90,7 +91,7 @@ export default function ConversationItem({ conversation }: ConversationItemProps
           <Text
             style={{
               fontSize: 12,
-              fontFamily: "Inter_400Regular",
+              fontFamily: FONTS.body,
               color: COLORS.outline,
               flex: 1,
               marginRight: 8,
@@ -106,13 +107,13 @@ export default function ConversationItem({ conversation }: ConversationItemProps
                 minWidth: 20,
                 height: 20,
                 borderRadius: 10,
-                backgroundColor: COLORS.secondary,
+                backgroundColor: COLORS.primary,
                 alignItems: "center",
                 justifyContent: "center",
                 paddingHorizontal: 6,
               }}
             >
-              <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: "#fff" }}>
+              <Text style={{ fontSize: 10, fontFamily: FONTS.bodyBold, color: "#fff" }}>
                 {conversation.unreadCount}
               </Text>
             </View>

@@ -11,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../../lib/constants";
+import { TYPE, SHADOW } from "../../../lib/typography";
 import { formatPrice, formatDate } from "../../../lib/utils";
 import { getProductImage } from "../../../lib/mock-data";
 import { useOrders } from "../../../features/orders/hooks";
@@ -22,7 +23,7 @@ import type { QuoteStatus } from "../../../lib/types";
 const STATUS_COLORS: Record<string, string> = {
   commande_confirmee: COLORS.primary,
   en_preparation: COLORS.primary,
-  en_attente_expedition: COLORS.warning,
+  en_attente_expedition: COLORS.primary,
   expediee: COLORS.secondary,
   livree: COLORS.success,
 };
@@ -60,13 +61,13 @@ export default function OrdersScreen() {
           gap: 12,
           paddingHorizontal: 20,
           paddingTop: 8,
-          paddingBottom: 12,
+          paddingBottom: 16,
         }}
       >
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Retour">
           <MaterialCommunityIcons name="chevron-left" size={26} color={COLORS.onSurface} />
         </TouchableOpacity>
-        <Text style={{ fontSize: 18, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}>
+        <Text style={TYPE.screenTitle}>
           Mes Commandes
         </Text>
       </View>
@@ -87,7 +88,8 @@ export default function OrdersScreen() {
               paddingHorizontal: 16,
               paddingVertical: 8,
               borderRadius: 9999,
-              backgroundColor: tab === t.key ? COLORS.primary : "#ffffff",
+              backgroundColor: tab === t.key ? COLORS.primary : COLORS.surfaceContainerLowest,
+              ...(tab === t.key ? {} : SHADOW.soft),
             }}
           >
             <Text
@@ -104,7 +106,7 @@ export default function OrdersScreen() {
                 minWidth: 20,
                 height: 20,
                 borderRadius: 10,
-                backgroundColor: tab === t.key ? "rgba(255,255,255,0.25)" : "#f0f0f0",
+                backgroundColor: tab === t.key ? "rgba(255,255,255,0.25)" : COLORS.surfaceContainerLow,
                 alignItems: "center",
                 justifyContent: "center",
                 paddingHorizontal: 5,
@@ -139,15 +141,16 @@ export default function OrdersScreen() {
                   activeOpacity={0.9}
                   onPress={() => router.push(`/(main)/orders/${order.id}`)}
                   style={{
-                    backgroundColor: "#ffffff",
-                    borderRadius: 14,
-                    padding: 14,
+                    backgroundColor: COLORS.surfaceContainerLowest,
+                    borderRadius: 16,
+                    padding: 16,
                     flexDirection: "row",
                     gap: 14,
+                    ...SHADOW.card,
                   }}
                 >
                   {img && (
-                    <Image source={img} style={{ width: 72, height: 72, borderRadius: 10 }} resizeMode="cover" />
+                    <Image source={img} style={{ width: 72, height: 72, borderRadius: 12, backgroundColor: COLORS.surfaceContainer }} resizeMode="cover" />
                   )}
                   <View style={{ flex: 1, justifyContent: "space-between" }}>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
@@ -166,7 +169,7 @@ export default function OrdersScreen() {
                       </Text>
                     )}
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                      <Text style={{ fontSize: 14, fontFamily: "Manrope_700Bold", color: COLORS.secondary }}>
+                      <Text style={[TYPE.price, { fontSize: 18 }]}>
                         {formatPrice(order.total)}
                       </Text>
                       <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: COLORS.outline }}>
@@ -192,11 +195,11 @@ export default function OrdersScreen() {
             return (
               <View
                 key={quote.id}
-                style={{ backgroundColor: "#ffffff", borderRadius: 14, padding: 14 }}
+                style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, ...SHADOW.card }}
               >
                 <View style={{ flexDirection: "row", gap: 14 }}>
                   {img && (
-                    <Image source={img} style={{ width: 72, height: 72, borderRadius: 10 }} resizeMode="cover" />
+                    <Image source={img} style={{ width: 72, height: 72, borderRadius: 12, backgroundColor: COLORS.surfaceContainer }} resizeMode="cover" />
                   )}
                   <View style={{ flex: 1, justifyContent: "space-between" }}>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
@@ -210,7 +213,7 @@ export default function OrdersScreen() {
                       </View>
                     </View>
                     {quote.quotedPrice != null && (
-                      <Text style={{ fontSize: 14, fontFamily: "Manrope_700Bold", color: COLORS.secondary }}>
+                      <Text style={[TYPE.price, { fontSize: 18 }]}>
                         {formatPrice(quote.quotedPrice)}
                       </Text>
                     )}
@@ -266,10 +269,10 @@ function LoadingBlock() {
 function EmptyBlock({ icon, title, message }: { icon: string; title: string; message: string }) {
   return (
     <View style={{ alignItems: "center", paddingTop: 60, paddingHorizontal: 20 }}>
-      <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#f0ebe6", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
-        <MaterialCommunityIcons name={icon as any} size={28} color={COLORS.secondary} />
+      <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: COLORS.surfaceContainer, alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+        <MaterialCommunityIcons name={icon as any} size={28} color={COLORS.primary} />
       </View>
-      <Text style={{ fontSize: 16, fontFamily: "Manrope_700Bold", color: COLORS.onSurface, marginBottom: 4 }}>{title}</Text>
+      <Text style={[TYPE.sectionTitle, { marginBottom: 4 }]}>{title}</Text>
       <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.onSurfaceVariant, textAlign: "center" }}>{message}</Text>
     </View>
   );

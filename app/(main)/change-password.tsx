@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../lib/constants";
+import { TYPE } from "../../lib/typography";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import Toast from "../../components/ui/Toast";
@@ -68,11 +69,11 @@ export default function ChangePasswordScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 }}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 }}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={8} accessibilityLabel="Retour">
             <MaterialCommunityIcons name="chevron-left" size={26} color={COLORS.onSurface} />
           </TouchableOpacity>
-          <Text style={{ fontSize: 18, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}>
+          <Text style={[TYPE.screenTitle, { flex: 1 }]}>
             Modifier mon mot de passe
           </Text>
         </View>

@@ -31,6 +31,7 @@ import Animated, {
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { COLORS, PRODUCT_TYPES, PRICE_MODES } from "../../../lib/constants";
+import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import { formatPrice } from "../../../lib/utils";
 import { priceTagLabel } from "../../../lib/pricing";
 import Button from "../../../components/ui/Button";
@@ -39,6 +40,7 @@ import Toast from "../../../components/ui/Toast";
 import ContactSellerSheet from "../../../components/product/ContactSellerSheet";
 import DevisRequestSheet from "../../../components/product/DevisRequestSheet";
 import ProductOptionsPreview from "../../../components/product/ProductOptionsPreview";
+import ProductVideo from "../../../components/product/ProductVideo";
 import { getProductImage } from "../../../lib/mock-data";
 import { useCartStore } from "../../../features/cart/store";
 import { useFavoritesStore } from "../../../features/favorites/store";
@@ -143,7 +145,14 @@ export default function ProductDetailScreen() {
   const hasOpeningTypes = openingTypes.length > 0;
   // Effective blocks: product override wins, else the category template.
   const configBlocks = product.configBlocks ?? product.category.configBlocks ?? [];
-  const galleryImages = product.images.length > 0 ? product.images : ["__placeholder__"];
+  // Gallery shows images first, then videos. Falls back to a placeholder cell.
+  const galleryItems: { type: "image" | "video"; key: string }[] = [
+    ...product.images.map((url) => ({ type: "image" as const, key: url })),
+    ...(product.videos ?? []).map((url) => ({ type: "video" as const, key: url })),
+  ];
+  if (galleryItems.length === 0) {
+    galleryItems.push({ type: "image", key: "__placeholder__" });
+  }
 
   // Products that need any choice (dimensions, opening, or config blocks) are
   // configured in the dedicated guided flow rather than inline on this page.
@@ -191,10 +200,15 @@ export default function ProductDetailScreen() {
             onScroll={onGalleryScroll}
             scrollEventThrottle={16}
           >
-            {galleryImages.map((key, idx) => {
-              const src = getProductImage(key);
+            {galleryItems.map((item, idx) => {
+              if (item.type === "video") {
+                return (
+                  <ProductVideo key={`${item.key}-${idx}`} uri={item.key} width={W} height={GALLERY_H} />
+                );
+              }
+              const src = getProductImage(item.key);
               return (
-                <View key={`${key}-${idx}`} style={{ width: W, height: GALLERY_H, alignItems: "center", justifyContent: "center" }}>
+                <View key={`${item.key}-${idx}`} style={{ width: W, height: GALLERY_H, alignItems: "center", justifyContent: "center" }}>
                   {src ? (
                     <Image source={src} style={{ width: W, height: GALLERY_H }} resizeMode="cover" />
                   ) : (
@@ -228,7 +242,7 @@ export default function ProductDetailScreen() {
           </SafeAreaView>
 
           {/* Page counter */}
-          {galleryImages.length > 1 && (
+          {galleryItems.length > 1 && (
             <View
               style={{
                 position: "absolute",
@@ -241,7 +255,7 @@ export default function ProductDetailScreen() {
               }}
             >
               <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#fff" }}>
-                {galleryIndex + 1} / {galleryImages.length}
+                {galleryIndex + 1} / {galleryItems.length}
               </Text>
             </View>
           )}
@@ -251,9 +265,9 @@ export default function ProductDetailScreen() {
         <View
           style={{
             flexDirection: "row",
-            paddingVertical: 10,
+            paddingVertical: 12,
             paddingHorizontal: 16,
-            backgroundColor: "#FFF7ED",
+            backgroundColor: COLORS.surfaceContainerLow,
             gap: 14,
           }}
         >
@@ -313,35 +327,26 @@ export default function ProductDetailScreen() {
 
         {/* ── Title + price block ──────────────────── */}
         <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>
-          <Text
-            style={{
-              fontSize: 11,
-              fontFamily: "Inter_500Medium",
-              color: COLORS.outline,
-              textTransform: "uppercase",
-              letterSpacing: 1.5,
-              marginBottom: 4,
-            }}
-          >
+          <Text style={[TYPE.overline, { marginBottom: 6 }]}>
             {product.category.name}
           </Text>
           <Text
             style={{
-              fontSize: 22,
-              fontFamily: "Manrope_700Bold",
+              fontSize: 32,
+              fontFamily: FONTS.serifBold,
               color: COLORS.onSurface,
-              lineHeight: 28,
+              lineHeight: 36,
             }}
           >
             {product.name}
           </Text>
-          <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 2 }}>
+          <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 4 }}>
             par La Ménagère Paris
           </Text>
 
           {product.ratingCount ? (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 8 }}>
-              <Icon name="star" size={15} color={COLORS.secondary} />
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 10 }}>
+              <Icon name="star" size={15} color={COLORS.primary} />
               <Text style={{ fontSize: 14, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}>
                 {(product.ratingAvg ?? 0).toFixed(1)}
               </Text>
@@ -355,16 +360,16 @@ export default function ProductDetailScreen() {
           <View style={{ marginTop: 16, marginBottom: 4 }}>
             {isPerSqm ? (
               <View>
-                <Text style={{ fontSize: 28, fontFamily: "Manrope_800ExtraBold", color: COLORS.secondary }}>
+                <Text style={[TYPE.priceLarge, { fontSize: 30 }]}>
                   {product.pricePerSqm != null ? `${formatPrice(product.pricePerSqm)}/m²` : "Sur mesure"}
                 </Text>
-                <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 2 }}>
+                <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 4 }}>
                   Prix calculé selon vos dimensions
                 </Text>
               </View>
             ) : product.price ? (
               <View>
-                <Text style={{ fontSize: 28, fontFamily: "Manrope_800ExtraBold", color: COLORS.secondary }}>
+                <Text style={[TYPE.priceLarge, { fontSize: 30 }]}>
                   {hasConfiguration ? `À partir de ${formatPrice(product.price)}` : formatPrice(product.price)}
                 </Text>
                 <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 2 }}>
@@ -485,11 +490,12 @@ export default function ProductDetailScreen() {
                       <View
                         style={{
                           width: 130,
-                          height: 130,
-                          borderRadius: 12,
+                          height: 150,
+                          borderRadius: 16,
                           overflow: "hidden",
                           backgroundColor: COLORS.surfaceContainer,
-                          marginBottom: 6,
+                          marginBottom: 8,
+                          ...SHADOW.soft,
                         }}
                       >
                         {img && <Image source={img} style={{ width: "100%", height: "100%" }} resizeMode="cover" />}
@@ -497,7 +503,7 @@ export default function ProductDetailScreen() {
                       <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.onSurface }} numberOfLines={1}>
                         {p.name}
                       </Text>
-                      <Text style={{ fontSize: 13, fontFamily: "Manrope_700Bold", color: COLORS.secondary }}>
+                      <Text style={[TYPE.price, { fontSize: 16, marginTop: 1 }]}>
                         {priceTagLabel(p)}
                       </Text>
                     </PressableScale>
@@ -558,9 +564,11 @@ export default function ProductDetailScreen() {
           onPress={() => setDevisOpen(true)}
           activeOpacity={0.85}
           style={{
-            backgroundColor: "#F4B400",
+            backgroundColor: COLORS.surfaceContainerLowest,
             borderRadius: 14,
-            paddingVertical: 15,
+            borderWidth: 1.5,
+            borderColor: COLORS.primary,
+            paddingVertical: 14,
             alignItems: "center",
             justifyContent: "center",
             flexDirection: "row",
@@ -568,8 +576,8 @@ export default function ProductDetailScreen() {
             marginBottom: 10,
           }}
         >
-          <Icon name="file-document-outline" size={18} color={COLORS.onSurface} />
-          <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}>
+          <Icon name="file-document-outline" size={18} color={COLORS.primary} />
+          <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: COLORS.primary }}>
             Demander un devis
           </Text>
         </TouchableOpacity>
@@ -632,12 +640,13 @@ function CircleButton({
       onPress={onPress}
       activeOpacity={0.85}
       style={{
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 38,
+        height: 38,
+        borderRadius: 19,
         backgroundColor: "rgba(255,255,255,0.95)",
         alignItems: "center",
         justifyContent: "center",
+        ...SHADOW.soft,
       }}
     >
       <Icon name={icon} size={20} color={color} />
@@ -708,13 +717,13 @@ function Section({
   noBackground?: boolean;
 }) {
   return (
-    <View style={{ paddingHorizontal: 16, marginTop: 16 }}>
+    <View style={{ paddingHorizontal: 16, marginTop: 20 }}>
       <Text
         style={{
-          fontSize: 14,
-          fontFamily: "Manrope_700Bold",
+          fontSize: 20,
+          fontFamily: FONTS.serif,
           color: COLORS.onSurface,
-          marginBottom: 10,
+          marginBottom: 12,
         }}
       >
         {title}
@@ -724,9 +733,10 @@ function Section({
           noBackground
             ? undefined
             : {
-                backgroundColor: "#fff",
-                borderRadius: 12,
-                padding: 14,
+                backgroundColor: COLORS.surfaceContainerLowest,
+                borderRadius: 16,
+                padding: 16,
+                ...SHADOW.soft,
               }
         }
       >

@@ -160,7 +160,7 @@ export default function NotificationsScreen() {
               width: 72,
               height: 72,
               borderRadius: 20,
-              backgroundColor: "#f0ebe6",
+              backgroundColor: "#dbe8f5",
               alignItems: "center",
               justifyContent: "center",
               marginBottom: 16,
