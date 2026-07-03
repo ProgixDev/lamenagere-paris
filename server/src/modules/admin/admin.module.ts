@@ -28,6 +28,8 @@ import { AdminAnalyticsService } from './admin-analytics.service';
 import { AdminUsersController } from './admin-users.controller';
 import { AdminUsersService } from './admin-users.service';
 import { AdminActivityController } from './admin-activity.controller';
+import { AdminPopupsController } from './admin-popups.controller';
+import { AdminPopupsService } from './admin-popups.service';
 import { AuditInterceptor } from '../../common/interceptors/audit.interceptor';
 import { HomeController } from '../catalog/home.controller';
 import { PaymentsModule } from '../payments/payments.module';
@@ -50,6 +52,7 @@ import { PaymentsModule } from '../payments/payments.module';
     AdminAnalyticsController,
     AdminUsersController,
     AdminActivityController,
+    AdminPopupsController,
     HomeController,
   ],
   providers: [
@@ -66,6 +69,7 @@ import { PaymentsModule } from '../payments/payments.module';
     AdminCampaignsService,
     AdminAnalyticsService,
     AdminUsersService,
+    AdminPopupsService,
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })

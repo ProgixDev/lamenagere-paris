@@ -8,6 +8,7 @@ export type MediaFolder =
   | 'categories'
   | 'carousel'
   | 'banners'
+  | 'popups'
   | 'avatars';
 
 export interface UploadResult {

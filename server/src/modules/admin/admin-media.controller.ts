@@ -22,6 +22,7 @@ const ALLOWED: MediaFolder[] = [
   'categories',
   'carousel',
   'banners',
+  'popups',
   'avatars',
 ];
 

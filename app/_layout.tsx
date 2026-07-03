@@ -19,6 +19,7 @@ import { useGuestStore } from "../features/auth/guest";
 import { useOnboardingStore } from "../features/onboarding/store";
 import AnimatedSplash from "../components/AnimatedSplash";
 import GuestModeChrome from "../components/GuestModeChrome";
+import PopupGate from "../components/PopupGate";
 import {
   buildDeepLinkFromTarget,
   registerForPushNotifications,
@@ -250,6 +251,7 @@ export default function RootLayout() {
                   />
                   <Stack.Screen name="(main)" />
                 </Stack>
+                <PopupGate />
               </GuestModeChrome>
               {showSplash && <AnimatedSplash onFinish={handleSplashFinish} />}
             </AuthGate>

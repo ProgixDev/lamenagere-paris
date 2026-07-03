@@ -337,3 +337,17 @@ export interface HomeData {
   carousel: CarouselSlide[];
   banners: PromoBanner[];
 }
+
+// ── Launch pop-ups (GET /popups) ────────────────────────────────────────────
+export interface AppPopup {
+  id: string;
+  title?: string;
+  imageUrl: string;
+  linkKind: "none" | "category" | "product";
+  linkCategoryId?: string;
+  linkProductId?: string;
+  startsAt?: string;
+  endsAt?: string;
+  isActive: boolean;
+  position: number;
+}
