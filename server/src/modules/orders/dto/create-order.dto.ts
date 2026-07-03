@@ -76,6 +76,9 @@ export class CreateOrderDto {
   @IsString() shippingMethod!: string;
   @IsOptional() @IsEnum(ZONES) territory?: ShippingZone;
 
+  /** Optional promo code; re-validated + applied server-side. */
+  @IsOptional() @IsString() promoCode?: string;
+
   /** Optional free-text note from the buyer describing their order. */
   @IsOptional() @IsString() customerNote?: string;
 

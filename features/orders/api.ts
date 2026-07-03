@@ -34,6 +34,7 @@ export const createOrderApi = async (payload: {
   };
   shippingMethod: string;
   territory?: string;
+  promoCode?: string;
   customerNote?: string;
   customerAttachments?: { url: string; type: "image" | "video" }[];
 }): Promise<Order> => {

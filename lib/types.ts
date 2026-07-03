@@ -217,6 +217,10 @@ export interface Order {
   total: number;
   subtotal: number;
   shippingCost: number;
+  /** Promo discount applied to the subtotal (0 when none). */
+  discount?: number;
+  /** Applied promo code, if any. */
+  promoCode?: string;
   shippingAddress: Address;
   territory: ShippingZone;
   shippingMethod: string;

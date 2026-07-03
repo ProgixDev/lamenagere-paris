@@ -32,6 +32,7 @@ import {
   confirmPaymentApi,
 } from "../../../features/payments/api";
 import { useCheckoutStore } from "../../../features/checkout/store";
+import { validatePromoApi } from "../../../features/promo/api";
 import { isStripeAvailable } from "../../../components/StripeGate";
 
 export default function CheckoutPaymentScreen() {
@@ -39,12 +40,57 @@ export default function CheckoutPaymentScreen() {
   const queryClient = useQueryClient();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const { items, subtotal, clearCart } = useCart();
-  const { address, territory, shippingMethod, setLastOrderNumber } =
-    useCheckoutStore();
+  const {
+    address,
+    territory,
+    shippingMethod,
+    setLastOrderNumber,
+    appliedPromo,
+    setAppliedPromo,
+  } = useCheckoutStore();
   const [loading, setLoading] = useState(false);
   const [note, setNote] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [promoInput, setPromoInput] = useState("");
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
+
+  const discount = appliedPromo ? appliedPromo.discountCents / 100 : 0;
+  const totalDue = Math.max(0, subtotal - discount);
+
+  const applyPromo = async () => {
+    const code = promoInput.trim();
+    if (!code || promoLoading) return;
+    setPromoLoading(true);
+    setPromoError(null);
+    try {
+      const lineItems = items.map((item) => ({
+        productId: item.product.id,
+        lineTotalCents: Math.round(
+          (item.calculatedPrice || item.product.price || 0) * item.quantity * 100,
+        ),
+      }));
+      const res = await validatePromoApi(code, lineItems);
+      if (res.valid && res.discountCents) {
+        setAppliedPromo({ code: res.code ?? code.toUpperCase(), discountCents: res.discountCents });
+        setPromoInput("");
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        setAppliedPromo(null);
+        setPromoError(res.message ?? "Code promo invalide");
+      }
+    } catch (e: any) {
+      setPromoError(e?.message ?? "Vérification impossible. Réessayez.");
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const removePromo = () => {
+    setAppliedPromo(null);
+    setPromoError(null);
+  };
 
   const handlePickAttachment = async () => {
     if (uploading || loading) return;
@@ -92,6 +138,7 @@ export default function CheckoutPaymentScreen() {
         shippingAddress: { ...address, territory },
         shippingMethod,
         territory,
+        promoCode: appliedPromo?.code,
         customerNote: note.trim() || undefined,
         customerAttachments: attachments.length ? attachments : undefined,
       });
@@ -137,6 +184,7 @@ export default function CheckoutPaymentScreen() {
       }
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       clearCart();
+      setAppliedPromo(null);
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       setLastOrderNumber(order.orderNumber);
       router.replace("/(main)/checkout/confirmation");
@@ -176,10 +224,99 @@ export default function CheckoutPaymentScreen() {
           </Text>
         </View>
 
-        <View className="flex-row justify-between items-center" style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 20, marginBottom: 32, ...SHADOW.card }}>
-          <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 20 }}>Total à payer</Text>
-          <Text style={[TYPE.priceLarge, { color: COLORS.primary }]}>
-            {formatPrice(subtotal)}
+        {/* Promo code */}
+        <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, marginBottom: 16, ...SHADOW.card }}>
+          <View className="flex-row items-center gap-2 mb-3">
+            <MaterialCommunityIcons name="ticket-percent-outline" size={20} color={COLORS.primary} />
+            <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 18 }}>
+              Code promo
+            </Text>
+          </View>
+
+          {appliedPromo ? (
+            <View
+              className="flex-row items-center justify-between rounded-xl px-4 py-3"
+              style={{ backgroundColor: COLORS.background }}
+            >
+              <View className="flex-row items-center gap-2 flex-1">
+                <MaterialCommunityIcons name="check-circle" size={18} color={COLORS.secondary} />
+                <Text style={{ fontFamily: "Inter_600SemiBold", color: COLORS.onSurface, letterSpacing: 1 }}>
+                  {appliedPromo.code}
+                </Text>
+                <Text style={{ color: COLORS.secondary, fontFamily: "Inter_500Medium" }}>
+                  −{formatPrice(discount)}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={removePromo} hitSlop={8} disabled={loading}>
+                <Text style={{ color: COLORS.outline, fontFamily: "Inter_500Medium", fontSize: 13 }}>
+                  Retirer
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <View className="flex-row gap-2">
+                <View className="flex-1 rounded-xl px-4 py-3" style={{ backgroundColor: COLORS.background }}>
+                  <TextInput
+                    value={promoInput}
+                    onChangeText={(t) => {
+                      setPromoInput(t);
+                      setPromoError(null);
+                    }}
+                    placeholder="Entrer un code"
+                    placeholderTextColor={COLORS.surfaceDim}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    editable={!promoLoading && !loading}
+                    onSubmitEditing={applyPromo}
+                    returnKeyType="done"
+                    style={{ fontSize: 14, color: COLORS.onSurface, fontFamily: "Inter_500Medium", letterSpacing: 1 }}
+                  />
+                </View>
+                <TouchableOpacity
+                  onPress={applyPromo}
+                  disabled={promoLoading || !promoInput.trim()}
+                  className="rounded-xl px-5 items-center justify-center"
+                  style={{ backgroundColor: COLORS.primary, opacity: promoLoading || !promoInput.trim() ? 0.5 : 1 }}
+                >
+                  {promoLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold" }}>Appliquer</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+              {promoError ? (
+                <Text style={{ color: COLORS.error, fontSize: 12, marginTop: 8, fontFamily: "Inter_400Regular" }}>
+                  {promoError}
+                </Text>
+              ) : null}
+            </>
+          )}
+        </View>
+
+        {/* Totals */}
+        <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 20, marginBottom: 32, ...SHADOW.card }}>
+          <View className="flex-row justify-between items-center mb-2">
+            <Text style={{ color: COLORS.onSurfaceVariant, fontFamily: "Inter_500Medium", fontSize: 14 }}>Sous-total</Text>
+            <Text style={{ color: COLORS.onSurface, fontFamily: "Inter_500Medium", fontSize: 14 }}>{formatPrice(subtotal)}</Text>
+          </View>
+          {discount > 0 ? (
+            <View className="flex-row justify-between items-center mb-2">
+              <Text style={{ color: COLORS.secondary, fontFamily: "Inter_500Medium", fontSize: 14 }}>
+                Réduction{appliedPromo ? ` (${appliedPromo.code})` : ""}
+              </Text>
+              <Text style={{ color: COLORS.secondary, fontFamily: "Inter_500Medium", fontSize: 14 }}>
+                −{formatPrice(discount)}
+              </Text>
+            </View>
+          ) : null}
+          <View className="flex-row justify-between items-center mt-2 pt-3" style={{ borderTopWidth: 1, borderTopColor: COLORS.outlineVariant }}>
+            <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 20 }}>Total à payer</Text>
+            <Text style={[TYPE.priceLarge, { color: COLORS.primary }]}>{formatPrice(totalDue)}</Text>
+          </View>
+          <Text style={{ color: COLORS.outline, fontSize: 11, marginTop: 8, fontFamily: "Inter_400Regular" }}>
+            Hors frais de livraison, calculés selon votre zone.
           </Text>
         </View>
 

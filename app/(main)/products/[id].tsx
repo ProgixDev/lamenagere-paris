@@ -601,6 +601,7 @@ export default function ProductDetailScreen() {
           }
           onPress={handlePrimaryAction}
           size="lg"
+          radius={14}
         />
       </View>
 

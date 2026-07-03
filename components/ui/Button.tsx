@@ -24,6 +24,8 @@ interface ButtonProps {
   disabled?: boolean;
   fullWidth?: boolean;
   icon?: (color: string) => React.ReactNode;
+  /** Corner radius override; defaults to a full pill. */
+  radius?: number;
 }
 
 const SIZE_PADDING: Record<string, ViewStyle> = {
@@ -47,6 +49,7 @@ export default function Button({
   disabled = false,
   fullWidth = true,
   icon,
+  radius = 9999,
 }: ButtonProps) {
   const isDisabled = disabled || loading;
   const scale = useSharedValue(1);
@@ -87,7 +90,7 @@ export default function Button({
           style={[
             SIZE_PADDING[size],
             {
-              borderRadius: 9999,
+              borderRadius: radius,
               alignItems: "center",
               justifyContent: "center",
               flexDirection: "row",
@@ -138,7 +141,7 @@ export default function Button({
       style={[
         SIZE_PADDING[size],
         {
-          borderRadius: 9999,
+          borderRadius: radius,
           alignItems: "center",
           justifyContent: "center",
           flexDirection: "row",

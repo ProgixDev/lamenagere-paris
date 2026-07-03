@@ -56,6 +56,8 @@ export interface OrderRow {
   payment_status: 'unpaid' | 'paid' | 'failed' | 'refunded';
   subtotal_cents: number;
   shipping_cost_cents: number;
+  discount_cents: number | null;
+  promo_code: string | null;
   total_cents: number;
   territory: ShippingZone;
   shipping_method: string;
@@ -116,6 +118,8 @@ export interface OrderDto {
   total: number;
   subtotal: number;
   shippingCost: number;
+  discount: number;
+  promoCode?: string;
   shippingAddress: AddressDto;
   territory: ShippingZone;
   shippingMethod: string;
@@ -227,6 +231,8 @@ export function toOrderDto(row: OrderRow): OrderDto {
     total: centsToEuros(row.total_cents),
     subtotal: centsToEuros(row.subtotal_cents),
     shippingCost: centsToEuros(row.shipping_cost_cents),
+    discount: centsToEuros(row.discount_cents ?? 0),
+    promoCode: row.promo_code ?? undefined,
     shippingAddress: shippingAddress(row),
     territory: row.territory,
     shippingMethod: row.shipping_method,

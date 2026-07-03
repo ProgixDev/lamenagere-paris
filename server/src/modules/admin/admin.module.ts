@@ -15,6 +15,8 @@ import { AdminCustomersController } from './admin-customers.controller';
 import { AdminCustomersService } from './admin-customers.service';
 import { AdminFeaturedController } from './admin-featured.controller';
 import { AdminFeaturedService } from './admin-featured.service';
+import { AdminPromoController } from './admin-promo.controller';
+import { AdminPromoService } from './admin-promo.service';
 import { AdminSettingsController } from './admin-settings.controller';
 import { AdminSettingsService } from './admin-settings.service';
 import { AdminConversationsController } from './admin-conversations.controller';
@@ -41,6 +43,7 @@ import { PaymentsModule } from '../payments/payments.module';
     AdminDashboardController,
     AdminCustomersController,
     AdminFeaturedController,
+    AdminPromoController,
     AdminSettingsController,
     AdminConversationsController,
     AdminCampaignsController,
@@ -57,6 +60,7 @@ import { PaymentsModule } from '../payments/payments.module';
     AdminDashboardService,
     AdminCustomersService,
     AdminFeaturedService,
+    AdminPromoService,
     AdminSettingsService,
     AdminConversationsService,
     AdminCampaignsService,

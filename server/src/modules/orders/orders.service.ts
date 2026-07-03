@@ -22,6 +22,7 @@ import {
 import { CreateOrderDto } from './dto/create-order.dto';
 import type { ConfigBlock } from '../catalog/catalog.serializer';
 import { TicketsService } from '../tickets/tickets.service';
+import { PromoService, PromoCodeRow } from '../promo/promo.service';
 
 interface AddressRowFull {
   id: string;
@@ -75,6 +76,7 @@ export class OrdersService {
     private readonly supabase: SupabaseService,
     private readonly pricing: PricingService,
     private readonly tickets: TicketsService,
+    private readonly promo: PromoService,
   ) {}
 
   async list(userId: string): Promise<OrderDto[]> {
@@ -313,7 +315,25 @@ export class OrdersService {
       .eq('zone', territory)
       .maybeSingle<{ delay: string; fee_cents: number }>();
     const shippingCost = zoneFee?.fee_cents ?? 0;
-    const total = subtotal + shippingCost;
+
+    // Promo code (optional): re-validate against the server-priced lines and
+    // apply the discount to the subtotal. Charge = subtotal - discount + ship.
+    let promoRow: PromoCodeRow | null = null;
+    let discountCents = 0;
+    if (dto.promoCode?.trim()) {
+      const lineItems = itemRows.map((r) => ({
+        productId: r.product_id,
+        lineTotalCents: r.unit_price_cents * r.quantity,
+      }));
+      const res = await this.promo.validateForCart(
+        userId,
+        dto.promoCode,
+        lineItems,
+      );
+      promoRow = res.promo;
+      discountCents = Math.min(res.discountCents, subtotal);
+    }
+    const total = Math.max(0, subtotal - discountCents) + shippingCost;
 
     // 4. Atomic order number.
     const year = new Date().getFullYear();
@@ -335,6 +355,9 @@ export class OrdersService {
         status: 'commande_confirmee',
         subtotal_cents: subtotal,
         shipping_cost_cents: shippingCost,
+        discount_cents: discountCents,
+        promo_code: promoRow?.code ?? null,
+        promo_code_id: promoRow?.id ?? null,
         total_cents: total,
         territory,
         shipping_method: dto.shippingMethod,
@@ -370,6 +393,22 @@ export class OrdersService {
       completed: true,
       occurred_at: new Date().toISOString(),
     });
+
+    // 6b. Log the promo redemption (per-customer cap + global counter).
+    //     Best-effort: the order is already committed, so a failure here must
+    //     not fail the checkout.
+    if (promoRow && discountCents > 0) {
+      try {
+        await this.promo.recordRedemption(
+          promoRow,
+          userId,
+          order.id,
+          discountCents,
+        );
+      } catch {
+        // ignore — redemption logging must not block a placed order
+      }
+    }
 
     // 7. Mark any consumed devis as accepted so they can't be re-ordered.
     if (quoteIds.length) {

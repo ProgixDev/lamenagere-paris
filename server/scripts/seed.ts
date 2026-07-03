@@ -107,11 +107,19 @@ async function seedCategories(
   return map;
 }
 
+interface FeaturedSlideRec {
+  id: string;
+  title: string;
+  subtitle: string;
+  mediaUrl: string | null;
+}
+
 async function seedProducts(
   supabase: SupabaseClient,
   categoryIds: Map<string, string>,
 ): Promise<void> {
-  const featured: string[] = [];
+  const featured: FeaturedSlideRec[] = [];
+  const categoryName = new Map(SEED_CATEGORIES.map((c) => [c.slug, c.name]));
   let n = 0;
 
   for (const p of SEED_PRODUCTS) {
@@ -157,7 +165,7 @@ async function seedProducts(
           popularity: p.featured ? 100 : 50,
           published_at: new Date(p.createdAt).toISOString(),
         },
-        { onConflict: 'slug' },
+        { onConflict: 'sku' },
       )
       .select('id')
       .single<{ id: string }>();
@@ -165,9 +173,11 @@ async function seedProducts(
 
     // Replace media: upload images, then reset rows.
     await supabase.from('product_media').delete().eq('product_id', prod.id);
+    let primaryUrl: string | null = null;
     for (let i = 0; i < p.imageKeys.length; i++) {
       const url = await uploadImage(supabase, p.imageKeys[i], `${p.slug}-${i}`);
       if (url) {
+        if (i === 0) primaryUrl = url;
         await supabase.from('product_media').insert({
           product_id: prod.id,
           type: 'image',
@@ -177,7 +187,14 @@ async function seedProducts(
         });
       }
     }
-    if (p.featured) featured.push(prod.id);
+    if (p.featured) {
+      featured.push({
+        id: prod.id,
+        title: p.name,
+        subtitle: categoryName.get(p.categorySlug) ?? '',
+        mediaUrl: primaryUrl,
+      });
+    }
     n++;
   }
   console.log(`• products: ${n}`);
@@ -186,8 +203,47 @@ async function seedProducts(
   await supabase.from('featured_products').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase
     .from('featured_products')
-    .insert(featured.map((product_id, position) => ({ product_id, position })));
+    .insert(featured.map((f, position) => ({ product_id: f.id, position })));
   console.log(`• featured_products: ${featured.length}`);
+
+  await seedCarousel(supabase, featured);
+}
+
+/**
+ * Home hero carousel. Seeds one slide per featured product (primary image,
+ * linked to the product) so the app's carousel is admin-managed from the
+ * start instead of falling back to popular products. Skipped when the admin
+ * has already curated slides, so re-running the seed never clobbers their work.
+ */
+async function seedCarousel(
+  supabase: SupabaseClient,
+  featured: FeaturedSlideRec[],
+): Promise<void> {
+  const { count } = await supabase
+    .from('carousel_slides')
+    .select('id', { count: 'exact', head: true });
+  if (count && count > 0) {
+    console.log(`• carousel_slides: skipped (${count} already present)`);
+    return;
+  }
+  const slides = featured
+    .filter((f) => f.mediaUrl)
+    .map((f, position) => ({
+      kind: 'image' as const,
+      title: f.title,
+      subtitle: f.subtitle || null,
+      media_url: f.mediaUrl as string,
+      link_kind: 'product' as const,
+      link_product_id: f.id,
+      position,
+      is_active: true,
+    }));
+  if (slides.length === 0) {
+    console.log('• carousel_slides: skipped (no featured images)');
+    return;
+  }
+  await supabase.from('carousel_slides').insert(slides);
+  console.log(`• carousel_slides: ${slides.length}`);
 }
 
 async function seedAdmin(supabase: SupabaseClient): Promise<void> {
@@ -219,6 +275,39 @@ async function seedAdmin(supabase: SupabaseClient): Promise<void> {
   }
 }
 
+/**
+ * Example promo codes so the admin "Codes promo" page isn't empty. Idempotent:
+ * upserts by code, and never resets the live redemption counter.
+ */
+async function seedPromoCodes(supabase: SupabaseClient): Promise<void> {
+  const codes = [
+    {
+      code: 'BIENVENUE10',
+      description: 'Réduction de bienvenue',
+      discount_type: 'percent',
+      discount_value: 10,
+      per_customer_limit: 1,
+      is_active: true,
+    },
+    {
+      code: 'DECO20',
+      description: '20 € offerts dès 200 € d’achat',
+      discount_type: 'fixed',
+      discount_value: 2000,
+      min_order_cents: 20000,
+      is_active: true,
+    },
+  ];
+  const { error } = await supabase
+    .from('promo_codes')
+    .upsert(codes, { onConflict: 'code', ignoreDuplicates: true });
+  if (error) {
+    console.warn(`  ! promo_codes: ${error.message}`);
+    return;
+  }
+  console.log(`• promo_codes: ${codes.length}`);
+}
+
 async function main(): Promise<void> {
   loadEnv();
   const url = process.env.SUPABASE_URL;
@@ -234,6 +323,7 @@ async function main(): Promise<void> {
   await ensureBucket(supabase);
   const categoryIds = await seedCategories(supabase);
   await seedProducts(supabase, categoryIds);
+  await seedPromoCodes(supabase);
   await seedAdmin(supabase);
   console.log('✓ seed complete');
 }
