@@ -151,6 +151,11 @@ export class AdminProductsService {
         type: o.type,
         surcharge_cents: eurosToCents(o.surcharge ?? 0),
       })),
+      quality_tiers: (dto.qualityTiers ?? []).map((t) => ({
+        key: t.key,
+        label: t.label,
+        price_per_sqm_cents: eurosToCents(t.pricePerSqm ?? 0),
+      })),
       dim_width: dto.dimWidth,
       dim_height: dto.dimHeight,
       dim_depth: dto.dimDepth,

@@ -7,6 +7,13 @@ export interface OpeningTypeOption {
   /** Surcharge added to the dimension price when this type is chosen (euros). */
   surcharge: number;
 }
+
+export interface QualityTierOption {
+  key: string;
+  label: string;
+  /** €/m² rate applied when this tier is selected. */
+  pricePerSqm: number;
+}
 export type ShippingZone = "metropole" | "reunion" | "guadeloupe" | "martinique" | "guyane" | "mayotte";
 
 export type OrderStatus =
@@ -160,6 +167,8 @@ export interface Product {
   };
   /** Allowed opening types + per-type surcharge (euros). */
   openingTypes?: OpeningTypeOption[];
+  /** Quality tiers for per_sqm products, each with its own €/m² rate. */
+  qualityTiers?: QualityTierOption[];
   deliveryEstimates: {
     metropole: string;
     outreMer: string;
@@ -191,6 +200,8 @@ export interface CartItem {
   };
   /** Chosen opening type key (e.g. "coulissante"), when the product offers them. */
   openingType?: string;
+  /** Chosen quality tier key, when the product offers tiers. */
+  qualityTier?: string;
   /** Captured selections for the category's config blocks. */
   configuration?: ItemConfiguration;
   /** When set, this line comes from an admin-priced devis (fixed price). */
@@ -236,6 +247,7 @@ export interface OrderItem {
     height: number;
   };
   openingType?: string;
+  qualityTier?: string;
   configuration?: ItemConfiguration;
 }
 

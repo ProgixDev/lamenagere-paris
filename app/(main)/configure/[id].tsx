@@ -11,7 +11,7 @@ import ProductConfigBlocks from "../../../components/product/ProductConfigBlocks
 import { COLORS, PRODUCT_TYPES, PRICE_MODES } from "../../../lib/constants";
 import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import { formatPrice } from "../../../lib/utils";
-import { computeConfiguredPrice } from "../../../lib/pricing";
+import { computeConfiguredPrice, perSqmRate } from "../../../lib/pricing";
 import { openingTypeLabel, diagramForTypes } from "../../../lib/opening-types";
 import {
   buildConfiguration,
@@ -35,6 +35,7 @@ export default function ConfigureScreen() {
   const [customWidth, setCustomWidth] = useState("");
   const [customHeight, setCustomHeight] = useState("");
   const [openingType, setOpeningType] = useState<string | null>(null);
+  const [qualityTier, setQualityTier] = useState<string | null>(null);
   const [configState, setConfigState] = useState<ConfigState>({});
   const [quantity, setQuantity] = useState(1);
 
@@ -46,6 +47,8 @@ export default function ConfigureScreen() {
   const needsDims = product?.productType === PRODUCT_TYPES.CONFIGURABLE || isPerSqm;
   const openingTypes = product?.openingTypes ?? [];
   const hasOpening = openingTypes.length > 0;
+  const qualityTiers = product?.qualityTiers ?? [];
+  const hasTiers = qualityTiers.length > 0;
 
   const steps = useMemo<StepKind[]>(() => {
     const s: StepKind[] = [];
@@ -69,8 +72,14 @@ export default function ConfigureScreen() {
       : undefined;
   const configuration = buildConfiguration(blocks, configState);
   const surcharge = configSurchargeEuros(configuration);
-  const base = computeConfiguredPrice(product, dims, openingType ?? undefined);
+  const base = computeConfiguredPrice(
+    product,
+    dims,
+    openingType ?? undefined,
+    qualityTier ?? undefined,
+  );
   const total = base != null ? base + surcharge : undefined;
+  const liveRate = isPerSqm ? perSqmRate(product, qualityTier ?? undefined) : undefined;
 
   const step = steps[stepIdx];
   const isLast = stepIdx === steps.length - 1;
@@ -78,6 +87,7 @@ export default function ConfigureScreen() {
   // Per-step validation gate.
   function stepError(): string | null {
     if (step === "measures") {
+      if (hasTiers && !qualityTier) return "Choisissez une gamme";
       if (needsDims && !dims) return "Renseignez la largeur et la hauteur";
       const v = configValidation(measurementBlocks, configState);
       if (!v.ok) return v.hint ?? "Complétez les mesures";
@@ -105,7 +115,7 @@ export default function ConfigureScreen() {
   };
   const addToCart = async () => {
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    addItem(product, quantity, dims, openingType ?? undefined, {
+    addItem(product, quantity, dims, openingType ?? undefined, qualityTier ?? undefined, {
       configuration,
       configSurcharge: surcharge,
     });
@@ -150,6 +160,46 @@ export default function ConfigureScreen() {
           {step === "measures" && (
             <View style={{ paddingTop: 6 }}>
               <StepTitle title="Vos mesures" subtitle="Indiquez les dimensions souhaitées." />
+              {hasTiers && (
+                <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+                  <Text style={{ fontSize: 18, fontFamily: FONTS.serif, color: COLORS.onSurface, marginBottom: 12 }}>
+                    Gamme
+                  </Text>
+                  <View style={{ gap: 8 }}>
+                    {qualityTiers.map((tier) => {
+                      const active = qualityTier === tier.key;
+                      return (
+                        <TouchableOpacity
+                          key={tier.key}
+                          onPress={() => {
+                            Haptics.selectionAsync();
+                            setQualityTier(tier.key);
+                          }}
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            paddingHorizontal: 16,
+                            paddingVertical: 14,
+                            borderRadius: 14,
+                            backgroundColor: active ? COLORS.primary : COLORS.surfaceContainerLowest,
+                            borderWidth: 1,
+                            borderColor: active ? COLORS.primary : COLORS.outlineVariant,
+                            ...SHADOW.card,
+                          }}
+                        >
+                          <Text style={{ fontSize: 15, fontFamily: active ? "Inter_600SemiBold" : "Inter_500Medium", color: active ? COLORS.onPrimary : COLORS.onSurface }}>
+                            {tier.label}
+                          </Text>
+                          <Text style={{ fontSize: 14, fontFamily: "Manrope_700Bold", color: active ? COLORS.onPrimary : COLORS.primary }}>
+                            {formatPrice(tier.pricePerSqm)}/m²
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
               {needsDims && (
                 <View style={{ paddingHorizontal: 16 }}>
                   <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, ...SHADOW.card }}>
@@ -161,9 +211,9 @@ export default function ConfigureScreen() {
                         <Input label="HAUTEUR" value={customHeight} onChangeText={setCustomHeight} keyboardType="numeric" suffix="cm" />
                       </View>
                     </View>
-                    {isPerSqm && product.pricePerSqm != null && (
+                    {isPerSqm && liveRate != null && (
                       <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.secondary, marginTop: 8 }}>
-                        {formatPrice(product.pricePerSqm)}/m²
+                        {formatPrice(liveRate)}/m²
                         {product.minDimensions && product.maxDimensions
                           ? ` · de ${product.minDimensions.width}×${product.minDimensions.height} à ${product.maxDimensions.width}×${product.maxDimensions.height} cm`
                           : ""}
@@ -237,6 +287,12 @@ export default function ConfigureScreen() {
                   <Text style={{ fontSize: 20, fontFamily: FONTS.serif, color: COLORS.onSurface, marginBottom: 10 }}>
                     {product.name}
                   </Text>
+                  {qualityTier && (
+                    <SummaryRow
+                      label="Gamme"
+                      value={qualityTiers.find((t) => t.key === qualityTier)?.label ?? qualityTier}
+                    />
+                  )}
                   {dims && <SummaryRow label="Dimensions" value={`${dims.width} × ${dims.height} cm`} />}
                   {openingType && <SummaryRow label="Ouverture" value={openingTypeLabel(openingType)} />}
                   {configuration.length > 0 && <SummaryRow label="Configuration" value={summarizeConfiguration(configuration)} />}

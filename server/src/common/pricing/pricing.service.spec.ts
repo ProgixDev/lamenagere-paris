@@ -119,4 +119,35 @@ describe('PricingService', () => {
       svc.resolveUnitPriceCents(withTypes, { width: 200, height: 200 }, 'bogus'),
     ).toThrow(BadRequestException);
   });
+
+  const tiered: PricingProduct = {
+    ...perSqm,
+    price_per_sqm_cents: null, // no flat rate — tiers drive the price
+    quality_tiers: [
+      { key: 'bas', label: 'Bas de gamme', price_per_sqm_cents: 8000 }, // 80 €/m²
+      { key: 'haute', label: 'Haute de gamme', price_per_sqm_cents: 18000 }, // 180 €/m²
+    ],
+  };
+
+  it('prices per m² using the chosen quality tier rate', () => {
+    // 4 m² × 80 €/m² = 320 € ; 4 m² × 180 €/m² = 720 €
+    expect(
+      svc.resolveUnitPriceCents(tiered, { width: 200, height: 200 }, null, 'bas'),
+    ).toBe(32000);
+    expect(
+      svc.resolveUnitPriceCents(tiered, { width: 200, height: 200 }, null, 'haute'),
+    ).toBe(72000);
+  });
+
+  it('requires a quality tier when the product offers them', () => {
+    expect(() =>
+      svc.resolveUnitPriceCents(tiered, { width: 200, height: 200 }),
+    ).toThrow(BadRequestException);
+  });
+
+  it('rejects an unknown quality tier', () => {
+    expect(() =>
+      svc.resolveUnitPriceCents(tiered, { width: 200, height: 200 }, null, 'bogus'),
+    ).toThrow(BadRequestException);
+  });
 });

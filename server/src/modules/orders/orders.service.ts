@@ -50,6 +50,9 @@ interface ProductForOrder {
   max_width: number | null;
   max_height: number | null;
   opening_types: { type: string; surcharge_cents: number }[] | null;
+  quality_tiers:
+    | { key: string; label: string; price_per_sqm_cents: number }[]
+    | null;
   delivery_metropole: string;
   delivery_outremer: string;
   media: { url: string; type: string; is_primary: boolean }[];
@@ -218,7 +221,7 @@ export class OrdersService {
     const { data: products } = await this.supabase.client
       .from('products')
       .select(
-        'id, name, price_mode, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, ref_width, ref_height, min_width, min_height, max_width, max_height, opening_types, delivery_metropole, delivery_outremer, config_blocks, media:product_media(url,type,is_primary), category:categories(config_blocks)',
+        'id, name, price_mode, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, ref_width, ref_height, min_width, min_height, max_width, max_height, opening_types, quality_tiers, delivery_metropole, delivery_outremer, config_blocks, media:product_media(url,type,is_primary), category:categories(config_blocks)',
       )
       .in('id', productIds.length ? productIds : ['00000000-0000-0000-0000-000000000000'])
       .returns<ProductForOrder[]>();
@@ -260,6 +263,7 @@ export class OrdersService {
           custom_width: null,
           custom_height: null,
           opening_type: null,
+          quality_tier: null,
           configuration: [],
         };
       }
@@ -272,6 +276,7 @@ export class OrdersService {
         product,
         item.customDimensions,
         item.openingType,
+        item.qualityTier,
       );
       // Re-price config-block add-ons (colors/accessories/openings) server-side
       // and snapshot the selection for the order line.
@@ -296,6 +301,7 @@ export class OrdersService {
         custom_width: item.customDimensions?.width ?? null,
         custom_height: item.customDimensions?.height ?? null,
         opening_type: item.openingType ?? null,
+        quality_tier: item.qualityTier ?? null,
         configuration: snapshot,
       };
     });

@@ -31,6 +31,7 @@ export interface OrderItemRow {
   custom_width: number | null;
   custom_height: number | null;
   opening_type: string | null;
+  quality_tier: string | null;
   configuration: ConfigSelectionEntry[] | null;
 }
 
@@ -94,6 +95,7 @@ export interface OrderItemDto {
   price: number;
   customDimensions?: { width: number; height: number };
   openingType?: string;
+  qualityTier?: string;
   configuration?: ItemConfiguration;
 }
 
@@ -212,6 +214,7 @@ export function toOrderDto(row: OrderRow): OrderDto {
         ? { width: Number(it.custom_width), height: Number(it.custom_height) }
         : undefined,
     openingType: it.opening_type ?? undefined,
+    qualityTier: it.quality_tier ?? undefined,
     configuration: it.configuration?.length ? it.configuration : undefined,
   }));
 

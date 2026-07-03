@@ -19,6 +19,7 @@ interface CartStore {
     quantity?: number,
     customDimensions?: { width: number; height: number },
     openingType?: string,
+    qualityTier?: string,
     extra?: AddItemExtra,
   ) => void;
   /** Adds an admin-priced devis to the cart as a fixed-price line. */
@@ -34,7 +35,14 @@ export const useCartStore = create<CartStore>()(
       items: [],
       lastUpdated: Date.now(),
 
-      addItem: (product, quantity = 1, customDimensions, openingType, extra) => {
+      addItem: (
+        product,
+        quantity = 1,
+        customDimensions,
+        openingType,
+        qualityTier,
+        extra,
+      ) => {
         // Made-to-measure products (priced per m²) can't be added without
         // dimensions — there'd be no price. The customer must configure them
         // on the product page first.
@@ -53,13 +61,19 @@ export const useCartStore = create<CartStore>()(
         const configuration = extra?.configuration?.length ? extra.configuration : undefined;
         // A made-to-measure line (custom dimensions, opening type, or any config
         // selection) is unique — never merge it. Plain products still merge.
-        const isConfigured = !!customDimensions || !!openingType || !!configuration;
+        const isConfigured =
+          !!customDimensions || !!openingType || !!qualityTier || !!configuration;
         const existingIndex = isConfigured
           ? -1
           : items.findIndex((item) => item.product.id === product.id);
 
         const base =
-          computeConfiguredPrice(product, customDimensions, openingType) ??
+          computeConfiguredPrice(
+            product,
+            customDimensions,
+            openingType,
+            qualityTier,
+          ) ??
           product.price ??
           0;
         const calculatedPrice = base + (extra?.configSurcharge ?? 0);
@@ -78,6 +92,7 @@ export const useCartStore = create<CartStore>()(
             quantity,
             customDimensions,
             openingType,
+            qualityTier,
             configuration,
             calculatedPrice,
           };

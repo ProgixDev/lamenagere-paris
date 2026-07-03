@@ -22,6 +22,13 @@ export class OpeningTypeDto {
   @IsNumber() surcharge!: number;
 }
 
+/** One quality tier for a per_sqm product, with its own €/m² rate (euros). */
+export class QualityTierDto {
+  @IsString() key!: string;
+  @IsString() label!: string;
+  @IsNumber() pricePerSqm!: number;
+}
+
 export class UpsertProductDto {
   @IsString() @MinLength(1) name!: string;
   @IsOptional() @IsString() slug?: string;
@@ -46,6 +53,13 @@ export class UpsertProductDto {
   @ValidateNested({ each: true })
   @Type(() => OpeningTypeDto)
   openingTypes?: OpeningTypeDto[];
+
+  // Quality tiers for per_sqm products, each with its own €/m² rate.
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => QualityTierDto)
+  qualityTiers?: QualityTierDto[];
 
   // Dimensions (cm).
   @IsOptional() @IsNumber() dimWidth?: number;

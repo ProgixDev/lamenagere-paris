@@ -21,10 +21,13 @@ export default function CartItem({
   onUpdateQuantity,
   onRemove,
 }: CartItemProps) {
-  const { product, quantity, customDimensions, openingType, configuration, calculatedPrice } = item;
+  const { product, quantity, customDimensions, openingType, qualityTier, configuration, calculatedPrice } = item;
   const price = calculatedPrice || product.price || 0;
   const imgSource = getProductImage(product.images[0]);
   const configSummary = configuration?.length ? summarizeConfiguration(configuration) : "";
+  const tierLabel = qualityTier
+    ? product.qualityTiers?.find((t) => t.key === qualityTier)?.label ?? qualityTier
+    : "";
 
   const handleRemove = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -110,6 +113,19 @@ export default function CartItem({
               {openingTypeLabel(openingType)}
             </Text>
           )}
+
+          {tierLabel ? (
+            <Text
+              style={{
+                fontSize: 11,
+                fontFamily: "Inter_500Medium",
+                color: COLORS.secondary,
+                marginTop: 2,
+              }}
+            >
+              {tierLabel}
+            </Text>
+          ) : null}
 
           {configSummary ? (
             <Text

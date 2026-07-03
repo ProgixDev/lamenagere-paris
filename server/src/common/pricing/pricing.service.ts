@@ -14,6 +14,13 @@ export interface OpeningTypeOption {
   surcharge_cents: number;
 }
 
+/** One quality tier for a per_sqm product, with its own €/m² rate. */
+export interface QualityTierOption {
+  key: string;
+  label: string;
+  price_per_sqm_cents: number;
+}
+
 /** Minimal pricing-relevant fields from a product row. */
 export interface PricingProduct {
   price_mode: PriceMode;
@@ -28,6 +35,7 @@ export interface PricingProduct {
   max_width: number | null;
   max_height: number | null;
   opening_types?: OpeningTypeOption[] | null;
+  quality_tiers?: QualityTierOption[] | null;
 }
 
 export interface CustomDimensions {
@@ -56,8 +64,9 @@ export class PricingService {
     product: PricingProduct,
     customDimensions?: CustomDimensions | null,
     openingType?: string | null,
+    qualityTier?: string | null,
   ): number {
-    const base = this.resolveBaseCents(product, customDimensions);
+    const base = this.resolveBaseCents(product, customDimensions, qualityTier);
     return base + this.openingSurchargeCents(product, openingType);
   }
 
@@ -158,6 +167,7 @@ export class PricingService {
   private resolveBaseCents(
     product: PricingProduct,
     customDimensions?: CustomDimensions | null,
+    qualityTier?: string | null,
   ): number {
     switch (product.price_mode) {
       case 'fixed':
@@ -170,7 +180,7 @@ export class PricingService {
         return this.resolveCalculated(product, customDimensions);
 
       case 'per_sqm':
-        return this.resolvePerSqm(product, customDimensions);
+        return this.resolvePerSqm(product, customDimensions, qualityTier);
 
       case 'quote':
         throw new BadRequestException(
@@ -201,14 +211,19 @@ export class PricingService {
     return match.surcharge_cents ?? 0;
   }
 
-  /** per_sqm: area(m²) × price_per_sqm, clamped dims, rounded to whole euros. */
+  /**
+   * per_sqm: area(m²) × €/m², clamped dims, rounded to whole euros.
+   *
+   * When the product offers quality tiers, the chosen tier's rate is used and a
+   * valid tier must be supplied. Products without tiers fall back to the flat
+   * price_per_sqm_cents.
+   */
   private resolvePerSqm(
     product: PricingProduct,
     dims?: CustomDimensions | null,
+    qualityTier?: string | null,
   ): number {
-    if (product.price_per_sqm_cents == null) {
-      throw new BadRequestException('Prix au m² indisponible');
-    }
+    const rate = this.perSqmRateCents(product, qualityTier);
     if (!dims) {
       throw new BadRequestException('Dimensions requises');
     }
@@ -225,9 +240,31 @@ export class PricingService {
       'hauteur',
     );
     const areaM2 = (width / 100) * (height / 100);
-    const raw = areaM2 * product.price_per_sqm_cents;
+    const raw = areaM2 * rate;
     // Round to whole euros.
     return Math.max(0, Math.round(raw / 100) * 100);
+  }
+
+  /** Resolves the effective €/m² rate (cents), validating the chosen tier. */
+  private perSqmRateCents(
+    product: PricingProduct,
+    qualityTier?: string | null,
+  ): number {
+    const tiers = product.quality_tiers ?? [];
+    if (tiers.length > 0) {
+      if (!qualityTier) {
+        throw new BadRequestException('Gamme requise');
+      }
+      const match = tiers.find((t) => t.key === qualityTier);
+      if (!match) {
+        throw new BadRequestException('Gamme invalide');
+      }
+      return match.price_per_sqm_cents;
+    }
+    if (product.price_per_sqm_cents == null) {
+      throw new BadRequestException('Prix au m² indisponible');
+    }
+    return product.price_per_sqm_cents;
   }
 
   private resolveCalculated(

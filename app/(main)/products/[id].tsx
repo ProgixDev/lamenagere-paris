@@ -26,7 +26,7 @@ import * as Haptics from "expo-haptics";
 import { COLORS, PRODUCT_TYPES, PRICE_MODES } from "../../../lib/constants";
 import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import { formatPrice } from "../../../lib/utils";
-import { priceTagLabel, computeConfiguredPrice } from "../../../lib/pricing";
+import { priceTagLabel, computeConfiguredPrice, perSqmRate } from "../../../lib/pricing";
 import Button from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
 import PressableScale from "../../../components/ui/PressableScale";
@@ -64,6 +64,7 @@ export default function ProductDetailScreen() {
   // Inline made-to-measure inputs (cm) for per-m² products.
   const [customWidth, setCustomWidth] = useState("");
   const [customHeight, setCustomHeight] = useState("");
+  const [qualityTier, setQualityTier] = useState<string | null>(null);
   const [toast, setToast] = useState({
     visible: false,
     message: "",
@@ -95,6 +96,8 @@ export default function ProductDetailScreen() {
   }
 
   const isPerSqm = product.priceMode === PRICE_MODES.PER_SQM;
+  const qualityTiers = product.qualityTiers ?? [];
+  const hasTiers = qualityTiers.length > 0;
   // Made-to-measure: needs width/height before it can be priced/ordered.
   const needsDimensions =
     product.productType === PRODUCT_TYPES.CONFIGURABLE || isPerSqm;
@@ -130,24 +133,38 @@ export default function ProductDetailScreen() {
     Number.isFinite(dims.height) &&
     dims.width > 0 &&
     dims.height > 0;
+  // Effective €/m² rate for the entered/selected tier (flat rate if no tiers).
+  const effectiveRate = isPerSqm
+    ? perSqmRate(product, qualityTier ?? undefined)
+    : undefined;
+  const tierReady = !hasTiers || !!qualityTier;
   const livePrice =
-    inlineSqm && validDims ? computeConfiguredPrice(product, dims) : undefined;
+    inlineSqm && validDims && tierReady
+      ? computeConfiguredPrice(product, dims, undefined, qualityTier ?? undefined)
+      : undefined;
   // Estimate shown by the standalone calculator below "À propos". Covers every
   // per-m² product (even configurable ones); it's informational only — the
   // guided configure flow stays authoritative for products with extra options.
   const estimatePrice =
-    isPerSqm && validDims ? computeConfiguredPrice(product, dims) : undefined;
+    isPerSqm && validDims && tierReady
+      ? computeConfiguredPrice(product, dims, undefined, qualityTier ?? undefined)
+      : undefined;
 
   const handlePrimaryAction = async () => {
     // Pure per-m² product → price & add inline using the entered dimensions.
     if (inlineSqm) {
+      if (hasTiers && !qualityTier) {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        setToast({ visible: true, message: "Choisissez une gamme", type: "error" });
+        return;
+      }
       if (!validDims || livePrice == null) {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
         setToast({ visible: true, message: "Renseignez la largeur et la hauteur", type: "error" });
         return;
       }
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      addItem(product, 1, dims);
+      addItem(product, 1, dims, undefined, qualityTier ?? undefined);
       setJustAdded(true);
       setTimeout(() => setJustAdded(false), 1500);
       setToast({ visible: true, message: "Ajouté au panier", type: "success" });
@@ -306,16 +323,14 @@ export default function ProductDetailScreen() {
             {isPerSqm ? (
               <View>
                 <Text style={[TYPE.priceLarge, { fontSize: 32 }]}>
-                  {livePrice != null
-                    ? formatPrice(livePrice)
-                    : product.pricePerSqm != null
-                      ? `${formatPrice(product.pricePerSqm)}/m²`
-                      : "Sur mesure"}
+                  {livePrice != null ? formatPrice(livePrice) : priceTagLabel(product)}
                 </Text>
                 <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 4 }}>
-                  {livePrice != null && dims
-                    ? `Soit ${formatPrice(product.pricePerSqm ?? 0)}/m² · ${dims.width} × ${dims.height} cm`
-                    : "Indiquez vos dimensions ci-dessous pour obtenir le prix"}
+                  {livePrice != null && dims && effectiveRate != null
+                    ? `Soit ${formatPrice(effectiveRate)}/m² · ${dims.width} × ${dims.height} cm`
+                    : hasTiers && !qualityTier
+                      ? "Choisissez une gamme et vos dimensions ci-dessous"
+                      : "Indiquez vos dimensions ci-dessous pour obtenir le prix"}
                 </Text>
               </View>
             ) : product.price ? (
@@ -346,6 +361,39 @@ export default function ProductDetailScreen() {
               Entrez la largeur et la hauteur souhaitées — le prix se calcule automatiquement.
             </Text>
             <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, ...SHADOW.card }}>
+              {hasTiers && (
+                <View style={{ marginBottom: 14 }}>
+                  <Text style={{ fontSize: 12, fontFamily: FONTS.bodySemibold, color: COLORS.onSurfaceVariant, marginBottom: 8 }}>
+                    GAMME
+                  </Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                    {qualityTiers.map((tier) => {
+                      const active = qualityTier === tier.key;
+                      return (
+                        <TouchableOpacity
+                          key={tier.key}
+                          onPress={() => {
+                            Haptics.selectionAsync();
+                            setQualityTier(tier.key);
+                          }}
+                          style={{
+                            paddingHorizontal: 14,
+                            paddingVertical: 9,
+                            borderRadius: 9999,
+                            backgroundColor: active ? COLORS.primary : "transparent",
+                            borderWidth: 1,
+                            borderColor: active ? COLORS.primary : COLORS.outlineVariant,
+                          }}
+                        >
+                          <Text style={{ fontSize: 13, fontFamily: active ? "Inter_600SemiBold" : "Inter_500Medium", color: active ? COLORS.onPrimary : COLORS.onSurface }}>
+                            {tier.label} · {formatPrice(tier.pricePerSqm)}/m²
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
               <View style={{ flexDirection: "row", gap: 12 }}>
                 <View style={{ flex: 1 }}>
                   <Input label="LARGEUR" value={customWidth} onChangeText={setCustomWidth} keyboardType="numeric" suffix="cm" />
@@ -374,7 +422,7 @@ export default function ProductDetailScreen() {
                   </Text>
                   <Text style={{ fontSize: 13, fontFamily: FONTS.bodySemibold, color: COLORS.onSurfaceVariant }}>
                     {((dims.width / 100) * (dims.height / 100)).toFixed(2)} m²
-                    {product.pricePerSqm != null ? ` · ${formatPrice(product.pricePerSqm)}/m²` : ""}
+                    {effectiveRate != null ? ` · ${formatPrice(effectiveRate)}/m²` : ""}
                   </Text>
                 </View>
               )}

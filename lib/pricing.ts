@@ -13,12 +13,33 @@ export interface Dimensions {
  * longer exist.
  */
 export function priceTagLabel(product: Product): string {
-  if (product.priceMode === "per_sqm" && product.pricePerSqm != null) {
-    return `${formatPrice(product.pricePerSqm)}/m²`;
+  if (product.priceMode === "per_sqm") {
+    // Tiered products advertise their cheapest tier as a starting price.
+    if (product.qualityTiers?.length) {
+      const min = Math.min(...product.qualityTiers.map((t) => t.pricePerSqm));
+      return `dès ${formatPrice(min)}/m²`;
+    }
+    if (product.pricePerSqm != null) return `${formatPrice(product.pricePerSqm)}/m²`;
   }
   if (product.price != null) return formatPrice(product.price);
   if (product.pricePerSqm != null) return `${formatPrice(product.pricePerSqm)}/m²`;
   return formatPrice(0);
+}
+
+/**
+ * Effective €/m² rate for a per_sqm product. When the product offers quality
+ * tiers, the chosen tier's rate is used; otherwise the flat pricePerSqm. Returns
+ * undefined when a tier is required but none (or an invalid one) is selected.
+ */
+export function perSqmRate(
+  product: Product,
+  qualityTier?: string,
+): number | undefined {
+  if (product.qualityTiers?.length) {
+    if (!qualityTier) return undefined;
+    return product.qualityTiers.find((t) => t.key === qualityTier)?.pricePerSqm;
+  }
+  return product.pricePerSqm;
 }
 
 /** Clamp a dimension to [min, max] when bounds are provided. */
@@ -49,6 +70,7 @@ export function computeConfiguredPrice(
   product: Product,
   dims?: Dimensions | null,
   openingType?: string,
+  qualityTier?: string,
 ): number | undefined {
   const surcharge = openingSurcharge(product, openingType);
 
@@ -57,7 +79,8 @@ export function computeConfiguredPrice(
       return product.price != null ? product.price + surcharge : undefined;
 
     case "per_sqm": {
-      if (product.pricePerSqm == null || !dims) return undefined;
+      const rate = perSqmRate(product, qualityTier);
+      if (rate == null || !dims) return undefined;
       const w = clamp(
         dims.width,
         product.minDimensions?.width,
@@ -70,7 +93,7 @@ export function computeConfiguredPrice(
       );
       const areaM2 = (w / 100) * (h / 100);
       // Round to whole euros (matches server PricingService).
-      const base = Math.max(0, Math.round(areaM2 * product.pricePerSqm));
+      const base = Math.max(0, Math.round(areaM2 * rate));
       return base + surcharge;
     }
 
