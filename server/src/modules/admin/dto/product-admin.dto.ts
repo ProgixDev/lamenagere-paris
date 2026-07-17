@@ -29,6 +29,14 @@ export class QualityTierDto {
   @IsNumber() pricePerSqm!: number;
 }
 
+/** One colour variant of a product, with its own gallery image URLs. */
+export class ProductColorDto {
+  @IsString() key!: string;
+  @IsString() name!: string;
+  @IsOptional() @IsString() hex?: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) images?: string[];
+}
+
 export class UpsertProductDto {
   @IsString() @MinLength(1) name!: string;
   @IsOptional() @IsString() slug?: string;
@@ -60,6 +68,13 @@ export class UpsertProductDto {
   @ValidateNested({ each: true })
   @Type(() => QualityTierDto)
   qualityTiers?: QualityTierDto[];
+
+  // Colour variants, each with its own gallery images.
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductColorDto)
+  colors?: ProductColorDto[];
 
   // Dimensions (cm).
   @IsOptional() @IsNumber() dimWidth?: number;

@@ -14,6 +14,15 @@ export interface QualityTierOption {
   /** €/m² rate applied when this tier is selected. */
   pricePerSqm: number;
 }
+
+/** One colour variant of a product, with its own gallery images. */
+export interface ProductColor {
+  key: string;
+  name: string;
+  /** Swatch colour (e.g. "#ffffff"). Falls back to a neutral dot if absent. */
+  hex?: string;
+  images: string[];
+}
 export type ShippingZone = "metropole" | "reunion" | "guadeloupe" | "martinique" | "guyane" | "mayotte";
 
 export type OrderStatus =
@@ -169,6 +178,8 @@ export interface Product {
   openingTypes?: OpeningTypeOption[];
   /** Quality tiers for per_sqm products, each with its own €/m² rate. */
   qualityTiers?: QualityTierOption[];
+  /** Colour variants; selecting one swaps the gallery to its images. */
+  colors?: ProductColor[];
   deliveryEstimates: {
     metropole: string;
     outreMer: string;

@@ -58,6 +58,7 @@ export default function ProductDetailScreen() {
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
 
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [selectedColorKey, setSelectedColorKey] = useState<string | null>(null);
   const [contactOpen, setContactOpen] = useState(false);
   const [devisOpen, setDevisOpen] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
@@ -105,9 +106,18 @@ export default function ProductDetailScreen() {
   const hasOpeningTypes = openingTypes.length > 0;
   // Effective blocks: product override wins, else the category template.
   const configBlocks = product.configBlocks ?? product.category.configBlocks ?? [];
+  // Colour variants: picking one swaps the gallery to that colour's images.
+  const colors = (product.colors ?? []).filter((c) => c.images.length > 0);
+  const hasColors = colors.length > 0;
+  const selectedColor = hasColors
+    ? colors.find((c) => c.key === selectedColorKey) ?? colors[0]
+    : null;
+  // The selected colour's images win; otherwise the product's own gallery.
+  const activeImages =
+    selectedColor && selectedColor.images.length ? selectedColor.images : product.images;
   // Gallery shows images first, then videos. Falls back to a placeholder cell.
   const galleryItems: { type: "image" | "video"; key: string }[] = [
-    ...product.images.map((url) => ({ type: "image" as const, key: url })),
+    ...activeImages.map((url) => ({ type: "image" as const, key: url })),
     ...(product.videos ?? []).map((url) => ({ type: "video" as const, key: url })),
   ];
   if (galleryItems.length === 0) {
@@ -191,6 +201,15 @@ export default function ProductDetailScreen() {
   const onGalleryScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const i = Math.round(e.nativeEvent.contentOffset.x / W);
     if (i !== galleryIndex) setGalleryIndex(i);
+  };
+
+  const selectColor = async (key: string) => {
+    if (key === (selectedColor?.key ?? null)) return;
+    await Haptics.selectionAsync();
+    setSelectedColorKey(key);
+    // Jump the gallery back to the first image of the new colour.
+    setGalleryIndex(0);
+    galleryRef.current?.scrollTo({ x: 0, animated: false });
   };
 
   return (
@@ -343,6 +362,76 @@ export default function ProductDetailScreen() {
             ) : null}
           </View>
         </View>
+
+        {/* ── Colour picker ────────────────────────── */}
+        {hasColors && (
+          <View style={{ paddingHorizontal: 16, marginTop: 20 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12 }}>
+              <Text style={{ fontSize: 12, fontFamily: FONTS.bodySemibold, color: COLORS.onSurfaceVariant, letterSpacing: 0.5 }}>
+                COULEUR
+              </Text>
+              {selectedColor && (
+                <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>
+                  · {selectedColor.name}
+                </Text>
+              )}
+            </View>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+              {colors.map((color) => {
+                const active = selectedColor?.key === color.key;
+                const swatch = getProductImage(color.images[0]);
+                return (
+                  <TouchableOpacity
+                    key={color.key}
+                    onPress={() => selectColor(color.key)}
+                    activeOpacity={0.85}
+                    style={{ alignItems: "center", width: 58 }}
+                  >
+                    <View
+                      style={{
+                        width: 52,
+                        height: 52,
+                        borderRadius: 26,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderWidth: active ? 2 : 1,
+                        borderColor: active ? COLORS.primary : COLORS.outlineVariant,
+                        padding: 3,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          borderRadius: 22,
+                          overflow: "hidden",
+                          backgroundColor: color.hex ?? COLORS.surfaceContainer,
+                        }}
+                      >
+                        {swatch && (
+                          <Image source={swatch} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                        )}
+                      </View>
+                    </View>
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        marginTop: 6,
+                        fontSize: 11,
+                        fontFamily: active ? "Inter_600SemiBold" : "Inter_400Regular",
+                        color: active ? COLORS.onSurface : COLORS.outline,
+                        maxWidth: 58,
+                        textAlign: "center",
+                      }}
+                    >
+                      {color.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         {/* ── À propos ─────────────────────────────── */}
         <Section title="À propos">

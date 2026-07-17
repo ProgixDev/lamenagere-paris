@@ -177,6 +177,17 @@ export class AdminProductsService {
       seo_description: dto.seoDescription,
       // Empty/omitted → null so the product inherits its category template.
       config_blocks: dto.configBlocks?.length ? dto.configBlocks : null,
+      // Colour variants; drop rows missing a name, keep the rest as-is.
+      colors: dto.colors?.length
+        ? dto.colors
+            .filter((c) => c.name?.trim())
+            .map((c) => ({
+              key: c.key?.trim() || slugify(c.name),
+              name: c.name.trim(),
+              hex: c.hex?.trim() || undefined,
+              images: c.images ?? [],
+            }))
+        : null,
     };
     if (id) row.id = id;
 
