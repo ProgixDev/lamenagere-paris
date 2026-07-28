@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Politique de confidentialité · La Ménagère Paris</title>
+  <style>
+    :root {
+      --accent: #c5a059;
+      --accent-dark: #a3823d;
+      --ink: #181818;
+      --ink-muted: #6b6b6b;
+      --border: #e8e5de;
+      --bg: #faf9f5;
+      --card: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 680px; margin: 0 auto; padding: 32px 20px 72px; }
+    header { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
+    .logo {
+      width: 52px; height: 52px; border-radius: 14px;
+      background: var(--ink); color: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 20px; letter-spacing: 0.04em;
+      flex-shrink: 0;
+    }
+    header .brand { font-weight: 800; font-size: 20px; line-height: 1.1; }
+    header .sub {
+      font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--ink-muted); margin-top: 2px;
+    }
+    h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.01em; }
+    .updated { color: var(--ink-muted); font-size: 13px; margin: 0 0 28px; }
+    .intro {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 18px; padding: 20px 22px; margin-bottom: 12px; font-size: 15px;
+    }
+    h2 { font-size: 19px; margin: 32px 0 10px; letter-spacing: -0.01em; }
+    h2 .num { color: var(--accent-dark); margin-right: 8px; }
+    p { margin: 0 0 12px; font-size: 15px; }
+    ul { margin: 0 0 12px; padding-left: 20px; }
+    li { margin-bottom: 7px; font-size: 15px; }
+    a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+    a:hover { color: var(--accent-dark); }
+    strong { font-weight: 700; }
+    .contact-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 18px; padding: 20px 22px; margin-top: 16px;
+    }
+    footer { text-align: center; font-size: 12px; color: var(--ink-muted); margin-top: 40px; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo">LM</div>
+      <div>
+        <div class="brand">La Ménagère</div>
+        <div class="sub">Paris</div>
+      </div>
+    </header>
+
+    <h1>Politique de confidentialité</h1>
+    <p class="updated">Dernière mise à jour&nbsp;: 28&nbsp;juillet&nbsp;2026</p>
+
+    <div class="intro">
+      La présente politique de confidentialité explique quelles données
+      personnelles l'application <strong>La Ménagère Paris</strong> collecte et
+      comment elles sont utilisées et protégées. Nous attachons une grande
+      importance au respect de votre vie privée et nous nous conformons au
+      Règlement Général sur la Protection des Données (RGPD).
+    </div>
+
+    <h2><span class="num">1.</span>Qui sommes-nous</h2>
+    <p>
+      L'application La Ménagère Paris est éditée par <strong>La Ménagère Paris</strong>,
+      Paris, France. Pour toute question relative à vos données, vous pouvez nous contacter à
+      <a href="mailto:contact@lamenagereparis.com">contact@lamenagereparis.com</a>.
+    </p>
+
+    <h2><span class="num">2.</span>Données que nous collectons</h2>
+    <p>
+      Nous collectons uniquement les informations strictement nécessaires à la
+      création de votre compte et à l'utilisation du service&nbsp;:
+    </p>
+    <ul>
+      <li><strong>Votre nom</strong>&nbsp;;</li>
+      <li><strong>Votre numéro de téléphone</strong>, qui sert à créer votre compte et à vous identifier via un code de vérification envoyé par SMS&nbsp;;</li>
+      <li><strong>Votre position précise (GPS)</strong>, utilisée uniquement dans le cadre de la livraison et des services géolocalisés (voir la section&nbsp;3 ci-dessous).</li>
+    </ul>
+    <p>
+      Nous ne collectons aucune autre donnée personnelle&nbsp;: pas de contacts,
+      pas de photos, pas de données de paiement stockées par nos soins.
+    </p>
+
+    <h2><span class="num">3.</span>Localisation (position précise)</h2>
+    <p>
+      L'application utilise votre <strong>position précise</strong> uniquement pour
+      les besoins de la livraison et des commandes&nbsp;:
+    </p>
+    <ul>
+      <li><strong>Côté client</strong>&nbsp;: pour vous proposer et confirmer votre adresse de livraison sur la carte au moment de la commande.</li>
+      <li><strong>Côté livreur</strong> (pour les comptes livreurs)&nbsp;: pour la navigation GPS guidée jusqu'à votre adresse, et pour partager la position du livreur en temps réel afin que vous puissiez suivre votre livraison.</li>
+    </ul>
+    <p>
+      Le partage de position du livreur s'effectue au moyen d'un
+      <strong>service de premier plan</strong> (foreground service), activé
+      uniquement pendant une livraison en cours et accompagné d'une notification
+      visible. Nous <strong>n'accédons jamais</strong> à votre position lorsque
+      l'application est fermée ou en arrière-plan en dehors d'une livraison
+      active. L'accès à la localisation est facultatif&nbsp;: vous pouvez le
+      refuser ou le désactiver à tout moment dans les réglages de votre appareil
+      (certaines fonctionnalités de livraison peuvent alors ne plus être disponibles).
+      Nous ne vendons jamais vos données de localisation et ne les utilisons à aucune fin publicitaire.
+    </p>
+
+    <h2><span class="num">4.</span>Pourquoi nous utilisons ces données</h2>
+    <p>Vos données sont utilisées pour&nbsp;:</p>
+    <ul>
+      <li>créer et sécuriser votre compte&nbsp;;</li>
+      <li>vous authentifier au moyen d'un code à usage unique envoyé par SMS&nbsp;;</li>
+      <li>traiter vos commandes et vous identifier auprès de notre établissement&nbsp;;</li>
+      <li>assurer la livraison&nbsp;: localisation de l'adresse, navigation du livreur et suivi en temps réel&nbsp;;</li>
+      <li>vous contacter si nécessaire au sujet d'une commande.</li>
+    </ul>
+    <p>
+      <strong>Base légale</strong>&nbsp;: l'exécution du contrat (fourniture du
+      service). Nous n'utilisons pas vos données à des fins publicitaires et nous
+      ne les vendons jamais.
+    </p>
+
+    <h2><span class="num">5.</span>Partage des données</h2>
+    <p>
+      Nous ne partageons pas vos données avec des tiers à des fins commerciales.
+      Nous faisons uniquement appel à des prestataires techniques qui agissent
+      pour notre compte et selon nos instructions&nbsp;:
+    </p>
+    <ul>
+      <li>un hébergeur sécurisé pour le stockage de la base de données et l'authentification&nbsp;;</li>
+      <li>un prestataire d'envoi de SMS pour vous transmettre votre code de vérification.</li>
+    </ul>
+
+    <h2><span class="num">6.</span>Durée de conservation</h2>
+    <p>
+      Vos données sont conservées tant que votre compte est actif. Elles sont
+      supprimées lorsque vous demandez la suppression de votre compte, ou après
+      une période d'inactivité prolongée.
+    </p>
+
+    <h2><span class="num">7.</span>Sécurité</h2>
+    <p>
+      Nous mettons en œuvre des mesures techniques et organisationnelles
+      appropriées pour protéger vos données&nbsp;: communications chiffrées
+      (HTTPS), authentification par code à usage unique et accès restreint aux
+      données.
+    </p>
+
+    <h2><span class="num">8.</span>Vos droits</h2>
+    <p>Conformément au RGPD, vous pouvez à tout moment&nbsp;:</p>
+    <ul>
+      <li>accéder à vos données et en demander une copie&nbsp;;</li>
+      <li>les faire rectifier si elles sont inexactes&nbsp;;</li>
+      <li>en demander la suppression&nbsp;;</li>
+      <li>vous opposer à leur traitement.</li>
+    </ul>
+    <p>
+      Pour exercer ces droits, écrivez-nous à
+      <a href="mailto:contact@lamenagereparis.com">contact@lamenagereparis.com</a>.
+    </p>
+
+    <h2><span class="num">9.</span>Suppression de votre compte</h2>
+    <p>
+      Vous pouvez demander la suppression de votre compte et des données associées
+      à tout moment depuis notre page dédiée&nbsp;:
+      <a href="../delete/">Supprimer mon compte</a>.
+    </p>
+
+    <h2><span class="num">10.</span>Mineurs</h2>
+    <p>
+      Notre service n'est pas destiné aux personnes de moins de 15&nbsp;ans et nous
+      ne collectons pas sciemment leurs données.
+    </p>
+
+    <h2><span class="num">11.</span>Modifications</h2>
+    <p>
+      Nous pouvons mettre à jour cette politique de confidentialité. La date de
+      dernière mise à jour figure en haut de cette page.
+    </p>
+
+    <h2><span class="num">12.</span>Contact</h2>
+    <div class="contact-card">
+      <p style="margin-bottom: 8px;">Pour toute question relative à vos données&nbsp;:</p>
+      <ul style="margin-bottom: 12px;">
+        <li>E-mail&nbsp;: <a href="mailto:contact@lamenagereparis.com">contact@lamenagereparis.com</a></li>
+        <li>Adresse&nbsp;: Paris, France</li>
+      </ul>
+      <p style="margin: 0;">
+        Vous pouvez également introduire une réclamation auprès de la
+        <strong>CNIL</strong>&nbsp;:
+        <a href="https://www.cnil.fr" target="_blank" rel="noopener noreferrer">www.cnil.fr</a>.
+      </p>
+    </div>
+
+    <hr />
+    <footer>© 2026 La Ménagère Paris · Tous droits réservés</footer>
+  </div>
+</body>
+</html>

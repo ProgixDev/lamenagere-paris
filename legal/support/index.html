@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Assistance · La Ménagère Paris</title>
+  <style>
+    :root {
+      --accent: #c5a059;
+      --accent-dark: #a3823d;
+      --ink: #181818;
+      --ink-muted: #6b6b6b;
+      --border: #e8e5de;
+      --bg: #faf9f5;
+      --card: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 680px; margin: 0 auto; padding: 32px 20px 72px; }
+    header { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
+    .logo {
+      width: 52px; height: 52px; border-radius: 14px;
+      background: var(--ink); color: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 20px; letter-spacing: 0.04em;
+      flex-shrink: 0;
+    }
+    header .brand { font-weight: 800; font-size: 20px; line-height: 1.1; }
+    header .sub {
+      font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--ink-muted); margin-top: 2px;
+    }
+    h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.01em; }
+    .updated { color: var(--ink-muted); font-size: 13px; margin: 0 0 28px; }
+    .intro {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 18px; padding: 20px 22px; margin-bottom: 12px; font-size: 15px;
+    }
+    h2 { font-size: 19px; margin: 32px 0 10px; letter-spacing: -0.01em; }
+    h2 .num { color: var(--accent-dark); margin-right: 8px; }
+    p { margin: 0 0 12px; font-size: 15px; }
+    ul { margin: 0 0 12px; padding-left: 20px; }
+    li { margin-bottom: 7px; font-size: 15px; }
+    a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+    a:hover { color: var(--accent-dark); }
+    strong { font-weight: 700; }
+    .contact-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 18px; padding: 20px 22px; margin-top: 16px;
+    }
+    .contact-card ul { list-style: none; padding: 0; margin: 0; }
+    .contact-card li { margin-bottom: 10px; }
+    .contact-card li:last-child { margin-bottom: 0; }
+    .faq-q { font-weight: 700; margin: 0 0 4px; }
+    .faq-a { margin: 0 0 16px; color: #2a2a2a; }
+    footer { text-align: center; font-size: 12px; color: var(--ink-muted); margin-top: 40px; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo">LM</div>
+      <div>
+        <div class="brand">La Ménagère</div>
+        <div class="sub">Paris</div>
+      </div>
+    </header>
+
+    <h1>Assistance</h1>
+    <p class="updated">Nous sommes là pour vous accompagner ✨</p>
+
+    <div class="intro">
+      Un souci avec votre commande, votre réservation ou l'application
+      <strong>La Ménagère Paris</strong>&nbsp;? Contactez-nous directement, nous vous
+      répondrons dans les plus brefs délais.
+    </div>
+
+    <h2><span class="num">•</span>Nous contacter</h2>
+    <div class="contact-card">
+      <ul>
+        <li>📧 E-mail&nbsp;: <a href="mailto:contact@lamenagereparis.com">contact@lamenagereparis.com</a></li>
+        <li>📍 Adresse&nbsp;: Paris, France</li>
+        <li>🕚 Horaires&nbsp;: tous les jours, 10h&nbsp;–&nbsp;23h</li>
+      </ul>
+    </div>
+
+    <h2><span class="num">•</span>Questions fréquentes</h2>
+
+    <p class="faq-q">Comment passer commande sur l'application&nbsp;?</p>
+    <p class="faq-a">
+      Choisissez vos articles ou plats dans le menu, ajoutez-les au panier, puis sélectionnez le mode de retrait ou la livraison avant de valider votre commande.
+    </p>
+
+    <p class="faq-q">Quels sont les moyens de paiement acceptés&nbsp;?</p>
+    <p class="faq-a">
+      Vous pouvez régler par carte bancaire ou en espèces selon les options proposées lors de la confirmation de votre commande.
+    </p>
+
+    <p class="faq-q">Comment suivre ma commande ou ma livraison&nbsp;?</p>
+    <p class="faq-a">
+      Une fois votre commande confirmée, vous pouvez suivre son état et, le cas échéant, la progression du livreur en temps réel depuis l'onglet dédié sur l'application.
+    </p>
+
+    <p class="faq-q">Comment supprimer mon compte&nbsp;?</p>
+    <p class="faq-a">
+      Directement dans l'application&nbsp;: <strong>Profil → Supprimer mon compte</strong>,
+      ou via notre page dédiée <a href="../delete/">Supprimer mon compte</a>.
+    </p>
+
+    <h2><span class="num">•</span>Liens utiles</h2>
+    <ul>
+      <li><a href="../privacy/">Politique de confidentialité</a></li>
+      <li><a href="../delete/">Supprimer mon compte</a></li>
+    </ul>
+
+    <hr />
+    <footer>© 2026 La Ménagère Paris · Tous droits réservés</footer>
+  </div>
+</body>
+</html>

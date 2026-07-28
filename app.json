@@ -18,10 +18,11 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.lamenagereparis.app",
+      "bundleIdentifier": "com.progix.lamenagereparis",
       "infoPlist": {
         "NSCameraUsageDescription": "Pour ajouter des photos à vos demandes de devis",
-        "NSPhotoLibraryUsageDescription": "Pour sélectionner des photos pour vos demandes"
+        "NSPhotoLibraryUsageDescription": "Pour sélectionner des photos pour vos demandes",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -30,7 +31,7 @@
         "backgroundColor": "#f9f9f9"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.lamenagereparis.app",
+      "package": "com.progix.lamenagereparis",
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.USE_BIOMETRIC",
@@ -52,7 +53,6 @@
       [
         "@stripe/stripe-react-native",
         {
-          "merchantIdentifier": "merchant.com.lamenagereparis.app",
           "enableGooglePay": false
         }
       ]
