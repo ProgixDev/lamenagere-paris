@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { ActivityService } from '../../common/activity/activity.service';
+import { AppleService } from './apple.service';
 import {
   AddressRow,
   ProfileRow,
@@ -29,7 +30,31 @@ export class AuthService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly activity: ActivityService,
+    private readonly apple: AppleService,
   ) {}
+
+  /**
+   * Stores the Apple refresh token for this user so their grant can be revoked
+   * when they delete their account (an Apple requirement). Called right after a
+   * successful Sign in with Apple, with the one-time authorization code from the
+   * native sheet. Best-effort: a failure must never break sign-in.
+   */
+  async linkApple(
+    userId: string,
+    authorizationCode: string,
+  ): Promise<{ success: boolean }> {
+    const refreshToken =
+      await this.apple.exchangeAuthorizationCode(authorizationCode);
+    if (!refreshToken) return { success: false };
+
+    const { error } = await this.supabase.client
+      .from('apple_auth_tokens')
+      .upsert(
+        { profile_id: userId, refresh_token: refreshToken },
+        { onConflict: 'profile_id' },
+      );
+    return { success: !error };
+  }
 
   async login(dto: LoginDto, ipAddress?: string): Promise<AuthResult> {
     const { data, error } = await this.supabase.auth.signInWithPassword({
@@ -122,12 +147,67 @@ export class AuthService {
     return { success: true };
   }
 
+  /**
+   * Erases the account (App Store 5.1.1(v), GDPR art. 17).
+   *
+   * Orders and quotes are kept for accounting/tax retention but detached and
+   * anonymised first: their personal columns are cleared here, then deleting
+   * the auth user cascades the profile away and sets `profile_id` to NULL via
+   * the FKs (see migration 0029). Everything else — addresses, tickets,
+   * conversations, reviews, devices, promo redemptions — cascades from
+   * `profiles`, so it disappears with the account.
+   */
   async deleteAccount(userId: string): Promise<{ success: boolean }> {
+    // Revoke the Sign in with Apple grant first — Apple requires this when an
+    // app offers both Apple sign-in and account deletion. Read before deleting,
+    // since the row cascades away with the profile. Best-effort by design: a
+    // revocation failure must not trap the user in an undeletable account.
+    const { data: appleToken } = await this.supabase.client
+      .from('apple_auth_tokens')
+      .select('refresh_token')
+      .eq('profile_id', userId)
+      .maybeSingle<{ refresh_token: string }>();
+    if (appleToken?.refresh_token) {
+      await this.apple.revokeRefreshToken(appleToken.refresh_token);
+    }
+
+    // Scrub the shipping identity snapshot from retained invoices. The
+    // financial fields (totals, order_number, dates, territory) stay intact.
+    const { error: ordersError } = await this.supabase.client
+      .from('orders')
+      .update({
+        ship_first_name: null,
+        ship_last_name: null,
+        ship_street: null,
+        ship_postal_code: null,
+        ship_city: null,
+        ship_country: null,
+        ship_phone: null,
+        customer_note: null,
+        customer_attachments: [],
+      })
+      .eq('profile_id', userId);
+    if (ordersError) {
+      throw new BadRequestException(
+        'Suppression impossible : réessayez ou contactez le support.',
+      );
+    }
+
+    // Quote notes are free text written by the customer — clear them too.
+    const { error: quotesError } = await this.supabase.client
+      .from('quotes')
+      .update({ notes: null })
+      .eq('profile_id', userId);
+    if (quotesError) {
+      throw new BadRequestException(
+        'Suppression impossible : réessayez ou contactez le support.',
+      );
+    }
+
     const { error } = await this.supabase.admin.deleteUser(userId);
     if (error) {
-      // Most commonly blocked by existing orders/quotes (FK restrict).
       throw new BadRequestException(
-        'Suppression impossible : contactez le support si vous avez des commandes en cours.',
+        'Suppression impossible : réessayez ou contactez le support.',
       );
     }
     return { success: true };

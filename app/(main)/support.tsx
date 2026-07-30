@@ -24,6 +24,8 @@ import {
   replyTicketApi,
   type Ticket,
 } from "../../features/tickets/api";
+import GuestGate from "../../components/GuestGate";
+import { useIsGuestVisitor } from "../../features/auth/guards";
 
 const CATEGORIES = [
   { value: "commande", label: "Commande" },
@@ -40,7 +42,7 @@ const STATUS_COLOR: Record<string, string> = {
   ferme: COLORS.outline,
 };
 
-export default function SupportScreen() {
+function SupportScreenContent() {
   const router = useRouter();
   const qc = useQueryClient();
   const [mode, setMode] = useState<"list" | "new">("list");
@@ -304,3 +306,22 @@ const inputStyle = {
   color: COLORS.onSurface,
   marginTop: 8,
 };
+
+/**
+ * Guests may browse the catalogue freely, but this screen holds personal
+ * account data — show the sign-in prompt instead of firing authenticated
+ * requests that would fail.
+ */
+export default function SupportScreen() {
+  const isGuestVisitor = useIsGuestVisitor();
+  if (isGuestVisitor) {
+    return (
+      <GuestGate
+        icon="lifebuoy-outline"
+        title="Votre assistance"
+        message="Connectez-vous pour contacter le support et suivre vos demandes."
+      />
+    );
+  }
+  return <SupportScreenContent />;
+}

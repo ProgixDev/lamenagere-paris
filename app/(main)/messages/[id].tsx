@@ -25,8 +25,10 @@ import {
   useSendMessage,
   useMarkAsRead,
 } from "../../../features/messaging/hooks";
+import GuestGate from "../../../components/GuestGate";
+import { useIsGuestVisitor } from "../../../features/auth/guards";
 
-export default function ConversationScreen() {
+function ConversationScreenContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
@@ -214,4 +216,23 @@ export default function ConversationScreen() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
+}
+
+/**
+ * Guests may browse the catalogue freely, but this screen holds personal
+ * account data — show the sign-in prompt instead of firing authenticated
+ * requests that would fail.
+ */
+export default function ConversationScreen() {
+  const isGuestVisitor = useIsGuestVisitor();
+  if (isGuestVisitor) {
+    return (
+      <GuestGate
+        icon="message-outline"
+        title="Vos messages"
+        message="Connectez-vous pour échanger avec notre équipe."
+      />
+    );
+  }
+  return <ConversationScreenContent />;
 }

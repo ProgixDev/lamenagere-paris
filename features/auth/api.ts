@@ -53,6 +53,21 @@ export const changePasswordApi = async (
   return data;
 };
 
+/**
+ * Hands the one-time Apple authorization code to the server, which exchanges it
+ * for a refresh token so the grant can be revoked when the account is deleted
+ * (required by Apple). Best-effort — callers ignore failures.
+ */
+export const linkAppleApi = async (
+  authorizationCode: string,
+): Promise<{ success: boolean }> => {
+  const { data } = await apiClient.post<{ success: boolean }>(
+    "/auth/apple/link",
+    { authorizationCode },
+  );
+  return data;
+};
+
 export const deleteAccountApi = async (): Promise<{ success: boolean }> => {
   const { data } = await apiClient.delete<{ success: boolean }>("/auth/account");
   return data;

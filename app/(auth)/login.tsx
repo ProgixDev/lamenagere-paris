@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ import Button from "../../components/ui/Button";
 import Toast from "../../components/ui/Toast";
 import { useAuthStore } from "../../features/auth/store";
 import { useGuestStore } from "../../features/auth/guest";
+import { isAppleSignInAvailable } from "../../features/auth/oauth";
 
 const { width: W, height: H } = Dimensions.get("window");
 const isSmall = H < 700;
@@ -35,7 +36,14 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, loginWithGoogle, isLoading, error, clearError } = useAuthStore();
+  const { login, loginWithGoogle, loginWithApple, isLoading, error, clearError } =
+    useAuthStore();
+  // Apple's sheet only exists on iOS 13+; hide the button everywhere else
+  // rather than offering a control that cannot work.
+  const [appleAvailable, setAppleAvailable] = useState(false);
+  useEffect(() => {
+    isAppleSignInAvailable().then(setAppleAvailable);
+  }, []);
   const enterGuest = useGuestStore((s) => s.enterGuest);
 
   const continueAsGuest = async () => {
@@ -60,6 +68,22 @@ export default function LoginScreen() {
       setToast({
         visible: true,
         message: message || "Connexion Google échouée",
+        type: "error",
+      });
+    }
+  };
+
+  const onApple = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await loginWithApple();
+    } catch (e) {
+      const message = (e as { message?: string })?.message ?? "";
+      // User dismissed the Apple sheet — not an error worth a toast.
+      if (message.includes("annulée")) return;
+      setToast({
+        visible: true,
+        message: message || "Connexion Apple échouée",
         type: "error",
       });
     }
@@ -218,22 +242,29 @@ export default function LoginScreen() {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              paddingVertical: 12,
-              borderRadius: 9999,
-              backgroundColor: COLORS.onSurface,
-              gap: 10,
-            }}
-          >
-            <MaterialCommunityIcons name="apple" size={18} color="#ffffff" />
-            <Text style={{ fontSize: 13, color: "#ffffff", fontFamily: "Inter_500Medium" }}>
-              Continuer avec Apple
-            </Text>
-          </TouchableOpacity>
+          {appleAvailable && (
+            <TouchableOpacity
+              onPress={onApple}
+              disabled={isLoading}
+              accessibilityRole="button"
+              accessibilityLabel="Continuer avec Apple"
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                paddingVertical: 12,
+                borderRadius: 9999,
+                backgroundColor: COLORS.onSurface,
+                gap: 10,
+                opacity: isLoading ? 0.5 : 1,
+              }}
+            >
+              <MaterialCommunityIcons name="apple" size={18} color="#ffffff" />
+              <Text style={{ fontSize: 13, color: "#ffffff", fontFamily: "Inter_500Medium" }}>
+                Continuer avec Apple
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Footer */}

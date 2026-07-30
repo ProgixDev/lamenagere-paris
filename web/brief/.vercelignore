@@ -1,0 +1,5 @@
+# Le README contient la grille tarifaire complète. Déployé, il serait lisible
+# par n'importe qui sur https://<domaine>/README.md — c'est-à-dire exactement
+# les montants qu'on a retirés du questionnaire. Il reste dans le dépôt, pas
+# sur le serveur.
+README.md

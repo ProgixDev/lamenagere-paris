@@ -16,8 +16,10 @@ import CheckoutSteps from "../../../components/cart/CheckoutSteps";
 import { useCart } from "../../../features/cart/hooks";
 import { useCheckoutStore, type DeliveryAddress } from "../../../features/checkout/store";
 import { useAuthStore } from "../../../features/auth/store";
+import GuestGate from "../../../components/GuestGate";
+import { useIsGuestVisitor } from "../../../features/auth/guards";
 
-export default function CheckoutAddressScreen() {
+function CheckoutAddressScreenContent() {
   const router = useRouter();
   const { items, subtotal } = useCart();
   const setDeliveryAddress = useCheckoutStore((s) => s.setDeliveryAddress);
@@ -141,4 +143,23 @@ export default function CheckoutAddressScreen() {
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+/**
+ * Guests may browse the catalogue freely, but this screen holds personal
+ * account data — show the sign-in prompt instead of firing authenticated
+ * requests that would fail.
+ */
+export default function CheckoutAddressScreen() {
+  const isGuestVisitor = useIsGuestVisitor();
+  if (isGuestVisitor) {
+    return (
+      <GuestGate
+        icon="lock-outline"
+        title="Finaliser votre commande"
+        message="Connectez-vous ou créez un compte pour passer commande. Votre panier est conservé."
+      />
+    );
+  }
+  return <CheckoutAddressScreenContent />;
 }

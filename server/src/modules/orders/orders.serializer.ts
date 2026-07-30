@@ -51,7 +51,8 @@ export interface OrderProfileRow {
 export interface OrderRow {
   id: string;
   order_number: string;
-  profile_id: string;
+  /** NULL once the customer deleted their account (order kept for accounting). */
+  profile_id: string | null;
   status: OrderStatus;
   payment_status: 'unpaid' | 'paid' | 'failed' | 'refunded';
   subtotal_cents: number;

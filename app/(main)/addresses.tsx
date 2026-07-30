@@ -23,8 +23,10 @@ import type { AddressInput } from "../../features/addresses/api";
 import type { Address } from "../../lib/types";
 import AddressFormModal from "../../components/address/AddressFormModal";
 import Toast from "../../components/ui/Toast";
+import GuestGate from "../../components/GuestGate";
+import { useIsGuestVisitor } from "../../features/auth/guards";
 
-export default function AddressesScreen() {
+function AddressesScreenContent() {
   const router = useRouter();
   const { data: addresses = [], isLoading, isError, refetch } = useAddresses();
   const createAddress = useCreateAddress();
@@ -246,4 +248,23 @@ export default function AddressesScreen() {
       )}
     </SafeAreaView>
   );
+}
+
+/**
+ * Guests may browse the catalogue freely, but this screen holds personal
+ * account data — show the sign-in prompt instead of firing authenticated
+ * requests that would fail.
+ */
+export default function AddressesScreen() {
+  const isGuestVisitor = useIsGuestVisitor();
+  if (isGuestVisitor) {
+    return (
+      <GuestGate
+        icon="map-marker-outline"
+        title="Vos adresses"
+        message="Connectez-vous pour enregistrer et gérer vos adresses de livraison."
+      />
+    );
+  }
+  return <AddressesScreenContent />;
 }

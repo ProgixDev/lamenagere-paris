@@ -40,6 +40,7 @@ export interface AuthState {
 export interface AuthActions {
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
+  loginWithApple: () => Promise<void>;
   register: (data: RegisterPayload) => Promise<void>;
   completeProfile: (data: CompleteProfilePayload) => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;

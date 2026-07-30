@@ -15,6 +15,7 @@ import { AuthService } from './auth.service';
 import {
   ChangePasswordDto,
   ForgotPasswordDto,
+  LinkAppleDto,
   LoginDto,
   RegisterDto,
   UpdateProfileDto,
@@ -75,6 +76,16 @@ export class AuthController {
       dto.currentPassword,
       dto.newPassword,
     );
+  }
+
+  /**
+   * Records the Apple grant so it can be revoked on account deletion. Called by
+   * the app right after a successful Sign in with Apple.
+   */
+  @Post('apple/link')
+  @HttpCode(200)
+  linkApple(@CurrentUser() user: AuthUser, @Body() dto: LinkAppleDto) {
+    return this.auth.linkApple(user.id, dto.authorizationCode);
   }
 
   @Delete('account')

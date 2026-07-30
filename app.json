@@ -33,7 +33,6 @@
       "edgeToEdgeEnabled": true,
       "package": "com.progix.lamenagereparis",
       "permissions": [
-        "android.permission.RECORD_AUDIO",
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT"
       ]
@@ -43,6 +42,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-apple-authentication",
       "expo-image-picker",
       "expo-notifications",
       "expo-secure-store",

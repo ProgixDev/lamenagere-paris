@@ -26,11 +26,28 @@ const envSchema = z.object({
   APNS_TEAM_ID: z.string().optional().default(''),
   APNS_BUNDLE_ID: z.string().optional().default('fr.lamenagereparis.app'),
 
+  // Sign in with Apple. Only needed to revoke a user's Apple token when they
+  // delete their account (required by Apple when both features are offered).
+  // Left empty, sign-in still works and revocation is skipped with a warning.
+  // KEY_P8 is the contents of the AuthKey_<KEY_ID>.p8 file (PEM, newlines may
+  // be escaped as \n); CLIENT_ID is the app's bundle identifier.
+  APPLE_SIGNIN_KEY_P8: z.string().optional().default(''),
+  APPLE_SIGNIN_KEY_ID: z.string().optional().default(''),
+  APPLE_SIGNIN_TEAM_ID: z.string().optional().default(''),
+  APPLE_SIGNIN_CLIENT_ID: z
+    .string()
+    .optional()
+    .default('com.progix.lamenagereparis'),
+
   // Stripe (online payments). Secret key is required because PaymentsService
   // initializes the Stripe client at boot. Webhook secret is optional until
   // the webhook endpoint is registered in the Stripe dashboard.
   STRIPE_SECRET_KEY: z.string().min(1),
   STRIPE_WEBHOOK_SECRET: z.string().optional().default(''),
+
+  // Shared secret guarding the website-brief owner console (/briefs?k=…).
+  // Left empty, the owner routes refuse every request.
+  BRIEF_OWNER_KEY: z.string().optional().default(''),
 });
 
 export type Env = z.infer<typeof envSchema>;

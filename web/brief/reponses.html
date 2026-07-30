@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Réponses — questionnaires de cadrage</title>
+<meta name="theme-color" content="#04121f">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* Console interne : même palette que le questionnaire, aucun effet — c'est un
+   outil de travail, la densité prime sur la mise en scène. */
+:root{
+  --ink:#04121f;--panel:#08192a;--panel-2:#0b2136;
+  --paper:#F4F1EA;--dim:#c3cedb;--muted:#8598ab;
+  --brass:#C6A664;--brass-hi:#E4CE9A;
+  --line:rgba(255,255,255,.10);--line-strong:rgba(255,255,255,.20);
+  --ok:#4ED8A0;--warn:#E8B04B;--bad:#E0736B;
+  --serif:"Cormorant Garamond",Garamond,serif;
+  --body:"Jost",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--ink);color:var(--paper);font-family:var(--body);font-weight:300;font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--brass);text-decoration:none}
+button,input,textarea,select{font:inherit;color:inherit}
+
+.bar{position:sticky;top:0;z-index:20;background:rgba(4,18,31,.94);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.bar-in{max-width:1120px;margin:0 auto;padding:13px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.logo{font-family:var(--serif);font-size:18px;letter-spacing:.13em;text-transform:uppercase}
+.logo small{display:block;font-family:var(--body);font-size:9px;letter-spacing:.22em;color:var(--brass)}
+.sp{flex:1}
+.tick{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+
+.page{max-width:1120px;margin:0 auto;padding:30px 22px 90px}
+h1{font-family:var(--serif);font-weight:400;font-size:clamp(28px,5vw,42px);line-height:1.1;margin-bottom:6px}
+.sub{color:var(--muted);font-size:13.5px;margin-bottom:26px}
+
+.btn{padding:10px 16px;border-radius:9px;border:1px solid var(--brass);background:var(--brass);color:#0b1a26;font-size:13px;letter-spacing:.06em;cursor:pointer;transition:opacity .2s}
+.btn:hover{opacity:.86}
+.btn.ghost{background:transparent;color:var(--brass);border-color:var(--line-strong)}
+.btn.ghost:hover{border-color:var(--brass);opacity:1}
+.btn.sm{padding:6px 11px;font-size:12px;border-radius:7px}
+
+.card{border:1px solid var(--line);border-radius:14px;background:var(--panel);overflow:hidden}
+.card+.card{margin-top:18px}
+.card>h2{font-family:var(--serif);font-weight:500;font-size:20px;padding:16px 20px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:baseline}
+.card>h2 span{font-family:var(--body);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+
+/* ── Liste ──────────────────────────────────────────────────────────────── */
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{text-align:left;font-weight:400;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);padding:12px 16px;border-bottom:1px solid var(--line)}
+.tbl td{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tbody tr{cursor:pointer;transition:background .2s}
+.tbl tbody tr:hover{background:rgba(198,166,100,.06)}
+.tbl .who{font-size:15px}
+.tbl .who small{display:block;color:var(--muted);font-size:12px}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.pill{display:inline-block;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;padding:4px 10px;border-radius:20px;border:1px solid var(--line-strong);color:var(--muted);white-space:nowrap}
+.pill.draft{border-color:rgba(232,176,75,.4);color:var(--warn)}
+.pill.submitted{border-color:rgba(78,216,160,.45);color:var(--ok)}
+.pill.reviewed{border-color:rgba(198,166,100,.5);color:var(--brass)}
+.pill.won{background:rgba(78,216,160,.16);border-color:transparent;color:var(--ok)}
+.pill.lost{border-color:rgba(224,115,107,.4);color:var(--bad)}
+
+.mini{height:4px;border-radius:4px;background:rgba(255,255,255,.09);width:88px;overflow:hidden}
+.mini i{display:block;height:100%;background:linear-gradient(90deg,var(--brass),var(--brass-hi))}
+
+/* ── Détail ─────────────────────────────────────────────────────────────── */
+.back{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);cursor:pointer;display:inline-block;margin-bottom:18px}
+.back:hover{color:var(--brass)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line)}
+.stat{background:var(--panel);padding:18px 20px}
+.stat b{display:block;font-family:var(--serif);font-size:27px;font-weight:500;line-height:1.15}
+.stat span{font-size:10.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--muted)}
+
+.grid2{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:900px){.grid2{grid-template-columns:1fr}}
+
+.qsec{padding:6px 20px 14px}
+.qsec>h3{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--brass);margin:18px 0 10px;padding-top:14px;border-top:1px solid var(--line)}
+.qsec>h3:first-child{border-top:none;padding-top:0;margin-top:14px}
+.ans{padding:9px 0;border-bottom:1px solid rgba(255,255,255,.045)}
+.ans:last-child{border-bottom:none}
+.ans .qt{font-size:12.5px;color:var(--muted);line-height:1.45}
+.ans .av{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
+.chip{font-size:12.5px;padding:4px 11px;border-radius:7px;background:rgba(198,166,100,.12);border:1px solid rgba(198,166,100,.28);color:var(--brass-hi)}
+.chip.later{background:transparent;border-color:var(--line);color:var(--muted)}
+.chip em{font-style:normal;opacity:.65;margin-left:6px;font-size:11px}
+.chip.none{background:transparent;border-style:dashed;color:#5d7085}
+
+.later-box{margin:0 20px 18px;padding:15px 17px;border-radius:11px;border:1px dashed rgba(232,176,75,.35);background:rgba(232,176,75,.05)}
+.later-box b{font-size:11px;letter-spacing:.17em;text-transform:uppercase;color:var(--warn);display:block;margin-bottom:9px}
+.later-box p{font-size:12.5px;color:var(--muted);margin-top:9px;line-height:1.55}
+
+.kv{padding:6px 20px 18px}
+.kv div{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.045);font-size:14px}
+.kv div:last-child{border-bottom:none}
+.kv dt{flex:0 0 40%;color:var(--muted);font-size:12.5px}
+.kv dd{flex:1;min-width:0;word-break:break-word}
+
+.tl{padding:6px 20px 18px;max-height:460px;overflow:auto}
+.tl::-webkit-scrollbar{width:3px}
+.tl::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:3px}
+.ev{display:grid;grid-template-columns:64px 1fr;gap:12px;padding:8px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,.045)}
+.ev:last-child{border-bottom:none}
+.ev time{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums;padding-top:2px}
+.ev .lbl{color:var(--dim);line-height:1.45}
+.ev .lbl b{font-weight:400;color:var(--paper)}
+.ev.view .lbl,.ev.submit .lbl{color:var(--brass)}
+
+.note{padding:16px 20px 20px}
+.note textarea{width:100%;min-height:110px;resize:vertical;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.035);font-size:14px}
+.note textarea:focus{outline:none;border-color:var(--brass)}
+.note .row{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap}
+select{padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:var(--panel-2);font-size:13px}
+select:focus{outline:none;border-color:var(--brass)}
+
+.link{display:flex;gap:9px;align-items:center;padding:12px 16px;margin:0 20px 18px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.03);font-size:12.5px}
+.link code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+
+/* ── Portail de clé ─────────────────────────────────────────────────────── */
+.gate{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:var(--ink);padding:24px}
+.gate.off{display:none}
+.gate form{width:100%;max-width:360px;text-align:center}
+.gate h2{font-family:var(--serif);font-weight:400;font-size:32px;margin-bottom:8px}
+.gate p{color:var(--muted);font-size:13.5px;margin-bottom:22px}
+.gate input{width:100%;padding:13px 15px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.04);font-size:15px;margin-bottom:12px;text-align:center;letter-spacing:.08em}
+.gate input:focus{outline:none;border-color:var(--brass)}
+.gate .err{color:var(--bad);font-size:12.5px;min-height:19px;margin-top:10px}
+
+.empty{padding:40px 20px;text-align:center;color:var(--muted);font-size:14px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(14px);z-index:80;padding:11px 20px;border-radius:9px;background:var(--brass);color:#0b1a26;font-size:13px;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none}
+.toast.on{opacity:1;transform:translateX(-50%)}
+</style>
+</head>
+<body>
+
+<div class="gate" id="gate">
+  <form id="gateForm">
+    <h2>Console des réponses</h2>
+    <p>Saisissez la clé d’accès (<code>BRIEF_OWNER_KEY</code>).</p>
+    <input id="gateKey" type="password" placeholder="Clé d’accès" autocomplete="off" autofocus>
+    <button class="btn" style="width:100%" type="submit">Ouvrir</button>
+    <div class="err" id="gateErr"></div>
+  </form>
+</div>
+
+<header class="bar">
+  <div class="bar-in">
+    <div class="logo">La Ménagère<small>Console interne</small></div>
+    <div class="sp"></div>
+    <div class="tick" id="tick"></div>
+    <button class="btn ghost sm" id="newBtn">Nouveau questionnaire</button>
+    <button class="btn ghost sm" id="outBtn">Verrouiller</button>
+  </div>
+</header>
+
+<main class="page" id="view"></main>
+<div class="toast" id="toast"></div>
+
+<!-- Même définition de questionnaire que la page envoyée au prospect. -->
+<script src="questionnaire.js"></script>
+<script>
+const API_BASE = new URLSearchParams(location.search).get('api')
+  || (['localhost','127.0.0.1'].includes(location.hostname)
+        ? 'http://localhost:3333'
+        : 'https://lamenagere-paris.vercel.app');
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g,c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const KEY_STORE = 'lmp-brief-owner-key';
+let KEY = localStorage.getItem(KEY_STORE) || '';
+let timer = null;
+
+const STATUS = {draft:'Brouillon',submitted:'Validé',reviewed:'Étudié',won:'Signé',lost:'Perdu'};
+const dt = new Intl.DateTimeFormat('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+const hm = new Intl.DateTimeFormat('fr-FR',{hour:'2-digit',minute:'2-digit'});
+
+function ago(iso){
+  if(!iso) return '—';
+  const s = (Date.now() - new Date(iso)) / 1000;
+  if(s < 90) return 'à l’instant';
+  if(s < 3600) return `il y a ${Math.round(s / 60)} min`;
+  if(s < 86400) return `il y a ${Math.round(s / 3600)} h`;
+  if(s < 604800) return `il y a ${Math.round(s / 86400)} j`;
+  return dt.format(new Date(iso));
+}
+function toast(msg){
+  const t = $('#toast');t.textContent = msg;t.classList.add('on');
+  setTimeout(() => t.classList.remove('on'), 2200);
+}
+
+async function api(path,opts = {}){
+  const sep = path.includes('?') ? '&' : '?';
+  const r = await fetch(`${API_BASE}/briefs${path}${sep}k=${encodeURIComponent(KEY)}`,{
+    headers:{'Content-Type':'application/json'},...opts
+  });
+  if(r.status === 401) throw new Error('unauthorized');
+  if(!r.ok) throw new Error((await r.json().catch(() => ({}))).message || `Erreur ${r.status}`);
+  return r.json();
+}
+
+/* ── Portail ────────────────────────────────────────────────────────────── */
+$('#gateForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  KEY = $('#gateKey').value.trim();
+  $('#gateErr').textContent = '';
+  try{
+    await api('');
+    localStorage.setItem(KEY_STORE, KEY);
+    $('#gate').classList.add('off');
+    route();
+  }catch(err){
+    $('#gateErr').textContent = err.message === 'unauthorized' ? 'Clé refusée.' : 'Serveur injoignable.';
+  }
+});
+$('#outBtn').addEventListener('click', () => {
+  localStorage.removeItem(KEY_STORE);KEY = '';
+  clearInterval(timer);
+  $('#gate').classList.remove('off');$('#gateKey').value = '';$('#gateKey').focus();
+});
+$('#newBtn').addEventListener('click', createBrief);
+
+async function createBrief(){
+  const name = prompt('Nom du prospect ?');
+  if(name === null) return;
+  const slug = (prompt('Segment de lien (minuscules, sans espace) ?',
+    name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')) || '').trim();
+  if(!slug) return;
+  try{
+    const b = await api('',{method:'POST',body:JSON.stringify({slug,clientName:name || undefined})});
+    await navigator.clipboard.writeText(linkFor(b)).catch(() => {});
+    toast('Créé — lien copié dans le presse-papiers');
+    location.hash = '#/' + b.slug;
+    route();
+  }catch(err){toast(err.message);}
+}
+
+const linkFor = b =>
+  `${location.origin}${location.pathname.replace(/reponses\.html$/,'index.html')}?slug=${encodeURIComponent(b.slug)}&t=${encodeURIComponent(b.token)}`;
+
+/* ── Liste ──────────────────────────────────────────────────────────────── */
+async function listView(){
+  let briefs;
+  try{briefs = await api('');}
+  catch(err){return fail(err);}
+
+  $('#view').innerHTML = `
+    <h1>Questionnaires de cadrage</h1>
+    <p class="sub">${briefs.length} questionnaire${briefs.length > 1 ? 's' : ''} — la liste se rafraîchit toute seule.</p>
+    <div class="card">
+      ${briefs.length ? `<table class="tbl">
+        <thead><tr><th>Prospect</th><th>Statut</th><th>Avancement</th><th>Estimation</th><th>Dernière activité</th><th></th></tr></thead>
+        <tbody>${briefs.map(b => `
+          <tr data-slug="${esc(b.slug)}">
+            <td class="who">${esc(b.clientName || b.slug)}<small>${esc(b.company || b.clientEmail || '—')}</small></td>
+            <td><span class="pill ${esc(b.status)}">${STATUS[b.status] || b.status}</span></td>
+            <td><div class="mini"><i style="width:${b.progressPct}%"></i></div>
+                <small style="color:var(--muted);font-size:11px">${b.progressPct} %</small></td>
+            <td class="num">${b.estimatedTotalCents ? CURRENCY.format(b.estimatedTotalCents / 100) : '—'}</td>
+            <td class="num" style="color:var(--muted);font-size:13px">${ago(b.lastSeenAt || b.updatedAt)}</td>
+            <td><button class="btn ghost sm" data-copy="${esc(linkFor(b))}">Lien</button></td>
+          </tr>`).join('')}
+        </tbody></table>`
+        : `<div class="empty">Aucun questionnaire. Créez-en un avec « Nouveau questionnaire ».</div>`}
+    </div>`;
+
+  $('#view').querySelectorAll('tbody tr').forEach(tr => tr.addEventListener('click', e => {
+    if(e.target.dataset.copy) return;
+    location.hash = '#/' + tr.dataset.slug;route();
+  }));
+  $('#view').querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', async e => {
+    e.stopPropagation();
+    await navigator.clipboard.writeText(b.dataset.copy);
+    toast('Lien copié');
+  }));
+}
+
+/* ── Détail ─────────────────────────────────────────────────────────────── */
+async function detailView(slug){
+  let data;
+  try{data = await api(`/${encodeURIComponent(slug)}/full`);}
+  catch(err){return fail(err);}
+  const {brief:b, events} = data;
+  const {_contact:contact = {}, ...answers} = b.answers || {};
+
+  /* Retenu vs reporté, question par question. */
+  const kept = [], later = [];
+  QUESTIONS.forEach(q => {
+    const a = answers[q.k];
+    if(a == null) return;
+    (Array.isArray(a) ? a : [a]).forEach(v => {
+      const o = optOf(q,v);
+      if(o) (o.later ? later : kept).push({q,o});
+    });
+  });
+  const total = totalOf(answers), monthly = monthlyOf(answers);
+
+  $('#view').innerHTML = `
+    <span class="back" id="back">← Tous les questionnaires</span>
+    <h1>${esc(b.clientName || b.slug)}</h1>
+    <p class="sub">${esc(b.company || '')} ${b.company ? '·' : ''}
+       ${b.firstSeenAt ? `ouvert ${ago(b.firstSeenAt)}` : 'jamais ouvert'} ·
+       dernière activité ${ago(b.lastSeenAt || b.updatedAt)}
+       ${b.submittedAt ? `· <span style="color:var(--ok)">validé le ${dt.format(new Date(b.submittedAt))}</span>` : ''}</p>
+
+    <div class="card"><div class="stats">
+      <div class="stat"><b>${CURRENCY.format(total)}</b><span>Estimation HT</span></div>
+      <div class="stat"><b>${monthly ? CURRENCY.format(monthly) : '—'}</b><span>Par mois</span></div>
+      <div class="stat"><b>${b.progressPct} %</b><span>Avancement</span></div>
+      <div class="stat"><b>${kept.length}</b><span>Éléments retenus</span></div>
+      <div class="stat"><b>${b.selectedTier && b.selectedTier !== 'custom' ? esc(TIERS[b.selectedTier]?.name || b.selectedTier) : 'Sur mesure'}</b><span>Formule</span></div>
+    </div></div>
+
+    <div class="card">
+      <div class="link">
+        <code>${esc(linkFor(b))}</code>
+        <button class="btn ghost sm" data-copy="${esc(linkFor(b))}">Copier</button>
+        <a class="btn ghost sm" href="${esc(linkFor(b))}" target="_blank" rel="noopener">Ouvrir</a>
+      </div>
+    </div>
+
+    <div class="grid2" style="margin-top:18px">
+      <div>
+        <div class="card">
+          <h2>Réponses <span>${Object.keys(answers).length} / ${QUESTIONS.length} questions</span></h2>
+          ${later.length ? `<div class="later-box">
+            <b>Reporté en phase 2 — ${later.length} point${later.length > 1 ? 's' : ''}</b>
+            ${later.map(({o}) => `<span class="chip later">${esc(o.l)}</span>`).join(' ')}
+            <p>Ce n’est pas un refus : c’est la matière du prochain devis. À reprendre en rendez-vous.</p>
+          </div>` : ''}
+          <div class="qsec">${sectionsHTML(answers)}</div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <h2>Coordonnées</h2>
+          <div class="kv">
+            ${kv('Nom', contact.clientName || b.clientName)}
+            ${kv('E-mail', (contact.clientEmail || b.clientEmail) ? `<a href="mailto:${esc(contact.clientEmail || b.clientEmail)}">${esc(contact.clientEmail || b.clientEmail)}</a>` : '', true)}
+            ${kv('Téléphone', (contact.clientPhone || b.clientPhone) ? `<a href="tel:${esc((contact.clientPhone || b.clientPhone).replace(/\s/g,''))}">${esc(contact.clientPhone || b.clientPhone)}</a>` : '', true)}
+            ${kv('Domaine souhaité', contact.domainWish || b.domainWish)}
+            ${kv('Échéance', contact.timeline || b.timeline)}
+            ${kv('Budget annoncé', contact.budgetRange || b.budgetRange)}
+          </div>
+        </div>
+        <div class="card">
+          <h2>Suivi</h2>
+          <div class="note">
+            <textarea id="noteBox" placeholder="Notes internes : objections, arbitrages, ce qu’il a dit au téléphone…">${esc(b.internalNote || '')}</textarea>
+            <div class="row">
+              <select id="statusSel">${Object.entries(STATUS).map(([v,l]) =>
+                `<option value="${v}"${b.status === v ? ' selected' : ''}>${l}</option>`).join('')}</select>
+              <button class="btn sm" id="saveBtn">Enregistrer</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Déroulé <span>${events.length} événement${events.length > 1 ? 's' : ''}</span></h2>
+          ${events.length ? `<div class="tl">${events.map(evHTML).join('')}</div>`
+            : '<div class="empty">Rien encore.</div>'}
+        </div>
+      </div>
+    </div>`;
+
+  $('#back').addEventListener('click', () => {location.hash = '';route();});
+  $('#view').querySelectorAll('[data-copy]').forEach(el => el.addEventListener('click', async () => {
+    await navigator.clipboard.writeText(el.dataset.copy);toast('Lien copié');
+  }));
+  $('#saveBtn').addEventListener('click', async () => {
+    try{
+      await api(`/${encodeURIComponent(slug)}`,{method:'PUT',body:JSON.stringify({
+        status:$('#statusSel').value, internalNote:$('#noteBox').value
+      })});
+      toast('Enregistré');
+    }catch(err){toast(err.message);}
+  });
+}
+
+function sectionsHTML(answers){
+  return SECTIONS.map(sec => {
+    const qs = QUESTIONS.filter(q => q.s === sec.id);
+    return `<h3>${esc(sec.title)}</h3>` + qs.map(q => {
+      const a = answers[q.k];
+      const vals = a == null ? [] : (Array.isArray(a) ? a : [a]);
+      const chips = vals.map(v => {
+        const o = optOf(q,v);
+        if(!o) return '';
+        const price = o.m ? `${CURRENCY.format(o.m)}/mois` : o.p ? CURRENCY.format(o.p) : '';
+        return `<span class="chip${o.later ? ' later' : ''}">${esc(o.l)}${price ? `<em>${price}</em>` : ''}</span>`;
+      }).join('');
+      return `<div class="ans">
+        <div class="qt">${esc(q.t)}</div>
+        <div class="av">${chips || '<span class="chip none">Sans réponse</span>'}</div>
+      </div>`;
+    }).join('');
+  }).join('');
+}
+
+function kv(label,value,raw){
+  return `<div><dt>${esc(label)}</dt><dd>${value ? (raw ? value : esc(value)) : '<span style="color:#5d7085">—</span>'}</dd></div>`;
+}
+
+/* Un événement lisible : « a choisi », « a coché », « a décoché ». */
+function evHTML(e){
+  let label;
+  if(e.kind === 'view') label = '<b>A ouvert la page</b>';
+  else if(e.kind === 'submit') label = '<b>A validé son périmètre</b>';
+  else if(e.kind === 'tier') label = `A choisi la formule <b>${esc(TIERS[e.value]?.name || e.value)}</b>`;
+  else{
+    const q = questionOf(e.questionKey);
+    const vals = Array.isArray(e.value) ? e.value : [e.value];
+    const names = vals.map(v => optOf(q || {o:[]},v)?.l).filter(Boolean);
+    label = q
+      ? `${esc(q.t)}<br><b>${names.length ? esc(names.join(' · ')) : 'plus rien de coché'}</b>`
+      : `<b>${esc(e.questionKey || 'réponse')}</b>`;
+  }
+  return `<div class="ev ${esc(e.kind)}"><time>${hm.format(new Date(e.occurredAt))}</time><div class="lbl">${label}</div></div>`;
+}
+
+function fail(err){
+  if(err.message === 'unauthorized'){
+    localStorage.removeItem(KEY_STORE);
+    $('#gate').classList.remove('off');
+    return;
+  }
+  $('#view').innerHTML = `<div class="card"><div class="empty">${esc(err.message)}</div></div>`;
+}
+
+/* ── Routage + rafraîchissement ─────────────────────────────────────────── */
+function route(){
+  if(!KEY){$('#gate').classList.remove('off');return;}
+  $('#gate').classList.add('off');
+  const slug = location.hash.startsWith('#/') ? decodeURIComponent(location.hash.slice(2)) : '';
+  (slug ? detailView(slug) : listView()).then(() => {
+    $('#tick').textContent = 'Actualisé à ' + hm.format(new Date());
+  });
+}
+addEventListener('hashchange', route);
+
+/* Rafraîchissement doux : on peut laisser la console ouverte pendant qu'il répond.
+   La zone de notes en cours de saisie n'est jamais écrasée. */
+timer = setInterval(() => {
+  if(!KEY || document.hidden) return;
+  if(document.activeElement?.tagName === 'TEXTAREA') return;
+  route();
+}, 30000);
+
+route();
+if(KEY) $('#gate').classList.add('off');
+</script>
+</body>
+</html>

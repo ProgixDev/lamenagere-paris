@@ -14,8 +14,9 @@ import {
   logoutApi,
   registerApi,
   updateProfileApi,
+  linkAppleApi,
 } from "./api";
-import { signInWithGoogle } from "./oauth";
+import { signInWithGoogle, signInWithApple } from "./oauth";
 import { unregisterDeviceApi } from "../notifications/api";
 import { AUTH_TOKEN_KEY, PUSH_TOKEN_KEY, USER_KEY } from "../../lib/storage";
 
@@ -55,6 +56,43 @@ export const useAuthStore = create<AuthStore>((set) => ({
       const token = await signInWithGoogle();
       await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
       const user = await getProfileApi();
+      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
+      set({ user, token, isAuthenticated: true, isLoading: false });
+    } catch (e) {
+      await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
+      set({ isLoading: false, error: errorMessage(e), isAuthenticated: false });
+      throw e;
+    }
+  },
+
+  loginWithApple: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      // Native Apple sheet → Supabase access token, which the backend accepts
+      // as a bearer token exactly like the Google flow's.
+      const { token, fullName, authorizationCode } = await signInWithApple();
+      await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
+      let user = await getProfileApi();
+      // Hand the one-time code to the server so it can revoke the Apple grant
+      // if this account is ever deleted (Apple requires it). Best-effort: the
+      // user is signed in either way.
+      if (authorizationCode) {
+        try {
+          await linkAppleApi(authorizationCode);
+        } catch {
+          // non-fatal — revocation just won't be possible for this grant
+        }
+      }
+      // Apple returns the name only on the very first authorization. The signup
+      // trigger cannot see it (it arrives with the token, not as signup
+      // metadata), so write it now or it is gone for good.
+      if (fullName && !user.fullName?.trim()) {
+        try {
+          user = await updateProfileApi({ fullName });
+        } catch {
+          // best-effort — the user can still set their name in the app
+        }
+      }
       await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
       set({ user, token, isAuthenticated: true, isLoading: false });
     } catch (e) {

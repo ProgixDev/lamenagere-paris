@@ -2,6 +2,7 @@ import {
   IsBoolean,
   IsEmail,
   IsEnum,
+  IsNotEmpty,
   IsOptional,
   IsString,
   MinLength,
@@ -101,4 +102,15 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsBoolean()
   onboarded?: boolean;
+}
+
+/**
+ * One-time authorization code from the native Sign in with Apple sheet. Posted
+ * right after sign-in so the server can obtain (and later revoke) the refresh
+ * token — Apple requires revocation on account deletion.
+ */
+export class LinkAppleDto {
+  @IsString()
+  @IsNotEmpty()
+  authorizationCode!: string;
 }

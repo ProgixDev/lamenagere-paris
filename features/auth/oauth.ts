@@ -1,5 +1,6 @@
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
+import * as AppleAuthentication from "expo-apple-authentication";
 import { supabase } from "../../lib/supabase";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -39,6 +40,76 @@ async function exchange(callbackUrl: string): Promise<string> {
   }
   console.log("[oauth] session obtained");
   return data.session.access_token;
+}
+
+/** True when the OS can present the Apple sheet (iOS 13+; never on Android). */
+export async function isAppleSignInAvailable(): Promise<boolean> {
+  try {
+    return await AppleAuthentication.isAvailableAsync();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Sign in with Apple. Unlike Google (which goes through the Supabase-hosted web
+ * flow) this uses the *native* sheet: Apple hands us an identity token that
+ * Supabase verifies directly, so there is no browser round-trip and no redirect
+ * to capture. Returns a Supabase access token, same contract as
+ * signInWithGoogle, so callers are interchangeable.
+ *
+ * Apple only returns the user's name on the *first* authorization ever granted
+ * for this app, so it is handed back to the caller to persist immediately —
+ * there is no second chance to read it. It deliberately does NOT go through
+ * supabase.auth.updateUser: the `handle_new_user` trigger copies
+ * raw_user_meta_data into `profiles` at user-creation time, which already
+ * happened inside signInWithIdToken below, so a metadata write afterwards would
+ * never reach the profiles row.
+ */
+export async function signInWithApple(): Promise<{
+  token: string;
+  fullName: string | null;
+  /** One-time code the server exchanges for a revocable refresh token. */
+  authorizationCode: string | null;
+}> {
+  let credential: AppleAuthentication.AppleAuthenticationCredential;
+  try {
+    credential = await AppleAuthentication.signInAsync({
+      requestedScopes: [
+        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      ],
+    });
+  } catch (e) {
+    // The user dismissing the sheet surfaces as ERR_REQUEST_CANCELED; keep it
+    // distinguishable so the UI can stay silent instead of showing an error.
+    if ((e as { code?: string })?.code === "ERR_REQUEST_CANCELED") {
+      throw new Error("Connexion Apple annulée");
+    }
+    throw new Error("Connexion Apple échouée");
+  }
+
+  if (!credential.identityToken) {
+    throw new Error("Connexion Apple échouée");
+  }
+
+  const { data, error } = await supabase.auth.signInWithIdToken({
+    provider: "apple",
+    token: credential.identityToken,
+  });
+  if (error || !data.session) {
+    console.log("[oauth] apple signInWithIdToken failed", error?.message);
+    throw new Error("Connexion Apple échouée");
+  }
+
+  const { givenName, familyName } = credential.fullName ?? {};
+  const fullName = [givenName, familyName].filter(Boolean).join(" ").trim();
+
+  return {
+    token: data.session.access_token,
+    fullName: fullName || null,
+    authorizationCode: credential.authorizationCode ?? null,
+  };
 }
 
 /**

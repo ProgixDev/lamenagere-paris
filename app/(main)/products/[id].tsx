@@ -39,6 +39,7 @@ import { useCartStore } from "../../../features/cart/store";
 import { useFavoritesStore } from "../../../features/favorites/store";
 import { useProduct, usePopularProducts } from "../../../features/products/hooks";
 import { useProductReviews } from "../../../features/reviews/hooks";
+import { useRequireAuth } from "../../../features/auth/guards";
 import StarRating from "../../../components/ui/StarRating";
 
 const { width: W, height: H } = Dimensions.get("window");
@@ -56,6 +57,9 @@ export default function ProductDetailScreen() {
   const addItem = useCartStore((s) => s.addItem);
   const isFavorited = useFavoritesStore((s) => s.favorites.includes(id));
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
+  // Browsing and building a cart stay open to guests; asking for a quote or
+  // messaging the seller writes to their account, so those need a sign-in.
+  const requireAuth = useRequireAuth();
 
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [selectedColorKey, setSelectedColorKey] = useState<string | null>(null);
@@ -659,7 +663,12 @@ export default function ProductDetailScreen() {
 
         {/* Stacked full-width CTAs: devis (yellow) then commander (blue). */}
         <TouchableOpacity
-          onPress={() => setDevisOpen(true)}
+          onPress={() =>
+            requireAuth(() => setDevisOpen(true), {
+              message:
+                "Connectez-vous ou créez un compte pour demander un devis — nous vous répondrons dans votre espace.",
+            })
+          }
           activeOpacity={0.85}
           style={{
             backgroundColor: COLORS.surfaceContainerLowest,
@@ -719,7 +728,14 @@ export default function ProductDetailScreen() {
         }
       />
 
-      <FloatingContactButton onPress={() => setContactOpen(true)} />
+      <FloatingContactButton
+        onPress={() =>
+          requireAuth(() => setContactOpen(true), {
+            message:
+              "Connectez-vous ou créez un compte pour contacter notre équipe au sujet de ce produit.",
+          })
+        }
+      />
     </View>
   );
 }

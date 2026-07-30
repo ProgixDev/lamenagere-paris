@@ -19,6 +19,8 @@ import { ORDER_STATUS_LABELS } from "../../../features/orders/store";
 import { useQuoteRequests } from "../../../features/quotes/hooks";
 import { useCartStore } from "../../../features/cart/store";
 import type { QuoteStatus } from "../../../lib/types";
+import GuestGate from "../../../components/GuestGate";
+import { useIsGuestVisitor } from "../../../features/auth/guards";
 
 const STATUS_COLORS: Record<string, string> = {
   commande_confirmee: COLORS.primary,
@@ -44,7 +46,7 @@ const QUOTE_STATUS_COLORS: Record<QuoteStatus, string> = {
 
 type Tab = "orders" | "quotes";
 
-export default function OrdersScreen() {
+function OrdersScreenContent() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("orders");
   const { data: orders = [], isLoading: ordersLoading } = useOrders();
@@ -276,4 +278,23 @@ function EmptyBlock({ icon, title, message }: { icon: string; title: string; mes
       <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.onSurfaceVariant, textAlign: "center" }}>{message}</Text>
     </View>
   );
+}
+
+/**
+ * Guests may browse the catalogue freely, but this screen holds personal
+ * account data — show the sign-in prompt instead of firing authenticated
+ * requests that would fail.
+ */
+export default function OrdersScreen() {
+  const isGuestVisitor = useIsGuestVisitor();
+  if (isGuestVisitor) {
+    return (
+      <GuestGate
+        icon="package-variant-closed"
+        title="Vos commandes"
+        message="Connectez-vous pour suivre vos commandes et vos demandes de devis."
+      />
+    );
+  }
+  return <OrdersScreenContent />;
 }

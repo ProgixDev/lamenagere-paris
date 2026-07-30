@@ -19,6 +19,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { PromoModule } from './modules/promo/promo.module';
+import { BriefsModule } from './modules/briefs/briefs.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { AppController } from './app.controller';
 
@@ -43,6 +44,7 @@ import { AppController } from './app.controller';
     TicketsModule,
     UploadsModule,
     PromoModule,
+    BriefsModule,
     AdminModule,
   ],
   controllers: [AppController],

@@ -17,8 +17,10 @@ import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import Toast from "../../components/ui/Toast";
 import { changePasswordApi } from "../../features/auth/api";
+import GuestGate from "../../components/GuestGate";
+import { useIsGuestVisitor } from "../../features/auth/guards";
 
-export default function ChangePasswordScreen() {
+function ChangePasswordScreenContent() {
   const router = useRouter();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -117,4 +119,23 @@ export default function ChangePasswordScreen() {
       />
     </SafeAreaView>
   );
+}
+
+/**
+ * Guests may browse the catalogue freely, but this screen holds personal
+ * account data — show the sign-in prompt instead of firing authenticated
+ * requests that would fail.
+ */
+export default function ChangePasswordScreen() {
+  const isGuestVisitor = useIsGuestVisitor();
+  if (isGuestVisitor) {
+    return (
+      <GuestGate
+        icon="lock-outline"
+        title="Votre compte"
+        message="Connectez-vous pour modifier votre mot de passe."
+      />
+    );
+  }
+  return <ChangePasswordScreenContent />;
 }

@@ -30,7 +30,8 @@ export interface QuoteProfileRow {
 export interface QuoteRow {
   id: string;
   quote_number: string | null;
-  profile_id: string;
+  /** NULL once the customer deleted their account (quote kept for accounting). */
+  profile_id: string | null;
   product_id: string | null;
   product_name: string | null;
   product_image: string | null;

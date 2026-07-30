@@ -18,8 +18,10 @@ import Button from "../../components/ui/Button";
 import Toast from "../../components/ui/Toast";
 import { useAuthStore } from "../../features/auth/store";
 import type { AccountType } from "../../lib/types";
+import GuestGate from "../../components/GuestGate";
+import { useIsGuestVisitor } from "../../features/auth/guards";
 
-export default function EditProfileScreen() {
+function EditProfileScreenContent() {
   const router = useRouter();
   const { user, updateProfile, isLoading, clearError } = useAuthStore();
 
@@ -213,4 +215,23 @@ export default function EditProfileScreen() {
       />
     </SafeAreaView>
   );
+}
+
+/**
+ * Guests may browse the catalogue freely, but this screen holds personal
+ * account data — show the sign-in prompt instead of firing authenticated
+ * requests that would fail.
+ */
+export default function EditProfileScreen() {
+  const isGuestVisitor = useIsGuestVisitor();
+  if (isGuestVisitor) {
+    return (
+      <GuestGate
+        icon="account-outline"
+        title="Votre profil"
+        message="Connectez-vous pour modifier vos informations personnelles."
+      />
+    );
+  }
+  return <EditProfileScreenContent />;
 }

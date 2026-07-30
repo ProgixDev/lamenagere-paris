@@ -27,6 +27,8 @@ import {
 import { useCreateReview } from "../../../features/reviews/hooks";
 import { summarizeConfiguration } from "../../../lib/config-blocks";
 import type { OrderItem, RefundStatus } from "../../../lib/types";
+import GuestGate from "../../../components/GuestGate";
+import { useIsGuestVisitor } from "../../../features/auth/guards";
 
 const CANCELLABLE_STATUSES = ["commande_confirmee", "en_preparation"];
 
@@ -51,7 +53,7 @@ const REFUND_BANNER: Record<
   },
 };
 
-export default function OrderDetailScreen() {
+function OrderDetailScreenContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { data: order, isLoading } = useOrder(id);
@@ -466,4 +468,23 @@ export default function OrderDetailScreen() {
       </Modal>
     </SafeAreaView>
   );
+}
+
+/**
+ * Guests may browse the catalogue freely, but this screen holds personal
+ * account data — show the sign-in prompt instead of firing authenticated
+ * requests that would fail.
+ */
+export default function OrderDetailScreen() {
+  const isGuestVisitor = useIsGuestVisitor();
+  if (isGuestVisitor) {
+    return (
+      <GuestGate
+        icon="package-variant-closed"
+        title="Vos commandes"
+        message="Connectez-vous pour consulter le détail de vos commandes."
+      />
+    );
+  }
+  return <OrderDetailScreenContent />;
 }

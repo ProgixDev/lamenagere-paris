@@ -38,6 +38,7 @@
         "releaseStatus": "draft"
       },
       "ios": {
+        "ascAppId": "6794943782",
         "ascApiKeyPath": "./asc-api-key.p8",
         "ascApiKeyId": "B2R47R673W",
         "ascApiKeyIssuerId": "a53a067d-f063-42e5-955c-9a7d92dc333b"

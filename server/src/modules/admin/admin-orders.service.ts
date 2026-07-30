@@ -90,13 +90,16 @@ export class AdminOrdersService {
 
     return {
       order: toOrderDto(row),
-      client: row.profile
-        ? {
-            id: row.profile_id,
-            name: row.profile.full_name ?? '',
-            accountType: row.profile.account_type,
-          }
-        : null,
+      // NULL profile_id = the customer deleted their account; the order is
+      // retained for accounting but has no client to link to any more.
+      client:
+        row.profile_id && row.profile
+          ? {
+              id: row.profile_id,
+              name: row.profile.full_name ?? '',
+              accountType: row.profile.account_type,
+            }
+          : null,
       notes: (notes ?? []).map((n) => ({
         id: n.id,
         body: n.body,
@@ -257,11 +260,14 @@ export class AdminOrdersService {
   // ── helpers ────────────────────────────────────────────────────────────────
   /** Best-effort push to the order's customer; never throws into the request. */
   private async notifyCustomer(
-    profileId: string,
+    profileId: string | null,
     title: string,
     body: string,
     orderId: string,
   ): Promise<void> {
+    // No profile = the customer deleted their account; there is nobody left to
+    // push to (their devices cascaded away with the profile).
+    if (!profileId) return;
     try {
       const tokens = await this.devices.tokensForProfiles([profileId]);
       if (tokens.length === 0) return;

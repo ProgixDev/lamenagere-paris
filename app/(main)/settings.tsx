@@ -21,8 +21,10 @@ import {
 } from "../../features/notifications/api";
 import { useNotifPrefStore } from "../../features/notifications/preference";
 import { useAuthStore } from "../../features/auth/store";
+import GuestGate from "../../components/GuestGate";
+import { useIsGuestVisitor } from "../../features/auth/guards";
 
-export default function SettingsScreen() {
+function SettingsScreenContent() {
   const router = useRouter();
   const notifications = useNotifPrefStore((s) => s.enabled);
   const setNotifEnabled = useNotifPrefStore((s) => s.setEnabled);
@@ -50,7 +52,7 @@ export default function SettingsScreen() {
   const handleDeleteAccount = () => {
     Alert.alert(
       "Supprimer mon compte",
-      "Cette action est irréversible. Toutes vos données seront supprimées.",
+      "Cette action est irréversible. Votre compte et vos données personnelles seront supprimés. Vos factures sont conservées de façon anonyme pendant la durée légale de conservation comptable.",
       [
         { text: "Annuler", style: "cancel" },
         {
@@ -176,4 +178,23 @@ function SettingsRow({ icon, label, value, onPress, rightComponent, last = false
       {rightComponent || (onPress && <Icon name="chevron-right" size={18} color={COLORS.surfaceDim} />)}
     </TouchableOpacity>
   );
+}
+
+/**
+ * Guests may browse the catalogue freely, but this screen holds personal
+ * account data — show the sign-in prompt instead of firing authenticated
+ * requests that would fail.
+ */
+export default function SettingsScreen() {
+  const isGuestVisitor = useIsGuestVisitor();
+  if (isGuestVisitor) {
+    return (
+      <GuestGate
+        icon="cog-outline"
+        title="Vos réglages"
+        message="Connectez-vous pour gérer vos préférences, vos notifications et votre compte."
+      />
+    );
+  }
+  return <SettingsScreenContent />;
 }
