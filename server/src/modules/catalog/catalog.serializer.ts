@@ -145,6 +145,8 @@ export interface ProductRow {
   delivery_outremer: string;
   stock_qty: number | null;
   low_stock_threshold: number | null;
+  /** Units one order may take of a standard product; null = no cap. */
+  max_per_order: number | null;
   /** Per-product override of the category's blocks; null = inherit. */
   config_blocks: ConfigBlock[] | null;
   /** Colour variants, each with its own gallery images. */
@@ -197,6 +199,12 @@ export interface ProductDto {
   configBlocks: ConfigBlock[];
   /** Colour variants; selecting one swaps the gallery to its images. */
   colors?: ProductColor[];
+  /** Availability label; omitted when the product doesn't track stock. */
+  stock?: Exclude<StockLabel, null>;
+  /** Units left in stock. Undefined when stock isn't tracked. */
+  stockQty?: number;
+  /** Units one order may take. Undefined when there's no per-order cap. */
+  maxPerOrder?: number;
   createdAt: string;
   /** Average customer rating (0–5) and number of reviews. */
   ratingAvg: number;
@@ -307,10 +315,14 @@ export function toProductDto(row: ProductRow): ProductDto {
       outreMer: row.delivery_outremer,
     },
     media: media.map((m) => ({ type: m.type, url: m.url })),
-    // Product override wins; otherwise inherit the category's template.
+    // Product override always wins. Inheritance from the category template is
+    // for made-to-measure products only: a fixed-price product is bought by
+    // the unit, so it must not pick up its category's configuration steps.
     configBlocks: row.config_blocks?.length
       ? row.config_blocks
-      : row.category?.config_blocks ?? [],
+      : row.price_mode === 'fixed' && row.product_type === 'standard'
+        ? []
+        : row.category?.config_blocks ?? [],
     colors:
       row.colors && row.colors.length
         ? row.colors.map((c) => ({
@@ -320,6 +332,9 @@ export function toProductDto(row: ProductRow): ProductDto {
             images: c.images ?? [],
           }))
         : undefined,
+    stock: deriveStock(row.stock_qty, row.low_stock_threshold) ?? undefined,
+    stockQty: row.stock_qty ?? undefined,
+    maxPerOrder: row.max_per_order ?? undefined,
     createdAt: row.created_at,
     ratingAvg: row.rating_avg != null ? Number(row.rating_avg) : 0,
     ratingCount: row.rating_count ?? 0,
@@ -406,7 +421,7 @@ export function toAdminCategoryDto(
 }
 
 export const PRODUCT_SELECT =
-  'id, sku, name, slug, description, short_description, category_id, product_type, price_mode, status, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, opening_types, quality_tiers, dim_width, dim_height, dim_depth, dim_unit, ref_width, ref_height, ref_unit, min_width, min_height, max_width, max_height, customizable, delivery_metropole, delivery_outremer, stock_qty, low_stock_threshold, config_blocks, colors, created_at, rating_avg, rating_count, category:categories(*), media:product_media(*)';
+  'id, sku, name, slug, description, short_description, category_id, product_type, price_mode, status, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, opening_types, quality_tiers, dim_width, dim_height, dim_depth, dim_unit, ref_width, ref_height, ref_unit, min_width, min_height, max_width, max_height, customizable, delivery_metropole, delivery_outremer, stock_qty, low_stock_threshold, max_per_order, config_blocks, colors, created_at, rating_avg, rating_count, category:categories(*), media:product_media(*)';
 
 export const CATEGORY_SELECT =
   'id, name, slug, icon, image_url, description, accent_color, parent_id, sort_order, is_visible, is_featured_home, b2b_only, delivery_override, config_blocks';

@@ -173,6 +173,7 @@ export class AdminProductsService {
       free_shipping: dto.freeShipping ?? false,
       stock_qty: dto.stockQty,
       low_stock_threshold: dto.lowStockThreshold,
+      max_per_order: dto.maxPerOrder,
       seo_title: dto.seoTitle,
       seo_description: dto.seoDescription,
       // Empty/omitted → null so the product inherits its category template.

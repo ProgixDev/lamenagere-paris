@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { persistStorage } from "../../lib/persist-storage";
 import type { Product, CartItem, ItemConfiguration } from "../../lib/types";
 import { computeConfiguredPrice } from "../../lib/pricing";
+import { maxOrderableQty } from "../../lib/stock";
 
 /** Optional configuration captured from the category's config blocks. */
 interface AddItemExtra {
@@ -80,9 +81,15 @@ export const useCartStore = create<CartStore>()(
 
         if (existingIndex >= 0) {
           const updated = [...items];
+          // Merging must respect the same ceiling the stepper does, or two
+          // visits to the product page could put more in the cart than the
+          // warehouse holds.
           updated[existingIndex] = {
             ...updated[existingIndex],
-            quantity: updated[existingIndex].quantity + quantity,
+            quantity: Math.min(
+              updated[existingIndex].quantity + quantity,
+              maxOrderableQty(product),
+            ),
           };
           set({ items: updated, lastUpdated: Date.now() });
         } else {

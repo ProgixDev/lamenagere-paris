@@ -27,6 +27,7 @@ import { COLORS, BRAND, PRODUCT_TYPES, PRICE_MODES } from "../../../lib/constant
 import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import { formatPrice } from "../../../lib/utils";
 import { priceTagLabel, computeConfiguredPrice, perSqmRate } from "../../../lib/pricing";
+import { isOutOfStock, maxOrderableQty } from "../../../lib/stock";
 import Button from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
 import PressableScale from "../../../components/ui/PressableScale";
@@ -41,6 +42,7 @@ import { useProduct, usePopularProducts } from "../../../features/products/hooks
 import { useProductReviews } from "../../../features/reviews/hooks";
 import { useRequireAuth } from "../../../features/auth/guards";
 import StarRating from "../../../components/ui/StarRating";
+import QuantitySelector from "../../../components/ui/QuantitySelector";
 import { productCoverSource } from "../../../lib/product-media";
 
 const { width: W, height: H } = Dimensions.get("window");
@@ -84,6 +86,11 @@ export default function ProductDetailScreen() {
   const [contactOpen, setContactOpen] = useState(false);
   const [devisOpen, setDevisOpen] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
+  // Units chosen on the stepper, for products sold by the unit. `addedCount`
+  // keeps the last added amount so the confirmation can name it after the
+  // stepper has gone back to one.
+  const [quantity, setQuantity] = useState(1);
+  const [addedCount, setAddedCount] = useState(1);
   // Inline made-to-measure inputs (cm) for per-m² products.
   const [customWidth, setCustomWidth] = useState("");
   const [customHeight, setCustomHeight] = useState("");
@@ -151,6 +158,19 @@ export default function ProductDetailScreen() {
   const hasConfiguration =
     needsDimensions || hasOpeningTypes || configBlocks.length > 0;
 
+  // Sold by the unit: nothing to configure, so the customer picks a quantity
+  // with − / + and adds it straight to the cart. Two limits bound the stepper
+  // and the lower one wins — what's left in stock, and the per-order cap set
+  // in the back office. Neither is required; untracked products stop at 99.
+  // A price is part of the deal: without one there's nothing to multiply, so
+  // the product keeps the devis + add-to-cart bar.
+  const isUnitSale = !hasConfiguration && !isPerSqm && product.price != null;
+  const outOfStock = isOutOfStock(product);
+  const maxQuantity = maxOrderableQty(product);
+  // "Plus que 2" is only worth saying while it's true — above the low-stock
+  // threshold the server reports en_stock and we stay quiet.
+  const lowStock = product.stock === "stock_faible" && product.stockQty != null;
+
   // Pure made-to-measure (priced by area, no extra options): the customer
   // enters width × height right here and we price + add it to the cart inline.
   const optionBlocks = configBlocks.filter((b) => b.type !== "measurements");
@@ -197,6 +217,7 @@ export default function ProductDetailScreen() {
       }
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       addItem(product, 1, dims, undefined, qualityTier ?? undefined);
+      setAddedCount(1);
       setJustAdded(true);
       setTimeout(() => setJustAdded(false), 1500);
       setToast({ visible: true, message: "Ajouté au panier", type: "success" });
@@ -207,12 +228,24 @@ export default function ProductDetailScreen() {
       router.push(`/(main)/configure/${product.id}`);
       return;
     }
-    // Simple product → straight to the cart.
+    // Sold by the unit → the chosen quantity goes straight to the cart.
+    if (outOfStock) {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setToast({ visible: true, message: "Ce produit est en rupture de stock", type: "error" });
+      return;
+    }
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    addItem(product, 1);
+    addItem(product, quantity);
+    setAddedCount(quantity);
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 1500);
-    setToast({ visible: true, message: "Ajouté au panier", type: "success" });
+    setToast({
+      visible: true,
+      message: quantity > 1 ? `${quantity} articles ajoutés au panier` : "Ajouté au panier",
+      type: "success",
+    });
+    // Back to one, so a second tap doesn't silently repeat a large order.
+    setQuantity(1);
   };
 
   const handleFavorite = async () => {
@@ -385,6 +418,36 @@ export default function ProductDetailScreen() {
                 </Text>
               </View>
             ) : null}
+
+            {/* Availability, said only when it changes what the customer can
+                do: nothing left, or few enough that waiting is a risk. */}
+            {isUnitSale && (outOfStock || lowStock) && (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  marginTop: 10,
+                }}
+              >
+                <Icon
+                  name={outOfStock ? "close-circle-outline" : "alert-circle-outline"}
+                  size={15}
+                  color={outOfStock ? COLORS.error : COLORS.warning}
+                />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontFamily: FONTS.bodyMedium,
+                    color: outOfStock ? COLORS.error : COLORS.warning,
+                  }}
+                >
+                  {outOfStock
+                    ? "Rupture de stock"
+                    : `Plus que ${product.stockQty} en stock`}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -681,12 +744,14 @@ export default function ProductDetailScreen() {
           >
             <Icon name="cart-check" size={15} color="#fff" />
             <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: "#fff" }}>
-              +1 dans le panier
+              +{addedCount} dans le panier
             </Text>
           </Animated.View>
         )}
 
-        {/* Stacked full-width CTAs: devis (yellow) then commander (blue). */}
+        {/* A fixed-price product sold by the unit has a price already — only
+            made-to-measure work needs quoting. */}
+        {!isUnitSale && (
         <TouchableOpacity
           onPress={() =>
             requireAuth(() => setDevisOpen(true), {
@@ -713,20 +778,51 @@ export default function ProductDetailScreen() {
             Demander un devis
           </Text>
         </TouchableOpacity>
+        )}
 
-        <Button
-          label={
-            justAdded
-              ? "Ajouté ✓"
-              : hasConfiguration && !inlineSqm
-                ? "Configurer & commander"
-                : "Ajouter au panier"
-          }
-          onPress={handlePrimaryAction}
-          size="lg"
-          radius={14}
-          tint={CTA_TINT}
-        />
+        {/* Sold by the unit: quantity on the left, add to cart filling the
+            rest. Everything else keeps the single full-width CTA. */}
+        {isUnitSale ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <QuantitySelector
+              quantity={quantity}
+              onQuantityChange={setQuantity}
+              max={maxQuantity}
+              outlined
+              disabled={outOfStock}
+            />
+            <View style={{ flex: 1 }}>
+              <Button
+                label={
+                  outOfStock
+                    ? "Rupture de stock"
+                    : justAdded
+                      ? "Ajouté ✓"
+                      : "Ajouter au panier"
+                }
+                onPress={handlePrimaryAction}
+                disabled={outOfStock}
+                size="lg"
+                radius={14}
+                tint={CTA_TINT}
+              />
+            </View>
+          </View>
+        ) : (
+          <Button
+            label={
+              justAdded
+                ? "Ajouté ✓"
+                : hasConfiguration && !inlineSqm
+                  ? "Configurer & commander"
+                  : "Ajouter au panier"
+            }
+            onPress={handlePrimaryAction}
+            size="lg"
+            radius={14}
+            tint={CTA_TINT}
+          />
+        )}
       </View>
 
       <Toast

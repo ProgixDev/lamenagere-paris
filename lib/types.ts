@@ -1,5 +1,8 @@
 export type AccountType = "particulier" | "professionnel";
 export type ProductType = "standard" | "quote_only" | "configurable";
+
+/** Availability of a stock-tracked product, derived server-side. */
+export type StockLabel = "en_stock" | "stock_faible" | "rupture";
 export type PriceMode = "fixed" | "calculated" | "per_sqm" | "quote";
 
 export interface OpeningTypeOption {
@@ -180,6 +183,12 @@ export interface Product {
   qualityTiers?: QualityTierOption[];
   /** Colour variants; selecting one swaps the gallery to its images. */
   colors?: ProductColor[];
+  /** Availability label; absent when the product doesn't track stock. */
+  stock?: StockLabel;
+  /** Units left in stock. Absent when stock isn't tracked. */
+  stockQty?: number;
+  /** Units one order may take. Absent when there's no per-order cap. */
+  maxPerOrder?: number;
   deliveryEstimates: {
     metropole: string;
     outreMer: string;

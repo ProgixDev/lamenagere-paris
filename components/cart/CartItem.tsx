@@ -10,6 +10,7 @@ import { openingTypeLabel } from "../../lib/opening-types";
 import { summarizeConfiguration } from "../../lib/config-blocks";
 import type { CartItem as CartItemType } from "../../lib/types";
 import QuantitySelector from "../ui/QuantitySelector";
+import { maxOrderableQty } from "../../lib/stock";
 import { productCoverSource } from "../../lib/product-media";
 
 interface CartItemProps {
@@ -181,6 +182,7 @@ export default function CartItem({
         <QuantitySelector
           quantity={quantity}
           onQuantityChange={onUpdateQuantity}
+          max={maxOrderableQty(product)}
           compact
         />
       </View>

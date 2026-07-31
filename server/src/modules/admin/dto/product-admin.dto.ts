@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Min,
   MinLength,
   ValidateNested,
 } from 'class-validator';
@@ -96,6 +97,8 @@ export class UpsertProductDto {
 
   @IsOptional() @IsInt() stockQty?: number;
   @IsOptional() @IsInt() lowStockThreshold?: number;
+  /** Units one order may take of a standard product; omitted = no cap. */
+  @IsOptional() @IsInt() @Min(1) maxPerOrder?: number;
 
   @IsOptional() @IsString() seoTitle?: string;
   @IsOptional() @IsString() seoDescription?: string;
