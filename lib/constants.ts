@@ -27,6 +27,30 @@ export const COLORS = {
   warning: "#F59E0B",
 } as const;
 
+/**
+ * The three marks from the La Ménagère Paris logo (assets/logo.png), used as
+ * accents on top of the navy/neutral base — never as page backgrounds.
+ *
+ * Each one has one job, so the colour always means something:
+ *   blue   → prices, CTAs and selected states on the product page; the price
+ *            bar on catalogue cards
+ *   yellow → the curated "Notre sélection" rails, and ratings
+ *   red    → the tricolour rule on the product page
+ *
+ * Text colour is not interchangeable across these. `blue` carries white text
+ * (7.6:1) and reads well as text on white; `yellow` is far too light for
+ * white (1.6:1), so anything set on it uses `COLORS.primary` navy (9.7:1).
+ * `red` currently carries no text — keep it that way, or deepen it to about
+ * #E31B22 first.
+ */
+export const BRAND = {
+  blue: "#0049C9",
+  /** Darker end of the brand-blue gradient on filled buttons. */
+  blueDeep: "#003AA3",
+  yellow: "#FEC103",
+  red: "#F91317",
+} as const;
+
 export const SHIPPING_ZONES = {
   METROPOLE: "metropole",
   REUNION: "reunion",

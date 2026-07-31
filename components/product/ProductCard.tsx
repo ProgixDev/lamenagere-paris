@@ -6,6 +6,7 @@ import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../lib/constants";
 import { priceTagLabel } from "../../lib/pricing";
+import { productCoverUri } from "../../lib/product-media";
 import type { Product } from "../../lib/types";
 import { useFavoritesStore } from "../../features/favorites/store";
 import { useCartStore } from "../../features/cart/store";
@@ -26,6 +27,9 @@ export default function ProductCard({
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
   const isFavorited = useFavoritesStore((s) => s.favorites.includes(product.id));
   const addItem = useCartStore((s) => s.addItem);
+  // Products whose only gallery media is a video keep their photos on the
+  // colour variants, so the cover falls back to the first colour image.
+  const coverUri = productCoverUri(product);
 
   const handlePress = () => {
     router.push(`/(main)/products/${product.id}`);
@@ -58,7 +62,7 @@ export default function ProductCard({
           }}
         >
           <Image
-            source={{ uri: product.images[0] }}
+            source={coverUri ? { uri: coverUri } : undefined}
             style={{ width: "100%", height: "100%" }}
             contentFit="cover"
             placeholder={{ blurhash: "LGF5]+Yk^6#M@-5c,1J5@[or[Q6." }}
@@ -106,7 +110,7 @@ export default function ProductCard({
         }}
       >
         <Image
-          source={{ uri: product.images[0] }}
+          source={coverUri ? { uri: coverUri } : undefined}
           style={{ width: "100%", height: "100%" }}
           contentFit="cover"
           placeholder={{ blurhash: "LGF5]+Yk^6#M@-5c,1J5@[or[Q6." }}

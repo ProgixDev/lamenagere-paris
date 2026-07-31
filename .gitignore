@@ -39,7 +39,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
-
+/NOQTA LEGAL
 # heavy product videos — manage via CDN/admin instead of git
 *.mp4
 .env
@@ -51,3 +51,4 @@ daily-report-2026-07-01.md
 # Google Play submission credential
 play-service-account.json
 lamenagere-paris-preview.apk
+daily-report-2026-07-30.md

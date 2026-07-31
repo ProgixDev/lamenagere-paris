@@ -11,12 +11,12 @@ import {
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
-import { COLORS } from "../../../lib/constants";
+import { COLORS, BRAND } from "../../../lib/constants";
 import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import { priceTagLabel } from "../../../lib/pricing";
 import type { Product } from "../../../lib/types";
@@ -31,6 +31,7 @@ import {
   useCategoryFeatured,
   useProductsByCategory,
 } from "../../../features/products/hooks";
+import { productCoverSource } from "../../../lib/product-media";
 
 const { width: W } = Dimensions.get("window");
 const CARD_W = (W - 20 * 2 - 12) / 2;
@@ -49,7 +50,7 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
   const router = useRouter();
   const toggleFav = useFavoritesStore((s) => s.toggleFavorite);
   const isFav = useFavoritesStore((s) => s.favorites.includes(product.id));
-  const imgSource = getProductImage(product.images[0]);
+  const imgSource = productCoverSource(product);
 
   return (
     <TouchableOpacity
@@ -104,7 +105,7 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
         </TouchableOpacity>
       </View>
 
-      <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 14 }}>
+      <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10 }}>
         <Text
           style={{ fontSize: 13, lineHeight: 18, fontFamily: FONTS.bodyMedium, color: COLORS.onSurface, marginBottom: 3 }}
           numberOfLines={1}
@@ -112,12 +113,19 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
           {product.name}
         </Text>
         <Text
-          style={{ fontSize: 11, fontFamily: FONTS.body, color: COLORS.onSurfaceVariant, marginBottom: 6 }}
+          style={{ fontSize: 11, fontFamily: FONTS.body, color: COLORS.onSurfaceVariant }}
           numberOfLines={1}
         >
           par La Ménagère Paris
         </Text>
-        <Text style={[TYPE.price, { fontSize: 19 }]}>
+      </View>
+
+      {/* Price bar — brand blue, flush to the card's bottom edge. */}
+      <View style={{ backgroundColor: BRAND.blue, paddingHorizontal: 12, paddingVertical: 9 }}>
+        <Text
+          style={[TYPE.price, { fontSize: 19, color: "#fff", textAlign: "right" }]}
+          numberOfLines={1}
+        >
           {priceTagLabel(product)}
         </Text>
       </View>
@@ -140,7 +148,7 @@ function SelectionRail({ products }: { products: Product[] }) {
           marginBottom: 12,
         }}
       >
-        <MaterialCommunityIcons name="star" size={16} color={COLORS.primary} />
+        <MaterialCommunityIcons name="star" size={16} color={BRAND.yellow} />
         <Text style={[TYPE.sectionTitle, { fontSize: 20, lineHeight: 24 }]}>
           Notre sélection
         </Text>
@@ -148,40 +156,46 @@ function SelectionRail({ products }: { products: Product[] }) {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
+        contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingTop: 2, paddingBottom: 12 }}
       >
         {products.map((product) => {
-          const source = getProductImage(product.images[0]);
+          const source = productCoverSource(product);
           return (
             <TouchableOpacity
               key={product.id}
               activeOpacity={0.92}
               onPress={() => router.push(`/(main)/products/${product.id}`)}
-              style={{ width: 150 }}
+              style={{
+                width: 150,
+                backgroundColor: COLORS.surfaceContainerLowest,
+                borderRadius: 16,
+                overflow: "hidden",
+                ...SHADOW.card,
+              }}
             >
-              <View
-                style={{
-                  width: 150,
-                  height: 188,
-                  borderRadius: 16,
-                  overflow: "hidden",
-                  backgroundColor: COLORS.surfaceContainer,
-                  ...SHADOW.card,
-                }}
-              >
+              <View style={{ width: "100%", height: 188, backgroundColor: COLORS.surfaceContainer }}>
                 {source && (
                   <Image source={source} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
                 )}
               </View>
-              <Text
-                numberOfLines={2}
-                style={{ fontSize: 13, fontFamily: FONTS.bodyMedium, color: COLORS.onSurface, marginTop: 8 }}
-              >
-                {product.name}
-              </Text>
-              <Text style={[TYPE.price, { fontSize: 18, marginTop: 3 }]}>
-                {priceTagLabel(product)}
-              </Text>
+              <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10 }}>
+                <Text
+                  numberOfLines={2}
+                  style={{ fontSize: 13, lineHeight: 18, height: 36, fontFamily: FONTS.bodyMedium, color: COLORS.onSurface }}
+                >
+                  {product.name}
+                </Text>
+              </View>
+              {/* Price bar — brand yellow marks the curated rail. Navy text:
+                  yellow is too light to carry white. */}
+              <View style={{ backgroundColor: BRAND.yellow, paddingHorizontal: 12, paddingVertical: 9 }}>
+                <Text
+                  style={[TYPE.price, { fontSize: 17, color: COLORS.primary, textAlign: "right" }]}
+                  numberOfLines={1}
+                >
+                  {priceTagLabel(product)}
+                </Text>
+              </View>
             </TouchableOpacity>
           );
         })}
@@ -195,6 +209,7 @@ const NEAR_BOTTOM_PX = 600;
 export default function CategoryProductsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
 
   const { data: categories } = useCategories();
@@ -213,7 +228,12 @@ export default function CategoryProductsScreen() {
     () => data?.pages.flatMap((p) => p.items) ?? [],
     [data],
   );
-  const heroImage = CATEGORY_HEROES[id];
+  // Prefer the category's own image from the API; CATEGORY_HEROES only covers
+  // the six seeded ids, so it is a fallback, and a navy panel backs both up.
+  // The header keeps a fixed height either way, so the nav and the title
+  // overlay always have something to sit on.
+  const heroImage = getProductImage(category?.image) ?? CATEGORY_HEROES[id];
+  const heroHeight = 220 + insets.top;
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -237,15 +257,15 @@ export default function CategoryProductsScreen() {
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         onScroll={onScroll}
         scrollEventThrottle={64}
       >
-        {/* Hero header with image */}
-        <View>
+        {/* Hero header — fixed height whether or not a hero image exists. */}
+        <View style={{ height: heroHeight, backgroundColor: COLORS.primary }}>
           {heroImage && (
-            <Image source={heroImage} style={{ width: W, height: 220 }} resizeMode="cover" />
+            <Image source={heroImage} style={{ width: W, height: heroHeight }} resizeMode="cover" />
           )}
           <LinearGradient
             colors={["rgba(0,0,0,0.35)", "transparent", "rgba(0,0,0,0.4)"]}
@@ -253,23 +273,27 @@ export default function CategoryProductsScreen() {
             style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
           />
 
-          {/* Nav */}
-          <SafeAreaView edges={["top"]} style={{ position: "absolute", top: 0, left: 0, right: 0 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 8 }}>
+          {/* Nav — offset below the status bar. */}
+          <View style={{ position: "absolute", top: insets.top + 8, left: 0, right: 0 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16 }}>
               <TouchableOpacity
                 onPress={() => router.back()}
+                accessibilityRole="button"
+                accessibilityLabel="Retour"
                 style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.3)", alignItems: "center", justifyContent: "center" }}
               >
                 <MaterialCommunityIcons name="chevron-left" size={22} color="#fff" />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => router.push("/(main)/search")}
+                accessibilityRole="button"
+                accessibilityLabel="Rechercher"
                 style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.3)", alignItems: "center", justifyContent: "center" }}
               >
                 <MaterialCommunityIcons name="magnify" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
-          </SafeAreaView>
+          </View>
 
           {/* Category title overlay */}
           <View style={{ position: "absolute", bottom: 16, left: 20, right: 20 }}>

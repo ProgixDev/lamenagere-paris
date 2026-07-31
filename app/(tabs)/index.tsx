@@ -22,7 +22,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "../../components/ui/Icon";
 import { ProductGridSkeleton } from "../../components/ui/Skeleton";
 import * as Haptics from "expo-haptics";
-import { COLORS } from "../../lib/constants";
+import { COLORS, BRAND } from "../../lib/constants";
 import { FONTS, TYPE, SPACE, SHADOW } from "../../lib/typography";
 import { getProductImage } from "../../lib/mock-data";
 import { priceTagLabel } from "../../lib/pricing";
@@ -48,6 +48,7 @@ import {
   isPriceActive,
   type FilterState,
 } from "../../features/products/filter-types";
+import { productCoverSource, productCoverUri } from "../../lib/product-media";
 
 const { width: W } = Dimensions.get("window");
 const H_PAD = 16;
@@ -192,7 +193,7 @@ function ProductCard({ product }: { product: Product }) {
   const router = useRouter();
   const isFav = useFavoritesStore((s) => s.favorites.includes(product.id));
   const toggleFav = useFavoritesStore((s) => s.toggleFavorite);
-  const imgSource = getProductImage(product.images[0]);
+  const imgSource = productCoverSource(product);
 
   const scale = useSharedValue(1);
   const cardStyle = useAnimatedStyle(() => ({
@@ -258,34 +259,50 @@ function ProductCard({ product }: { product: Product }) {
           </TouchableOpacity>
         </View>
 
-        {/* Content */}
-        <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 14 }}>
+        {/* Content — fixed heights so the price bar lines up across a row. */}
+        <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10 }}>
           <Text
             style={{
               fontSize: 13,
               lineHeight: 18,
+              height: 36,
               fontFamily: FONTS.bodyMedium,
               color: COLORS.onSurface,
-              marginBottom: 6,
             }}
             numberOfLines={2}
           >
             {product.name}
           </Text>
 
-          {product.ratingCount ? (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 6 }}>
-              <Icon name="star" size={11} color={COLORS.primary} />
-              <Text style={{ fontSize: 11, fontFamily: FONTS.bodySemibold, color: COLORS.onSurfaceVariant }}>
-                {(product.ratingAvg ?? 0).toFixed(1)}
-              </Text>
-              <Text style={{ fontSize: 10, fontFamily: FONTS.body, color: COLORS.outline }}>
-                ({product.ratingCount})
-              </Text>
-            </View>
-          ) : null}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, height: 18 }}>
+            {product.ratingCount ? (
+              <>
+                <Icon name="star" size={11} color={BRAND.yellow} />
+                <Text style={{ fontSize: 11, fontFamily: FONTS.bodySemibold, color: COLORS.onSurfaceVariant }}>
+                  {(product.ratingAvg ?? 0).toFixed(1)}
+                </Text>
+                <Text style={{ fontSize: 10, fontFamily: FONTS.body, color: COLORS.outline }}>
+                  ({product.ratingCount})
+                </Text>
+              </>
+            ) : null}
+          </View>
+        </View>
 
-          <Text style={[TYPE.price, { fontSize: 19 }]}>{priceTagLabel(product)}</Text>
+        {/* Price bar — brand blue, flush to the card's bottom edge. */}
+        <View
+          style={{
+            backgroundColor: BRAND.blue,
+            paddingHorizontal: 12,
+            paddingVertical: 9,
+          }}
+        >
+          <Text
+            style={[TYPE.price, { fontSize: 19, color: "#fff", textAlign: "right" }]}
+            numberOfLines={1}
+          >
+            {priceTagLabel(product)}
+          </Text>
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -370,46 +387,52 @@ function FeaturedRail({ products }: { products: Product[] }) {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 14 }}
+        contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 14, paddingTop: 2, paddingBottom: 12 }}
       >
         {products.map((product) => {
-          const source = getProductImage(product.images[0]);
+          const source = productCoverSource(product);
           return (
             <TouchableOpacity
               key={product.id}
               activeOpacity={0.95}
               onPress={() => router.push(`/(main)/products/${product.id}`)}
-              style={{ width: 168 }}
+              style={{
+                width: 168,
+                backgroundColor: COLORS.surfaceContainerLowest,
+                borderRadius: 16,
+                overflow: "hidden",
+                ...SHADOW.card,
+              }}
             >
-              <View
-                style={{
-                  width: 168,
-                  height: 200,
-                  borderRadius: 16,
-                  overflow: "hidden",
-                  backgroundColor: COLORS.surfaceContainer,
-                  ...SHADOW.card,
-                }}
-              >
+              <View style={{ width: "100%", height: 200, backgroundColor: COLORS.surfaceContainer }}>
                 {source && (
                   <Image source={source} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
                 )}
               </View>
-              <Text
-                numberOfLines={2}
-                style={{
-                  fontSize: 13,
-                  lineHeight: 18,
-                  fontFamily: FONTS.bodyMedium,
-                  color: COLORS.onSurface,
-                  marginTop: 10,
-                }}
-              >
-                {product.name}
-              </Text>
-              <Text style={[TYPE.price, { fontSize: 18, marginTop: 3 }]}>
-                {priceTagLabel(product)}
-              </Text>
+              <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10 }}>
+                <Text
+                  numberOfLines={2}
+                  style={{
+                    fontSize: 13,
+                    lineHeight: 18,
+                    height: 36,
+                    fontFamily: FONTS.bodyMedium,
+                    color: COLORS.onSurface,
+                  }}
+                >
+                  {product.name}
+                </Text>
+              </View>
+              {/* Price bar — brand yellow marks the curated rail. Navy text:
+                  yellow is too light to carry white. */}
+              <View style={{ backgroundColor: BRAND.yellow, paddingHorizontal: 12, paddingVertical: 9 }}>
+                <Text
+                  style={[TYPE.price, { fontSize: 17, color: COLORS.primary, textAlign: "right" }]}
+                  numberOfLines={1}
+                >
+                  {priceTagLabel(product)}
+                </Text>
+              </View>
             </TouchableOpacity>
           );
         })}
@@ -562,7 +585,7 @@ export default function HomeScreen() {
     const map: Record<string, string> = {};
     for (const p of popularQuery.data ?? []) {
       const cid = p.category?.id;
-      const img = p.images?.[0];
+      const img = productCoverUri(p);
       if (cid && img && !map[cid]) map[cid] = img;
     }
     return map;

@@ -6,9 +6,9 @@ import { COLORS } from "../../lib/constants";
 import { formatPrice, formatDimensions } from "../../lib/utils";
 import { openingTypeLabel } from "../../lib/opening-types";
 import { summarizeConfiguration } from "../../lib/config-blocks";
-import { getProductImage } from "../../lib/mock-data";
 import type { CartItem as CartItemType } from "../../lib/types";
 import QuantitySelector from "../ui/QuantitySelector";
+import { productCoverSource } from "../../lib/product-media";
 
 interface CartItemProps {
   item: CartItemType;
@@ -23,7 +23,7 @@ export default function CartItem({
 }: CartItemProps) {
   const { product, quantity, customDimensions, openingType, qualityTier, configuration, calculatedPrice } = item;
   const price = calculatedPrice || product.price || 0;
-  const imgSource = getProductImage(product.images[0]);
+  const imgSource = productCoverSource(product);
   const configSummary = configuration?.length ? summarizeConfiguration(configuration) : "";
   const tierLabel = qualityTier
     ? product.qualityTiers?.find((t) => t.key === qualityTier)?.label ?? qualityTier

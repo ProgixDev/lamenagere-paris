@@ -358,7 +358,11 @@ export function priceLabel(row: ProductRow): string {
 
 export function toAdminProductDto(row: ProductRow): AdminProductDto {
   const media = sortedMedia(row.media);
-  const primary = media.find((m) => m.type === 'image');
+  // Products whose gallery only holds a video keep their photos on the colour
+  // variants — fall back to those so the list thumbnail is never blank.
+  const primary =
+    media.find((m) => m.type === 'image')?.url ??
+    row.colors?.find((c) => c.images?.length)?.images?.[0];
   return {
     id: row.id,
     sku: row.sku ?? '',
@@ -370,7 +374,7 @@ export function toAdminProductDto(row: ProductRow): AdminProductDto {
     priceLabel: priceLabel(row),
     stock: deriveStock(row.stock_qty, row.low_stock_threshold),
     status: row.status,
-    image: primary?.url ?? '',
+    image: primary ?? '',
   };
 }
 

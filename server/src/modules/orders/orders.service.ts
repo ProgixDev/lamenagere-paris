@@ -57,6 +57,7 @@ interface ProductForOrder {
   delivery_metropole: string;
   delivery_outremer: string;
   media: { url: string; type: string; is_primary: boolean }[];
+  colors: { images: string[] }[] | null;
   config_blocks: ConfigBlock[] | null;
   category: { config_blocks: ConfigBlock[] | null } | null;
 }
@@ -223,7 +224,7 @@ export class OrdersService {
     const { data: products } = await this.supabase.client
       .from('products')
       .select(
-        'id, name, price_mode, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, ref_width, ref_height, min_width, min_height, max_width, max_height, opening_types, quality_tiers, delivery_metropole, delivery_outremer, config_blocks, media:product_media(url,type,is_primary), category:categories(config_blocks)',
+        'id, name, price_mode, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, ref_width, ref_height, min_width, min_height, max_width, max_height, opening_types, quality_tiers, delivery_metropole, delivery_outremer, config_blocks, colors, media:product_media(url,type,is_primary), category:categories(config_blocks)',
       )
       .in('id', productIds.length ? productIds : ['00000000-0000-0000-0000-000000000000'])
       .returns<ProductForOrder[]>();
@@ -291,13 +292,17 @@ export class OrdersService {
       );
       const unit = baseUnit + surchargeCents;
       subtotal += unit * item.quantity;
-      const primary =
-        product.media?.find((m) => m.is_primary && m.type === 'image') ??
-        product.media?.find((m) => m.type === 'image');
+      // Photos may live on the colour variants when the gallery holds a video
+      // only — fall back so the order line keeps a thumbnail.
+      const primaryUrl =
+        (
+          product.media?.find((m) => m.is_primary && m.type === 'image') ??
+          product.media?.find((m) => m.type === 'image')
+        )?.url ?? product.colors?.find((c) => c.images?.length)?.images[0];
       return {
         product_id: product.id,
         product_name: product.name,
-        product_image: primary?.url ?? null,
+        product_image: primaryUrl ?? null,
         quantity: item.quantity,
         unit_price_cents: unit,
         custom_width: item.customDimensions?.width ?? null,

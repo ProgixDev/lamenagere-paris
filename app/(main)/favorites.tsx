@@ -17,7 +17,7 @@ import { TYPE, FONTS, SHADOW } from "../../lib/typography";
 import { priceTagLabel } from "../../lib/pricing";
 import { useFavoritesStore } from "../../features/favorites/store";
 import { useProductsByIds } from "../../features/products/hooks";
-import { getProductImage } from "../../lib/mock-data";
+import { productCoverSource } from "../../lib/product-media";
 
 const { width: W } = Dimensions.get("window");
 const CARD_W = (W - 20 * 2 - 12) / 2;
@@ -56,7 +56,7 @@ export default function FavoritesScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
             {products.map((product) => {
-              const img = getProductImage(product.images[0]);
+              const img = productCoverSource(product);
               return (
                 <TouchableOpacity
                   key={product.id}

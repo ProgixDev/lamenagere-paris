@@ -27,6 +27,7 @@ import {
   useSearchProducts,
 } from "../../../features/products/hooks";
 import Toast from "../../../components/ui/Toast";
+import { productCoverSource } from "../../../lib/product-media";
 
 const { width: W } = Dimensions.get("window");
 const PAGE_PAD = 16;
@@ -320,7 +321,7 @@ export default function SearchScreen() {
                 keyboardShouldPersistTaps="handled"
               >
                 {trending.map((p) => {
-                  const img = getProductImage(p.images[0]);
+                  const img = productCoverSource(p);
                   return (
                     <TouchableOpacity
                       key={p.id}
@@ -404,7 +405,7 @@ export default function SearchScreen() {
             </View>
           ) : (
             results.map((item, i) => {
-              const img = getProductImage(item.images[0]);
+              const img = productCoverSource(item);
               return (
                 <TouchableOpacity
                   key={item.id}

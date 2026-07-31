@@ -11,7 +11,7 @@ import {
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Icon from "../../../components/ui/Icon";
 import Animated, {
@@ -23,7 +23,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
-import { COLORS, PRODUCT_TYPES, PRICE_MODES } from "../../../lib/constants";
+import { COLORS, BRAND, PRODUCT_TYPES, PRICE_MODES } from "../../../lib/constants";
 import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import { formatPrice } from "../../../lib/utils";
 import { priceTagLabel, computeConfiguredPrice, perSqmRate } from "../../../lib/pricing";
@@ -41,15 +41,33 @@ import { useProduct, usePopularProducts } from "../../../features/products/hooks
 import { useProductReviews } from "../../../features/reviews/hooks";
 import { useRequireAuth } from "../../../features/auth/guards";
 import StarRating from "../../../components/ui/StarRating";
+import { productCoverSource } from "../../../lib/product-media";
 
 const { width: W, height: H } = Dimensions.get("window");
 const GALLERY_H = Math.min(W, H * 0.55);
+
+/** Brand-blue gradient for the page's filled CTA. */
+const CTA_TINT = [BRAND.blue, BRAND.blueDeep] as const;
+
+/** The logo's blue · yellow · red bar, used once to open the title block. */
+function BrandRule() {
+  return (
+    <View
+      style={{ flexDirection: "row", width: 88, height: 3, borderRadius: 2, overflow: "hidden" }}
+    >
+      <View style={{ flex: 1, backgroundColor: BRAND.blue }} />
+      <View style={{ flex: 1, backgroundColor: BRAND.yellow }} />
+      <View style={{ flex: 1, backgroundColor: BRAND.red }} />
+    </View>
+  );
+}
 
 
 // ────────────────────────────────────────────────────────
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { data: product, isLoading } = useProduct(id);
   const { data: popular = [] } = usePopularProducts(12);
   const { data: reviews = [] } = useProductReviews(id);
@@ -220,7 +238,7 @@ export default function ProductDetailScreen() {
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 190 }}
+        contentContainerStyle={{ paddingBottom: 174 + Math.max(insets.bottom, 12) }}
       >
         {/* ── Gallery ──────────────────────────────── */}
         <View style={{ width: W, height: GALLERY_H, backgroundColor: COLORS.surfaceContainer }}>
@@ -312,7 +330,8 @@ export default function ProductDetailScreen() {
 
         {/* ── Title + price block ──────────────────── */}
         <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>
-          <Text style={[TYPE.overline, { marginBottom: 6 }]}>
+          <BrandRule />
+          <Text style={[TYPE.overline, { marginTop: 12, marginBottom: 6, color: BRAND.blue }]}>
             {product.category.name}
           </Text>
           <Text
@@ -331,7 +350,7 @@ export default function ProductDetailScreen() {
 
           {product.ratingCount ? (
             <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 10 }}>
-              <Icon name="star" size={15} color={COLORS.primary} />
+              <Icon name="star" size={15} color={BRAND.yellow} />
               <Text style={{ fontSize: 14, fontFamily: "Manrope_700Bold", color: COLORS.onSurface }}>
                 {(product.ratingAvg ?? 0).toFixed(1)}
               </Text>
@@ -345,7 +364,7 @@ export default function ProductDetailScreen() {
           <View style={{ marginTop: 16, marginBottom: 4 }}>
             {isPerSqm ? (
               <View>
-                <Text style={[TYPE.priceLarge, { fontSize: 32 }]}>
+                <Text style={[TYPE.priceLarge, { fontSize: 32, color: BRAND.blue }]}>
                   {livePrice != null ? formatPrice(livePrice) : priceTagLabel(product)}
                 </Text>
                 <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 4 }}>
@@ -358,7 +377,9 @@ export default function ProductDetailScreen() {
               </View>
             ) : product.price ? (
               <View>
-                <Text style={[TYPE.priceLarge, { fontSize: 32 }]}>{formatPrice(product.price)}</Text>
+                <Text style={[TYPE.priceLarge, { fontSize: 32, color: BRAND.blue }]}>
+                  {formatPrice(product.price)}
+                </Text>
                 <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 2 }}>
                   Dès {formatPrice(Math.round(product.price / 4))}/mois en 4× sans frais
                 </Text>
@@ -399,7 +420,7 @@ export default function ProductDetailScreen() {
                         alignItems: "center",
                         justifyContent: "center",
                         borderWidth: active ? 2 : 1,
-                        borderColor: active ? COLORS.primary : COLORS.outlineVariant,
+                        borderColor: active ? BRAND.blue : COLORS.outlineVariant,
                         padding: 3,
                       }}
                     >
@@ -473,9 +494,9 @@ export default function ProductDetailScreen() {
                             paddingHorizontal: 14,
                             paddingVertical: 9,
                             borderRadius: 9999,
-                            backgroundColor: active ? COLORS.primary : "transparent",
+                            backgroundColor: active ? BRAND.blue : "transparent",
                             borderWidth: 1,
-                            borderColor: active ? COLORS.primary : COLORS.outlineVariant,
+                            borderColor: active ? BRAND.blue : COLORS.outlineVariant,
                           }}
                         >
                           <Text style={{ fontSize: 13, fontFamily: active ? "Inter_600SemiBold" : "Inter_500Medium", color: active ? COLORS.onPrimary : COLORS.onSurface }}>
@@ -533,7 +554,7 @@ export default function ProductDetailScreen() {
                 <Text style={{ fontSize: 14, fontFamily: FONTS.bodySemibold, color: COLORS.onSurfaceVariant }}>
                   {validDims ? "Prix estimé" : "Prix"}
                 </Text>
-                <Text style={[TYPE.price, { fontSize: 24 }]}>
+                <Text style={[TYPE.price, { fontSize: 24, color: BRAND.blue }]}>
                   {estimatePrice != null ? formatPrice(estimatePrice) : "—"}
                 </Text>
               </View>
@@ -577,37 +598,41 @@ export default function ProductDetailScreen() {
         {/* ── Related products ─────────────────────── */}
         <View style={{ marginTop: 16 }}>
           <Section title="Articles similaires" noBackground>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 16 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 16, paddingTop: 2, paddingBottom: 10 }}>
               {popular
                 .filter((p) => p.id !== product.id)
                 .slice(0, 6)
                 .map((p) => {
-                  const img = getProductImage(p.images[0]);
+                  const img = productCoverSource(p);
                   return (
                     <PressableScale
                       key={p.id}
                       onPress={() => router.push(`/(main)/products/${p.id}`)}
-                      style={{ width: 130 }}
+                      style={{
+                        width: 130,
+                        backgroundColor: COLORS.surfaceContainerLowest,
+                        borderRadius: 16,
+                        overflow: "hidden",
+                        ...SHADOW.soft,
+                      }}
                     >
-                      <View
-                        style={{
-                          width: 130,
-                          height: 150,
-                          borderRadius: 16,
-                          overflow: "hidden",
-                          backgroundColor: COLORS.surfaceContainer,
-                          marginBottom: 8,
-                          ...SHADOW.soft,
-                        }}
-                      >
+                      <View style={{ width: "100%", height: 150, backgroundColor: COLORS.surfaceContainer }}>
                         {img && <Image source={img} style={{ width: "100%", height: "100%" }} resizeMode="cover" />}
                       </View>
-                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.onSurface }} numberOfLines={1}>
-                        {p.name}
-                      </Text>
-                      <Text style={[TYPE.price, { fontSize: 16, marginTop: 1 }]}>
-                        {priceTagLabel(p)}
-                      </Text>
+                      <View style={{ paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8 }}>
+                        <Text style={{ fontSize: 12, lineHeight: 16, height: 32, fontFamily: "Inter_500Medium", color: COLORS.onSurface }} numberOfLines={2}>
+                          {p.name}
+                        </Text>
+                      </View>
+                      {/* Price bar — same language as the curated rails. */}
+                      <View style={{ backgroundColor: BRAND.yellow, paddingHorizontal: 10, paddingVertical: 7 }}>
+                        <Text
+                          style={[TYPE.price, { fontSize: 15, color: COLORS.primary, textAlign: "right" }]}
+                          numberOfLines={1}
+                        >
+                          {priceTagLabel(p)}
+                        </Text>
+                      </View>
                     </PressableScale>
                   );
                 })}
@@ -626,7 +651,7 @@ export default function ProductDetailScreen() {
           backgroundColor: "#fff",
           paddingHorizontal: 12,
           paddingTop: 8,
-          paddingBottom: 28,
+          paddingBottom: Math.max(insets.bottom, 12) + 12,
           borderTopWidth: 1,
           borderTopColor: `${COLORS.outlineVariant}80`,
         }}
@@ -674,7 +699,7 @@ export default function ProductDetailScreen() {
             backgroundColor: COLORS.surfaceContainerLowest,
             borderRadius: 14,
             borderWidth: 1.5,
-            borderColor: COLORS.primary,
+            borderColor: BRAND.blue,
             paddingVertical: 14,
             alignItems: "center",
             justifyContent: "center",
@@ -683,8 +708,8 @@ export default function ProductDetailScreen() {
             marginBottom: 10,
           }}
         >
-          <Icon name="file-document-outline" size={18} color={COLORS.primary} />
-          <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: COLORS.primary }}>
+          <Icon name="file-document-outline" size={18} color={BRAND.blue} />
+          <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: BRAND.blue }}>
             Demander un devis
           </Text>
         </TouchableOpacity>
@@ -700,6 +725,7 @@ export default function ProductDetailScreen() {
           onPress={handlePrimaryAction}
           size="lg"
           radius={14}
+          tint={CTA_TINT}
         />
       </View>
 
@@ -800,7 +826,7 @@ function FloatingContactButton({ onPress }: { onPress: () => void }) {
           width: 56,
           height: 56,
           borderRadius: 28,
-          backgroundColor: COLORS.primary,
+          backgroundColor: BRAND.blue,
           alignItems: "center",
           justifyContent: "center",
         }}

@@ -10,12 +10,17 @@ import {
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { COLORS } from "../../lib/constants";
+import Icon from "../ui/Icon";
+import { COLORS, BRAND } from "../../lib/constants";
+import { FONTS } from "../../lib/typography";
 import type { Message } from "../../lib/types";
 
 interface MessageBubbleProps {
   message: Message;
+  /** First of a run from this sender — carries the avatar and full corners. */
   showAvatar?: boolean;
+  /** Last of a run — only this one shows a timestamp, so runs stay quiet. */
+  showTime?: boolean;
 }
 
 const MEDIA_W = 200;
@@ -119,7 +124,11 @@ function ImageAttachment({ uri }: { uri: string }) {
   );
 }
 
-export default function MessageBubble({ message, showAvatar = true }: MessageBubbleProps) {
+export default function MessageBubble({
+  message,
+  showAvatar = true,
+  showTime = true,
+}: MessageBubbleProps) {
   const isUser = message.sender === "user";
   const hasText = !!message.content?.trim();
   const attachments = message.attachments ?? [];
@@ -133,8 +142,8 @@ export default function MessageBubble({ message, showAvatar = true }: MessageBub
     <View
       style={{
         alignSelf: isUser ? "flex-end" : "flex-start",
-        maxWidth: "78%",
-        marginBottom: 10,
+        maxWidth: "80%",
+        marginBottom: showTime ? 12 : 3,
         flexDirection: isUser ? "row-reverse" : "row",
         alignItems: "flex-end",
         gap: 8,
@@ -147,12 +156,12 @@ export default function MessageBubble({ message, showAvatar = true }: MessageBub
             width: 28,
             height: 28,
             borderRadius: 14,
-            backgroundColor: COLORS.primary,
+            backgroundColor: BRAND.blue,
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <MaterialCommunityIcons name="store" size={14} color="#fff" />
+          <Icon name="store" size={14} color="#fff" />
         </View>
       )}
       {!isUser && !showAvatar && <View style={{ width: 28 }} />}

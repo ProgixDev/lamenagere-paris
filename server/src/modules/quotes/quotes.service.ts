@@ -39,17 +39,21 @@ export class QuotesService {
     // Snapshot product name/image.
     const { data: product } = await this.supabase.client
       .from('products')
-      .select('name, media:product_media(url,type,is_primary)')
+      .select('name, colors, media:product_media(url,type,is_primary)')
       .eq('id', dto.productId)
       .maybeSingle<{
         name: string;
+        colors: { images: string[] }[] | null;
         media: { url: string; type: string; is_primary: boolean }[];
       }>();
     if (!product) throw new NotFoundException('Produit introuvable');
 
-    const primary =
-      product.media?.find((m) => m.is_primary && m.type === 'image') ??
-      product.media?.find((m) => m.type === 'image');
+    // Colour variants carry the photos when the gallery holds a video only.
+    const primaryUrl =
+      (
+        product.media?.find((m) => m.is_primary && m.type === 'image') ??
+        product.media?.find((m) => m.type === 'image')
+      )?.url ?? product.colors?.find((c) => c.images?.length)?.images[0];
 
     const year = new Date().getFullYear();
     const { data: seq } = await this.supabase.client.rpc('next_counter', {
@@ -64,7 +68,7 @@ export class QuotesService {
         profile_id: userId,
         product_id: dto.productId,
         product_name: product.name,
-        product_image: primary?.url ?? null,
+        product_image: primaryUrl ?? null,
         req_width: dto.dimensions?.width ?? null,
         req_height: dto.dimensions?.height ?? null,
         notes: dto.notes,

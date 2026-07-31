@@ -10,8 +10,10 @@ import { COLORS } from "./constants";
  *  - BODY (Futura, mapped from the legacy Inter / Manrope family names in
  *    app/_layout.tsx) — calm, neutral UI text for everything else.
  *
- * Hierarchy comes from serif-vs-body, size, weight and whitespace — never from
- * decorative colour. The palette stays monochrome (navy + warm neutrals).
+ * Hierarchy comes from serif-vs-body, size, weight and whitespace. The base
+ * stays monochrome (navy + cool neutrals); the logo's blue / yellow / red
+ * (`BRAND` in lib/constants.ts) appear only as accents on prices and ratings,
+ * never as decoration.
  */
 export const FONTS = {
   // Display serif (Cormorant)

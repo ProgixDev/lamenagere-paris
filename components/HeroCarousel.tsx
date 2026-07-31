@@ -18,6 +18,7 @@ import { priceTagLabel } from "../lib/pricing";
 import { usePopularProducts } from "../features/products/hooks";
 import { useHeroSlides, type HeroSlide } from "../features/featured/store";
 import { FONTS } from "../lib/typography";
+import { productCoverUri } from "../lib/product-media";
 
 const { width: W } = Dimensions.get("window");
 const HERO_W = W; // full-bleed, edge-to-edge slides
@@ -42,7 +43,7 @@ export default function HeroCarousel() {
     return popular.map((p) => ({
       id: p.id,
       kind: "image" as const,
-      src: p.images[0] ?? "",
+      src: productCoverUri(p) ?? "",
       title: p.name,
       subtitle: priceTagLabel(p),
       productId: p.id,

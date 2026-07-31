@@ -1,125 +1,146 @@
 import React from "react";
-import { View, Text, TouchableOpacity, Image } from "react-native";
+import { View, Text, Image } from "react-native";
 import { useRouter } from "expo-router";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { COLORS } from "../../lib/constants";
-import { FONTS } from "../../lib/typography";
-import { relativeTime, truncate } from "../../lib/utils";
-import { getProductImage } from "../../lib/mock-data";
+import Icon from "../ui/Icon";
+import PressableScale from "../ui/PressableScale";
+import { COLORS, BRAND } from "../../lib/constants";
+import { FONTS, SHADOW } from "../../lib/typography";
+import { relativeTime } from "../../lib/utils";
 import type { Conversation } from "../../lib/types";
+import { productCoverSource } from "../../lib/product-media";
 
 interface ConversationItemProps {
   conversation: Conversation;
 }
 
+/**
+ * A thread reads as a dossier about a piece, not a chat row: the subject is
+ * the serif headline, the product is the identity, and unread state is a
+ * brand-blue rule flush to the leading edge — the same full-bleed device the
+ * catalogue cards use for prices, here meaning "this one needs you".
+ */
 export default function ConversationItem({ conversation }: ConversationItemProps) {
   const router = useRouter();
   const hasUnread = conversation.unreadCount > 0;
-  const productImg = conversation.product?.images[0]
-    ? getProductImage(conversation.product.images[0])
-    : null;
+  const productImg = productCoverSource(conversation.product);
 
   return (
-    <TouchableOpacity
+    <PressableScale
       onPress={() => router.push(`/(main)/messages/${conversation.id}`)}
-      activeOpacity={0.7}
       style={{
         flexDirection: "row",
-        alignItems: "center",
-        gap: 14,
-        paddingVertical: 16,
-        paddingHorizontal: 20,
-        backgroundColor: hasUnread ? COLORS.surfaceContainerLow : "transparent",
+        backgroundColor: COLORS.surfaceContainerLowest,
+        borderRadius: 16,
+        overflow: "hidden",
+        ...SHADOW.card,
       }}
     >
-      {/* Product thumbnail or avatar */}
-      <View
-        style={{
-          width: 52,
-          height: 52,
-          borderRadius: 16,
-          overflow: "hidden",
-          backgroundColor: COLORS.surfaceContainer,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {productImg ? (
-          <Image source={productImg} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
-        ) : (
-          <MaterialCommunityIcons name="store-outline" size={22} color={COLORS.outline} />
-        )}
-      </View>
+      {/* Unread rule — flush to the card's leading edge */}
+      <View style={{ width: 3, backgroundColor: hasUnread ? BRAND.blue : "transparent" }} />
 
-      {/* Content */}
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
-          <Text
-            style={{
-              fontSize: 15,
-              fontFamily: hasUnread ? FONTS.bodySemibold : FONTS.bodyMedium,
-              color: COLORS.onSurface,
-            }}
-            numberOfLines={1}
-          >
-            {conversation.vendorName}
-          </Text>
-          <Text
-            style={{
-              fontSize: 11,
-              fontFamily: FONTS.body,
-              color: hasUnread ? COLORS.primary : COLORS.outline,
-            }}
-          >
-            {relativeTime(conversation.lastMessageAt)}
-          </Text>
-        </View>
-
-        <Text
+      <View style={{ flex: 1, flexDirection: "row", gap: 14, padding: 14 }}>
+        {/* The piece being discussed */}
+        <View
           style={{
-            fontSize: 12,
-            fontFamily: FONTS.bodyMedium,
-            color: COLORS.onSurfaceVariant,
-            marginBottom: 3,
+            width: 56,
+            height: 56,
+            borderRadius: 14,
+            overflow: "hidden",
+            backgroundColor: COLORS.surfaceContainer,
+            alignItems: "center",
+            justifyContent: "center",
           }}
-          numberOfLines={1}
         >
-          {conversation.subject}
-        </Text>
-
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <Text
-            style={{
-              fontSize: 12,
-              fontFamily: FONTS.body,
-              color: COLORS.outline,
-              flex: 1,
-              marginRight: 8,
-            }}
-            numberOfLines={1}
-          >
-            {truncate(conversation.lastMessage, 50)}
-          </Text>
-
-          {hasUnread && (
-            <View
-              style={{
-                minWidth: 20,
-                height: 20,
-                borderRadius: 10,
-                backgroundColor: COLORS.primary,
-                alignItems: "center",
-                justifyContent: "center",
-                paddingHorizontal: 6,
-              }}
-            >
-              <Text style={{ fontSize: 10, fontFamily: FONTS.bodyBold, color: "#fff" }}>
-                {conversation.unreadCount}
-              </Text>
-            </View>
+          {productImg ? (
+            <Image source={productImg} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+          ) : (
+            <Icon name="store-outline" size={22} color={COLORS.outline} />
           )}
         </View>
+
+        <View style={{ flex: 1, minWidth: 0 }}>
+          {/* Vendor + time */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 8,
+              marginBottom: 2,
+            }}
+          >
+            <Text
+              style={{
+                flex: 1,
+                fontSize: 10,
+                letterSpacing: 1.4,
+                textTransform: "uppercase",
+                fontFamily: FONTS.bodySemibold,
+                color: COLORS.outline,
+              }}
+              numberOfLines={1}
+            >
+              {conversation.vendorName}
+            </Text>
+            <Text
+              style={{
+                fontSize: 11,
+                fontFamily: hasUnread ? FONTS.bodySemibold : FONTS.body,
+                color: hasUnread ? BRAND.blue : COLORS.outline,
+              }}
+            >
+              {relativeTime(conversation.lastMessageAt)}
+            </Text>
+          </View>
+
+          {/* Subject — the dossier title */}
+          <Text
+            style={{
+              fontFamily: hasUnread ? FONTS.serifBold : FONTS.serif,
+              fontSize: 19,
+              lineHeight: 23,
+              color: COLORS.onSurface,
+              marginBottom: 3,
+            }}
+            numberOfLines={1}
+          >
+            {conversation.subject}
+          </Text>
+
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Text
+              style={{
+                flex: 1,
+                fontSize: 13,
+                lineHeight: 18,
+                fontFamily: FONTS.body,
+                color: hasUnread ? COLORS.onSurfaceVariant : COLORS.outline,
+              }}
+              numberOfLines={1}
+            >
+              {conversation.lastMessage}
+            </Text>
+
+            {hasUnread && (
+              <View
+                style={{
+                  minWidth: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  backgroundColor: BRAND.blue,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingHorizontal: 6,
+                }}
+              >
+                <Text style={{ fontSize: 10, fontFamily: FONTS.bodyBold, color: "#fff" }}>
+                  {conversation.unreadCount}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
       </View>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }

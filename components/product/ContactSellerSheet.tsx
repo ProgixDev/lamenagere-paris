@@ -15,11 +15,11 @@ import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import Icon from "../ui/Icon";
 import { COLORS } from "../../lib/constants";
-import { getProductImage } from "../../lib/mock-data";
 import { priceTagLabel } from "../../lib/pricing";
 import type { Product } from "../../lib/types";
 import { useStartConversation } from "../../features/messaging/hooks";
 import { useAuthStore } from "../../features/auth/store";
+import { productCoverSource } from "../../lib/product-media";
 
 /**
  * Bottom sheet letting a customer ask the support team a question about a
@@ -41,7 +41,7 @@ export default function ContactSellerSheet({
   const start = useStartConversation();
   const [text, setText] = useState("");
 
-  const img = getProductImage(product.images[0]);
+  const img = productCoverSource(product);
 
   const handleSend = () => {
     const message = text.trim();

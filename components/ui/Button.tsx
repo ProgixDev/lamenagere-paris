@@ -26,6 +26,11 @@ interface ButtonProps {
   icon?: (color: string) => React.ReactNode;
   /** Corner radius override; defaults to a full pill. */
   radius?: number;
+  /**
+   * Gradient override for the primary variant, as [start, end]. Defaults to
+   * the navy ramp; pass [BRAND.blue, BRAND.blueDeep] for a brand-blue CTA.
+   */
+  tint?: readonly [string, string];
 }
 
 const SIZE_PADDING: Record<string, ViewStyle> = {
@@ -50,7 +55,9 @@ export default function Button({
   fullWidth = true,
   icon,
   radius = 9999,
+  tint,
 }: ButtonProps) {
+  const [tintStart, tintEnd] = tint ?? [COLORS.primary, COLORS.primaryContainer];
   const isDisabled = disabled || loading;
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({
@@ -84,7 +91,7 @@ export default function Button({
         ]}
       >
         <LinearGradient
-          colors={[COLORS.primary, COLORS.primaryContainer]}
+          colors={[tintStart, tintEnd]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[
@@ -95,7 +102,7 @@ export default function Button({
               justifyContent: "center",
               flexDirection: "row",
               minHeight: 44,
-              shadowColor: COLORS.primary,
+              shadowColor: tintStart,
               shadowOffset: { width: 0, height: 4 },
               shadowOpacity: 0.1,
               shadowRadius: 8,

@@ -7,19 +7,23 @@ import {
   TextInput,
   ActivityIndicator,
 } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { COLORS } from "../../lib/constants";
-import { FONTS, TYPE, SHADOW } from "../../lib/typography";
+import { useRouter } from "expo-router";
+import Icon from "../../components/ui/Icon";
+import { COLORS, BRAND } from "../../lib/constants";
+import { FONTS, TYPE, SPACE } from "../../lib/typography";
 import ConversationItem from "../../components/messaging/ConversationItem";
 import { useConversations, useMarkAsRead } from "../../features/messaging/hooks";
 import LogoHeader from "../../components/layout/LogoHeader";
 import GuestGate from "../../components/GuestGate";
+import Button from "../../components/ui/Button";
 import { useAuthStore } from "../../features/auth/store";
 import { useGuestStore } from "../../features/auth/guest";
 
 export default function MessagesScreen() {
   const [search, setSearch] = useState("");
+  const router = useRouter();
 
   const { data, isLoading } = useConversations();
   const conversations = data ?? [];
@@ -56,104 +60,113 @@ export default function MessagesScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
       <LogoHeader />
+
       {/* Header */}
       <View
         style={{
           flexDirection: "row",
-          alignItems: "center",
+          alignItems: "flex-end",
           justifyContent: "space-between",
           paddingHorizontal: 20,
           paddingTop: 8,
-          paddingBottom: 12,
+          paddingBottom: SPACE.lg,
         }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <Text style={[TYPE.screenTitle]}>Messages</Text>
-          {totalUnread > 0 && (
-            <View
-              style={{
-                minWidth: 22,
-                height: 22,
-                borderRadius: 11,
-                backgroundColor: COLORS.primary,
-                alignItems: "center",
-                justifyContent: "center",
-                paddingHorizontal: 6,
-              }}
-            >
-              <Text style={{ fontSize: 11, fontFamily: FONTS.bodyBold, color: "#fff" }}>
-                {totalUnread}
-              </Text>
-            </View>
-          )}
+        <View style={{ flex: 1 }}>
+          <Text style={TYPE.screenTitle}>Messages</Text>
+          <Text
+            style={{
+              fontSize: 12,
+              fontFamily: FONTS.body,
+              color: totalUnread > 0 ? BRAND.blue : COLORS.outline,
+              marginTop: 2,
+            }}
+          >
+            {totalUnread > 0
+              ? `${totalUnread} message${totalUnread > 1 ? "s" : ""} non lu${totalUnread > 1 ? "s" : ""}`
+              : "Tout est lu"}
+          </Text>
         </View>
-        <TouchableOpacity
-          onPress={handleMarkAllRead}
-          disabled={totalUnread === 0}
-          hitSlop={8}
-          accessibilityLabel="Tout marquer comme lu"
-        >
-          <MaterialCommunityIcons
-            name="email-check-outline"
-            size={22}
-            color={totalUnread === 0 ? COLORS.outlineVariant : COLORS.onSurface}
-          />
-        </TouchableOpacity>
+
+        {totalUnread > 0 && (
+          <TouchableOpacity
+            onPress={handleMarkAllRead}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Tout marquer comme lu"
+            style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 4 }}
+          >
+            <Icon name="check" size={14} color={BRAND.blue} />
+            <Text style={{ fontSize: 12, fontFamily: FONTS.bodyMedium, color: BRAND.blue }}>
+              Tout marquer lu
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Search */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            backgroundColor: COLORS.surfaceContainerLowest,
-            borderRadius: 16,
-            paddingHorizontal: 14,
-            paddingVertical: 12,
-            gap: 8,
-            ...SHADOW.soft,
-          }}
-        >
-          <MaterialCommunityIcons name="magnify" size={18} color={COLORS.outline} />
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Rechercher une conversation..."
-            placeholderTextColor={COLORS.outline}
+      {/* Search — a quiet inset field, so the cards below carry the elevation */}
+      {conversations.length > 0 && (
+        <View style={{ paddingHorizontal: 20, marginBottom: SPACE.lg }}>
+          <View
             style={{
-              flex: 1,
-              fontSize: 14,
-              fontFamily: FONTS.body,
-              color: COLORS.onSurface,
-              paddingVertical: 0,
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: COLORS.surfaceContainer,
+              borderRadius: 14,
+              paddingHorizontal: 14,
+              paddingVertical: 11,
+              gap: 8,
             }}
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch("")}>
-              <MaterialCommunityIcons name="close-circle" size={16} color={COLORS.outline} />
-            </TouchableOpacity>
-          )}
+          >
+            <Icon name="magnify" size={18} color={COLORS.outline} />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Rechercher un échange"
+              placeholderTextColor={COLORS.outline}
+              style={{
+                flex: 1,
+                fontSize: 14,
+                fontFamily: FONTS.body,
+                color: COLORS.onSurface,
+                paddingVertical: 0,
+              }}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearch("")}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Effacer la recherche"
+              >
+                <Icon name="close" size={16} color={COLORS.outline} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Conversations */}
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120, gap: SPACE.md }}
+      >
         {isLoading && conversations.length === 0 ? (
           <View style={{ alignItems: "center", justifyContent: "center", paddingTop: 100 }}>
-            <ActivityIndicator color={COLORS.primary} />
+            <ActivityIndicator color={BRAND.blue} />
           </View>
         ) : filtered.length > 0 ? (
           filtered.map((conv, idx) => (
-            <View key={conv.id}>
+            <Animated.View
+              key={conv.id}
+              entering={FadeInDown.delay(idx * 55).springify()}
+            >
               <ConversationItem conversation={conv} />
-              {idx < filtered.length - 1 && (
-                <View style={{ height: 1, backgroundColor: COLORS.outlineVariant + "88", marginLeft: 84 }} />
-              )}
-            </View>
+            </Animated.View>
           ))
         ) : (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 96, paddingHorizontal: 40 }}>
+          <View style={{ alignItems: "center", paddingTop: 80, paddingHorizontal: 20 }}>
             <View
               style={{
                 width: 72,
@@ -162,19 +175,41 @@ export default function MessagesScreen() {
                 backgroundColor: COLORS.surfaceContainer,
                 alignItems: "center",
                 justifyContent: "center",
-                marginBottom: 20,
+                marginBottom: SPACE.xl,
               }}
             >
-              <MaterialCommunityIcons name="chat-outline" size={32} color={COLORS.outline} />
+              <Icon name="chat-outline" size={30} color={BRAND.blue} />
             </View>
-            <Text style={{ fontFamily: FONTS.serif, fontSize: 22, color: COLORS.onSurface, marginBottom: 8, textAlign: "center" }}>
-              {search ? "Aucun résultat" : "Aucune conversation"}
+            <Text
+              style={[TYPE.sectionTitle, { marginBottom: SPACE.sm, textAlign: "center" }]}
+            >
+              {search ? "Aucun résultat" : "Aucun échange"}
             </Text>
-            <Text style={{ fontSize: 14, lineHeight: 21, fontFamily: FONTS.body, color: COLORS.outline, textAlign: "center" }}>
+            <Text
+              style={{
+                fontSize: 14,
+                lineHeight: 21,
+                fontFamily: FONTS.body,
+                color: COLORS.outline,
+                textAlign: "center",
+              }}
+            >
               {search
-                ? "Essayez avec d'autres termes"
-                : "Vos échanges avec nos artisans apparaîtront ici"}
+                ? "Essayez un autre nom ou un autre sujet."
+                : "Une question sur une pièce ? Ouvrez sa fiche et écrivez-nous — l’échange se retrouvera ici."}
             </Text>
+
+            {!search && (
+              <View style={{ marginTop: SPACE.xl }}>
+                <Button
+                  label="Parcourir le catalogue"
+                  onPress={() => router.push("/(tabs)/categories")}
+                  size="md"
+                  fullWidth={false}
+                  tint={[BRAND.blue, BRAND.blueDeep]}
+                />
+              </View>
+            )}
           </View>
         )}
       </ScrollView>

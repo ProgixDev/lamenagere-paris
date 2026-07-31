@@ -16,10 +16,7 @@ import Icon from "../../components/ui/Icon";
 import PressableScale from "../../components/ui/PressableScale";
 import { COLORS } from "../../lib/constants";
 import { FONTS, TYPE, SPACE, SHADOW } from "../../lib/typography";
-import {
-  PRODUCT_IMAGES,
-  getProductImage,
-} from "../../lib/mock-data";
+import { PRODUCT_IMAGES } from "../../lib/mock-data";
 import { useFeaturedProducts } from "../../features/featured/store";
 import {
   useCategories,
@@ -29,6 +26,7 @@ import { priceTagLabel } from "../../lib/pricing";
 import type { Product, Category } from "../../lib/types";
 import SearchBar from "../../components/SearchBar";
 import LogoHeader from "../../components/layout/LogoHeader";
+import { productCoverSource } from "../../lib/product-media";
 
 const { width: W } = Dimensions.get("window");
 const PAGE_PAD = 16;
@@ -373,7 +371,7 @@ function CategoryBentoCard({
 }
 
 function EditorialCard({ product, onPress }: { product: Product; onPress: () => void }) {
-  const img = getProductImage(product.images[0]);
+  const img = productCoverSource(product);
   return (
     <PressableScale onPress={onPress} style={{ width: 168 }}>
       <View

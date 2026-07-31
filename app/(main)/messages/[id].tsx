@@ -18,7 +18,6 @@ import { FONTS, SHADOW } from "../../../lib/typography";
 import { priceTagLabel } from "../../../lib/pricing";
 import MessageBubble from "../../../components/messaging/MessageBubble";
 import MessageInput from "../../../components/messaging/MessageInput";
-import { getProductImage } from "../../../lib/mock-data";
 import {
   useConversations,
   useConversationThread,
@@ -27,6 +26,7 @@ import {
 } from "../../../features/messaging/hooks";
 import GuestGate from "../../../components/GuestGate";
 import { useIsGuestVisitor } from "../../../features/auth/guards";
+import { productCoverSource } from "../../../lib/product-media";
 
 function ConversationScreenContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -41,9 +41,7 @@ function ConversationScreenContent() {
   const sendMessage = useSendMessage();
   const markAsRead = useMarkAsRead();
 
-  const productImg = conversation?.product?.images[0]
-    ? getProductImage(conversation.product.images[0])
-    : null;
+  const productImg = productCoverSource(conversation?.product);
 
   useEffect(() => {
     if (id) markAsRead.mutate(id);

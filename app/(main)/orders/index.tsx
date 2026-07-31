@@ -13,7 +13,6 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../../lib/constants";
 import { TYPE, SHADOW } from "../../../lib/typography";
 import { formatPrice, formatDate } from "../../../lib/utils";
-import { getProductImage } from "../../../lib/mock-data";
 import { useOrders } from "../../../features/orders/hooks";
 import { ORDER_STATUS_LABELS } from "../../../features/orders/store";
 import { useQuoteRequests } from "../../../features/quotes/hooks";
@@ -21,6 +20,7 @@ import { useCartStore } from "../../../features/cart/store";
 import type { QuoteStatus } from "../../../lib/types";
 import GuestGate from "../../../components/GuestGate";
 import { useIsGuestVisitor } from "../../../features/auth/guards";
+import { productCoverSource } from "../../../lib/product-media";
 
 const STATUS_COLORS: Record<string, string> = {
   commande_confirmee: COLORS.primary,
@@ -135,7 +135,7 @@ function OrdersScreenContent() {
           ) : orders.length > 0 ? (
             orders.map((order) => {
               const firstItem = order.items[0];
-              const img = firstItem ? getProductImage(firstItem.product.images[0]) : null;
+              const img = firstItem ? productCoverSource(firstItem.product) : null;
               const statusColor = STATUS_COLORS[order.status] ?? COLORS.primary;
               return (
                 <TouchableOpacity
@@ -189,7 +189,7 @@ function OrdersScreenContent() {
           <LoadingBlock />
         ) : quotes.length > 0 ? (
           quotes.map((quote) => {
-            const img = getProductImage(quote.product.images[0]);
+            const img = productCoverSource(quote.product);
             const statusColor = QUOTE_STATUS_COLORS[quote.status] ?? COLORS.secondary;
             const canAddToCart =
               quote.quotedPrice != null &&
