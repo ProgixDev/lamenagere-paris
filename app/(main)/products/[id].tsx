@@ -409,14 +409,9 @@ export default function ProductDetailScreen() {
                 </Text>
               </View>
             ) : product.price ? (
-              <View>
-                <Text style={[TYPE.priceLarge, { fontSize: 32, color: BRAND.blue }]}>
-                  {formatPrice(product.price)}
-                </Text>
-                <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 2 }}>
-                  Dès {formatPrice(Math.round(product.price / 4))}/mois en 4× sans frais
-                </Text>
-              </View>
+              <Text style={[TYPE.priceLarge, { fontSize: 32, color: BRAND.blue }]}>
+                {formatPrice(product.price)}
+              </Text>
             ) : null}
 
             {/* Availability, said only when it changes what the customer can
@@ -674,7 +669,7 @@ export default function ProductDetailScreen() {
                       style={{
                         width: 130,
                         backgroundColor: COLORS.surfaceContainerLowest,
-                        borderRadius: 16,
+                        borderRadius: 10,
                         overflow: "hidden",
                         ...SHADOW.soft,
                       }}
@@ -682,15 +677,14 @@ export default function ProductDetailScreen() {
                       <View style={{ width: "100%", height: 150, backgroundColor: COLORS.surfaceContainer }}>
                         {img && <Image source={img} style={{ width: "100%", height: "100%" }} resizeMode="cover" />}
                       </View>
-                      <View style={{ paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8 }}>
+                      <View style={{ paddingHorizontal: 10, paddingTop: 8, paddingBottom: 10 }}>
                         <Text style={{ fontSize: 12, lineHeight: 16, height: 32, fontFamily: "Inter_500Medium", color: COLORS.onSurface }} numberOfLines={2}>
                           {p.name}
                         </Text>
-                      </View>
-                      {/* Price bar — same language as the curated rails. */}
-                      <View style={{ backgroundColor: BRAND.yellow, paddingHorizontal: 10, paddingVertical: 7 }}>
+
+                        {/* Price — navy text, no filled bar. */}
                         <Text
-                          style={[TYPE.price, { fontSize: 15, color: COLORS.primary, textAlign: "right" }]}
+                          style={[TYPE.price, { fontSize: 15, color: COLORS.primary, textAlign: "right", marginTop: 5 }]}
                           numberOfLines={1}
                         >
                           {priceTagLabel(p)}

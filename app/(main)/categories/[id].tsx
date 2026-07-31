@@ -58,7 +58,7 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
       onPress={() => router.push(`/(main)/products/${product.id}`)}
       style={{
         width: CARD_W,
-        borderRadius: 16,
+        borderRadius: 10,
         overflow: "hidden",
         backgroundColor: COLORS.surfaceContainerLowest,
         marginBottom: 12,
@@ -105,7 +105,7 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
         </TouchableOpacity>
       </View>
 
-      <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10 }}>
+      <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12 }}>
         <Text
           style={{ fontSize: 13, lineHeight: 18, fontFamily: FONTS.bodyMedium, color: COLORS.onSurface, marginBottom: 3 }}
           numberOfLines={1}
@@ -118,12 +118,10 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
         >
           par La Ménagère Paris
         </Text>
-      </View>
 
-      {/* Price bar — brand blue, flush to the card's bottom edge. */}
-      <View style={{ backgroundColor: BRAND.blue, paddingHorizontal: 12, paddingVertical: 9 }}>
+        {/* Price — navy text, no filled bar. */}
         <Text
-          style={[TYPE.price, { fontSize: 19, color: "#fff", textAlign: "right" }]}
+          style={[TYPE.price, { fontSize: 19, color: COLORS.primary, textAlign: "right", marginTop: 6 }]}
           numberOfLines={1}
         >
           {priceTagLabel(product)}
@@ -168,7 +166,7 @@ function SelectionRail({ products }: { products: Product[] }) {
               style={{
                 width: 150,
                 backgroundColor: COLORS.surfaceContainerLowest,
-                borderRadius: 16,
+                borderRadius: 10,
                 overflow: "hidden",
                 ...SHADOW.card,
               }}
@@ -178,19 +176,17 @@ function SelectionRail({ products }: { products: Product[] }) {
                   <Image source={source} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
                 )}
               </View>
-              <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10 }}>
+              <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12 }}>
                 <Text
                   numberOfLines={2}
                   style={{ fontSize: 13, lineHeight: 18, height: 36, fontFamily: FONTS.bodyMedium, color: COLORS.onSurface }}
                 >
                   {product.name}
                 </Text>
-              </View>
-              {/* Price bar — brand yellow marks the curated rail. Navy text:
-                  yellow is too light to carry white. */}
-              <View style={{ backgroundColor: BRAND.yellow, paddingHorizontal: 12, paddingVertical: 9 }}>
+
+                {/* Price — navy text, no filled bar. */}
                 <Text
-                  style={[TYPE.price, { fontSize: 17, color: COLORS.primary, textAlign: "right" }]}
+                  style={[TYPE.price, { fontSize: 17, color: COLORS.primary, textAlign: "right", marginTop: 6 }]}
                   numberOfLines={1}
                 >
                   {priceTagLabel(product)}

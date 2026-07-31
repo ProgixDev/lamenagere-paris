@@ -219,7 +219,7 @@ function ProductCard({ product }: { product: Product }) {
         style={{
           width: COL_W,
           backgroundColor: COLORS.surfaceContainerLowest,
-          borderRadius: 16,
+          borderRadius: 10,
           overflow: "hidden",
           ...SHADOW.card,
         }}
@@ -259,8 +259,8 @@ function ProductCard({ product }: { product: Product }) {
           </TouchableOpacity>
         </View>
 
-        {/* Content — fixed heights so the price bar lines up across a row. */}
-        <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10 }}>
+        {/* Content — fixed heights so the price lines up across a row. */}
+        <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12 }}>
           <Text
             style={{
               fontSize: 13,
@@ -274,35 +274,33 @@ function ProductCard({ product }: { product: Product }) {
             {product.name}
           </Text>
 
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, height: 18 }}>
+          {/* Rating and price share a row: the price is right-aligned and never
+              shrinks, so a long rating truncates before the price does. */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, minHeight: 26, marginTop: 4 }}>
             {product.ratingCount ? (
               <>
                 <Icon name="star" size={11} color={BRAND.yellow} />
                 <Text style={{ fontSize: 11, fontFamily: FONTS.bodySemibold, color: COLORS.onSurfaceVariant }}>
                   {(product.ratingAvg ?? 0).toFixed(1)}
                 </Text>
-                <Text style={{ fontSize: 10, fontFamily: FONTS.body, color: COLORS.outline }}>
+                <Text
+                  style={{ fontSize: 10, fontFamily: FONTS.body, color: COLORS.outline, flexShrink: 1 }}
+                  numberOfLines={1}
+                >
                   ({product.ratingCount})
                 </Text>
               </>
             ) : null}
-          </View>
-        </View>
 
-        {/* Price bar — brand blue, flush to the card's bottom edge. */}
-        <View
-          style={{
-            backgroundColor: BRAND.blue,
-            paddingHorizontal: 12,
-            paddingVertical: 9,
-          }}
-        >
-          <Text
-            style={[TYPE.price, { fontSize: 19, color: "#fff", textAlign: "right" }]}
-            numberOfLines={1}
-          >
-            {priceTagLabel(product)}
-          </Text>
+            <View style={{ flex: 1 }} />
+
+            <Text
+              style={[TYPE.price, { fontSize: 18, color: COLORS.primary, flexShrink: 0 }]}
+              numberOfLines={1}
+            >
+              {priceTagLabel(product)}
+            </Text>
+          </View>
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -399,7 +397,7 @@ function FeaturedRail({ products }: { products: Product[] }) {
               style={{
                 width: 168,
                 backgroundColor: COLORS.surfaceContainerLowest,
-                borderRadius: 16,
+                borderRadius: 10,
                 overflow: "hidden",
                 ...SHADOW.card,
               }}
@@ -409,7 +407,7 @@ function FeaturedRail({ products }: { products: Product[] }) {
                   <Image source={source} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
                 )}
               </View>
-              <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10 }}>
+              <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12 }}>
                 <Text
                   numberOfLines={2}
                   style={{
@@ -422,12 +420,10 @@ function FeaturedRail({ products }: { products: Product[] }) {
                 >
                   {product.name}
                 </Text>
-              </View>
-              {/* Price bar — brand yellow marks the curated rail. Navy text:
-                  yellow is too light to carry white. */}
-              <View style={{ backgroundColor: BRAND.yellow, paddingHorizontal: 12, paddingVertical: 9 }}>
+
+                {/* Price — navy text, no filled bar. */}
                 <Text
-                  style={[TYPE.price, { fontSize: 17, color: COLORS.primary, textAlign: "right" }]}
+                  style={[TYPE.price, { fontSize: 17, color: COLORS.primary, textAlign: "right", marginTop: 6 }]}
                   numberOfLines={1}
                 >
                   {priceTagLabel(product)}

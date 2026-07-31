@@ -12,7 +12,7 @@ import { COLORS, PRODUCT_TYPES, PRICE_MODES } from "../../../lib/constants";
 import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import { formatPrice } from "../../../lib/utils";
 import { computeConfiguredPrice, perSqmRate } from "../../../lib/pricing";
-import { openingTypeLabel, diagramForTypes } from "../../../lib/opening-types";
+import { openingTypeLabel } from "../../../lib/opening-types";
 import {
   buildConfiguration,
   configSurchargeEuros,
@@ -235,16 +235,6 @@ export default function ConfigureScreen() {
                     Type d&apos;ouverture
                   </Text>
                   <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, ...SHADOW.card }}>
-                    {(() => {
-                      const diagram = diagramForTypes(openingTypes.map((o) => o.type));
-                      return diagram ? (
-                        <Animated.Image
-                          source={diagram}
-                          style={{ width: "100%", height: 140, borderRadius: 10, marginBottom: 12, backgroundColor: COLORS.surfaceContainer }}
-                          resizeMode="contain"
-                        />
-                      ) : null;
-                    })()}
                     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
                       {openingTypes.map((opt) => {
                         const active = openingType === opt.type;
