@@ -11,7 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "../../components/ui/Icon";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { COLORS } from "../../lib/constants";
+import { COLORS, BRAND } from "../../lib/constants";
 import { FONTS, TYPE, SPACE, SHADOW } from "../../lib/typography";
 import { useAuthStore } from "../../features/auth/store";
 import { useGuestStore } from "../../features/auth/guest";
@@ -90,7 +90,7 @@ export default function ProfileScreen() {
           >
             {/* Avatar */}
             <LinearGradient
-              colors={[COLORS.primary, COLORS.primaryContainer]}
+              colors={[BRAND.blue, BRAND.blueDeep]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={{
@@ -123,7 +123,7 @@ export default function ProfileScreen() {
                   paddingVertical: 4,
                 }}
               >
-                <Text style={[TYPE.overline, { color: COLORS.primary }]}>
+                <Text style={[TYPE.overline, { color: BRAND.blue }]}>
                   Compte Professionnel
                 </Text>
               </View>
@@ -140,8 +140,8 @@ export default function ProfileScreen() {
                 gap: 4,
               }}
             >
-              <Icon name="pencil-outline" size={14} color={COLORS.primary} />
-              <Text style={{ fontSize: 12, fontFamily: FONTS.bodyMedium, color: COLORS.primary }}>
+              <Icon name="pencil-outline" size={14} color={BRAND.blue} />
+              <Text style={{ fontSize: 12, fontFamily: FONTS.bodyMedium, color: BRAND.blue }}>
                 Modifier le profil
               </Text>
             </TouchableOpacity>
@@ -199,7 +199,7 @@ export default function ProfileScreen() {
                     <Icon
                       name={item.icon as any}
                       size={20}
-                      color={COLORS.primary}
+                      color={BRAND.blue}
                     />
                   </View>
                   <Text

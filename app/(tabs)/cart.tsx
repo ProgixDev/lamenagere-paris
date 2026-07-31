@@ -9,7 +9,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { COLORS } from "../../lib/constants";
+import Icon from "../../components/ui/Icon";
+import { COLORS, BRAND } from "../../lib/constants";
 import { TYPE } from "../../lib/typography";
 import { useCart } from "../../features/cart/hooks";
 import CartItemComponent from "../../components/cart/CartItem";
@@ -72,7 +73,7 @@ export default function CartScreen() {
               marginBottom: 20,
             }}
           >
-            <MaterialCommunityIcons name="shopping-outline" size={36} color={COLORS.primary} />
+            <MaterialCommunityIcons name="shopping-outline" size={36} color={BRAND.blue} />
           </View>
           <Text
             style={[
@@ -96,9 +97,9 @@ export default function CartScreen() {
           <Button
             label="Explorer le catalogue"
             onPress={() => router.push("/(tabs)/categories")}
-            variant="secondary"
             size="md"
             fullWidth={false}
+            tint={[BRAND.blue, BRAND.blueDeep]}
           />
         </View>
       </SafeAreaView>
@@ -126,7 +127,7 @@ export default function CartScreen() {
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
           <View
             style={{
-              backgroundColor: COLORS.primary,
+              backgroundColor: BRAND.blue,
               borderRadius: 10,
               paddingHorizontal: 8,
               paddingVertical: 2,
@@ -141,7 +142,7 @@ export default function CartScreen() {
             style={{ padding: 4, marginLeft: 8 }}
             accessibilityLabel="Vider le panier"
           >
-            <MaterialCommunityIcons name="trash-can-outline" size={20} color={COLORS.outline} />
+            <Icon name="trash-can-outline" size={20} color={COLORS.outline} />
           </TouchableOpacity>
         </View>
       </View>
@@ -183,6 +184,7 @@ export default function CartScreen() {
           label={isGuest && !isAuthenticated ? "Se connecter pour commander" : "Passer la commande"}
           onPress={handleCheckout}
           size="md"
+          tint={[BRAND.blue, BRAND.blueDeep]}
         />
       </View>
     </SafeAreaView>

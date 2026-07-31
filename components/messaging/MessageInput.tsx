@@ -9,7 +9,9 @@ import {
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { COLORS } from "../../lib/constants";
+import Icon from "../ui/Icon";
+import { COLORS, BRAND } from "../../lib/constants";
+import { FONTS } from "../../lib/typography";
 import {
   pickMessageMedia,
   uploadMessageMedia,
@@ -56,9 +58,9 @@ export default function MessageInput({ onSend, disabled = false }: MessageInputP
   return (
     <View
       style={{
-        backgroundColor: "#ffffff",
+        backgroundColor: COLORS.surfaceContainerLowest,
         borderTopWidth: 1,
-        borderTopColor: "#f0f0f0",
+        borderTopColor: COLORS.outlineVariant,
       }}
     >
       {/* Pending attachment previews */}
@@ -85,7 +87,7 @@ export default function MessageInput({ onSend, disabled = false }: MessageInputP
                     justifyContent: "center",
                   }}
                 >
-                  <MaterialCommunityIcons name="play-circle" size={26} color={COLORS.primary} />
+                  <MaterialCommunityIcons name="play-circle" size={26} color={BRAND.blue} />
                 </View>
               ) : (
                 <Image
@@ -126,7 +128,7 @@ export default function MessageInput({ onSend, disabled = false }: MessageInputP
                 justifyContent: "center",
               }}
             >
-              <ActivityIndicator size="small" color={COLORS.primary} />
+              <ActivityIndicator size="small" color={BRAND.blue} />
             </View>
           )}
         </View>
@@ -144,16 +146,18 @@ export default function MessageInput({ onSend, disabled = false }: MessageInputP
         <TouchableOpacity
           onPress={handlePick}
           disabled={uploading || disabled}
+          accessibilityRole="button"
+          accessibilityLabel="Joindre une photo ou une vidéo"
           style={{
-            width: 38,
-            height: 38,
-            borderRadius: 19,
-            backgroundColor: "#f5f5f5",
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: COLORS.surfaceContainer,
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <MaterialCommunityIcons name="plus" size={20} color={COLORS.outline} />
+          <Icon name="paperclip" size={19} color={COLORS.onSurfaceVariant} />
         </TouchableOpacity>
 
         <View
@@ -161,24 +165,24 @@ export default function MessageInput({ onSend, disabled = false }: MessageInputP
             flex: 1,
             flexDirection: "row",
             alignItems: "flex-end",
-            backgroundColor: "#f5f5f5",
+            backgroundColor: COLORS.surfaceContainer,
             borderRadius: 20,
-            paddingHorizontal: 14,
-            paddingVertical: 8,
-            minHeight: 38,
-            maxHeight: 100,
+            paddingHorizontal: 15,
+            paddingVertical: 10,
+            minHeight: 40,
+            maxHeight: 110,
           }}
         >
           <TextInput
             value={text}
             onChangeText={setText}
-            placeholder="Écrire un message..."
-            placeholderTextColor={COLORS.surfaceDim}
+            placeholder="Écrire un message"
+            placeholderTextColor={COLORS.outline}
             style={{
               flex: 1,
-              fontSize: 14,
+              fontSize: 15,
               color: COLORS.onSurface,
-              fontFamily: "Inter_400Regular",
+              fontFamily: FONTS.body,
               lineHeight: 20,
               paddingVertical: 0,
             }}
@@ -190,20 +194,21 @@ export default function MessageInput({ onSend, disabled = false }: MessageInputP
         <TouchableOpacity
           onPress={handleSend}
           disabled={!canSend}
+          accessibilityRole="button"
+          accessibilityLabel="Envoyer"
           style={{
-            width: 38,
-            height: 38,
-            borderRadius: 19,
-            backgroundColor: canSend ? COLORS.primary : "#f5f5f5",
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: canSend ? BRAND.blue : COLORS.surfaceContainer,
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <MaterialCommunityIcons
+          <Icon
             name="send"
             size={18}
             color={canSend ? "#ffffff" : COLORS.surfaceDim}
-            style={{ marginLeft: 2 }}
           />
         </TouchableOpacity>
       </View>

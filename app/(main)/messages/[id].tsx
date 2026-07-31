@@ -12,9 +12,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { COLORS } from "../../../lib/constants";
-import { FONTS, SHADOW } from "../../../lib/typography";
+import Icon from "../../../components/ui/Icon";
+import { COLORS, BRAND } from "../../../lib/constants";
+import { FONTS, SPACE } from "../../../lib/typography";
 import { priceTagLabel } from "../../../lib/pricing";
 import MessageBubble from "../../../components/messaging/MessageBubble";
 import MessageInput from "../../../components/messaging/MessageInput";
@@ -27,6 +27,61 @@ import {
 import GuestGate from "../../../components/GuestGate";
 import { useIsGuestVisitor } from "../../../features/auth/guards";
 import { productCoverSource } from "../../../lib/product-media";
+
+/** Messages more than this far apart start a new run (fresh avatar + time). */
+const RUN_GAP_MS = 5 * 60 * 1000;
+
+const sameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate();
+
+/** "Aujourd'hui" / "Hier" / "12 juillet" — the year only when it isn't this one. */
+function dayLabel(iso: string): string {
+  const date = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  if (sameDay(date, today)) return "Aujourd’hui";
+  if (sameDay(date, yesterday)) return "Hier";
+
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "numeric",
+    month: "long",
+    ...(date.getFullYear() === today.getFullYear() ? {} : { year: "numeric" }),
+  }).format(date);
+}
+
+/** Centred small-caps date, held between two hairlines. */
+function DaySeparator({ label }: { label: string }) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: SPACE.md,
+        marginTop: SPACE.lg,
+        marginBottom: SPACE.lg,
+        paddingHorizontal: SPACE.sm,
+      }}
+    >
+      <View style={{ flex: 1, height: 1, backgroundColor: COLORS.outlineVariant }} />
+      <Text
+        style={{
+          fontSize: 10,
+          letterSpacing: 1.4,
+          textTransform: "uppercase",
+          fontFamily: FONTS.bodySemibold,
+          color: COLORS.outline,
+        }}
+      >
+        {label}
+      </Text>
+      <View style={{ flex: 1, height: 1, backgroundColor: COLORS.outlineVariant }} />
+    </View>
+  );
+}
 
 function ConversationScreenContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -70,8 +125,8 @@ function ConversationScreenContent() {
           },
           onError: () => {
             Alert.alert(
-              "Erreur",
-              "Votre message n'a pas pu être envoyé. Veuillez réessayer.",
+              "Message non envoyé",
+              "Vérifiez votre connexion, puis renvoyez-le.",
             );
           },
         },
@@ -87,7 +142,7 @@ function ConversationScreenContent() {
           Conversation introuvable
         </Text>
         <Text style={{ fontSize: 14, lineHeight: 21, fontFamily: FONTS.body, color: COLORS.outline, textAlign: "center" }}>
-          Cet échange n'est plus disponible.
+          Cet échange n’est plus disponible.
         </Text>
       </SafeAreaView>
     );
@@ -95,50 +150,126 @@ function ConversationScreenContent() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }} edges={["top"]}>
-      {/* Header */}
+      {/* Header — who you're writing to, and what about */}
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
-          gap: 12,
-          paddingHorizontal: 16,
-          paddingVertical: 12,
+          gap: SPACE.md,
+          paddingLeft: SPACE.sm,
+          paddingRight: SPACE.lg,
+          paddingVertical: SPACE.md,
           backgroundColor: COLORS.surfaceContainerLowest,
-          borderBottomWidth: 1,
-          borderBottomColor: COLORS.outlineVariant + "88",
+          // The product strip below carries the rule when there is one.
+          borderBottomWidth: conversation.product ? 0 : 1,
+          borderBottomColor: COLORS.outlineVariant,
         }}
       >
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Retour">
-          <MaterialCommunityIcons name="chevron-left" size={26} color={COLORS.onSurface} />
+        <TouchableOpacity
+          onPress={() => router.back()}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+          style={{ padding: SPACE.xs }}
+        >
+          <Icon name="chevron-left" size={26} color={COLORS.onSurface} />
         </TouchableOpacity>
 
-        {/* Vendor avatar */}
         <View
           style={{
             width: 40,
             height: 40,
             borderRadius: 14,
-            backgroundColor: COLORS.primary,
+            backgroundColor: BRAND.blue,
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <MaterialCommunityIcons name="store" size={18} color="#fff" />
+          <Icon name="store" size={18} color="#fff" />
         </View>
 
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontFamily: FONTS.serifBold, fontSize: 20, lineHeight: 24, color: COLORS.onSurface }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            style={{
+              fontSize: 10,
+              letterSpacing: 1.4,
+              textTransform: "uppercase",
+              fontFamily: FONTS.bodySemibold,
+              color: COLORS.outline,
+            }}
+            numberOfLines={1}
+          >
             {conversation.vendorName}
           </Text>
-          <Text style={{ fontSize: 11, fontFamily: FONTS.body, color: COLORS.outline, marginTop: 1 }}>
-            Répond généralement en 2h
+          <Text
+            style={{ fontFamily: FONTS.serifBold, fontSize: 20, lineHeight: 24, color: COLORS.onSurface }}
+            numberOfLines={1}
+          >
+            {conversation.subject}
           </Text>
         </View>
-
-        <TouchableOpacity accessibilityLabel="Appeler le vendeur">
-          <MaterialCommunityIcons name="phone-outline" size={22} color={COLORS.onSurface} />
-        </TouchableOpacity>
       </View>
+
+      {/*
+        Signature: the piece under discussion is pinned below the header, so the
+        reason for the conversation never scrolls out of reach. Its price stays
+        brand blue, as everywhere else in the catalogue.
+      */}
+      {conversation.product && (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => router.push(`/(main)/products/${conversation.product!.id}`)}
+          accessibilityRole="button"
+          accessibilityLabel={`Voir la fiche de ${conversation.product.name}`}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: SPACE.md,
+            paddingHorizontal: SPACE.lg,
+            paddingVertical: 10,
+            backgroundColor: COLORS.surfaceContainerLowest,
+            borderTopWidth: 1,
+            borderTopColor: COLORS.outlineVariant,
+            borderBottomWidth: 1,
+            borderBottomColor: COLORS.outlineVariant,
+          }}
+        >
+          {productImg ? (
+            <Image
+              source={productImg}
+              style={{ width: 40, height: 40, borderRadius: 10 }}
+              resizeMode="cover"
+            />
+          ) : (
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 10,
+                backgroundColor: COLORS.surfaceContainer,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Icon name="image-off-outline" size={18} color={COLORS.surfaceDim} />
+            </View>
+          )}
+
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text
+              style={{ fontSize: 13, fontFamily: FONTS.bodyMedium, color: COLORS.onSurface }}
+              numberOfLines={1}
+            >
+              {conversation.product.name}
+            </Text>
+            <Text style={{ fontSize: 15, fontFamily: FONTS.serif, color: BRAND.blue, marginTop: 1 }}>
+              {priceTagLabel(conversation.product)}
+            </Text>
+          </View>
+
+          <Icon name="chevron-right" size={18} color={COLORS.outline} />
+        </TouchableOpacity>
+      )}
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -148,66 +279,46 @@ function ConversationScreenContent() {
         <ScrollView
           ref={scrollRef}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 12, paddingBottom: 8 }}
+          contentContainerStyle={{ paddingHorizontal: SPACE.lg, paddingTop: SPACE.xs, paddingBottom: SPACE.md }}
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         >
-          {/* Product context card */}
-          {conversation.product && (
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={() => router.push(`/(main)/products/${conversation.product!.id}`)}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 12,
-                backgroundColor: COLORS.surfaceContainerLowest,
-                borderRadius: 16,
-                padding: 12,
-                marginBottom: 16,
-                alignSelf: "center",
-                maxWidth: "90%",
-                ...SHADOW.soft,
-              }}
-            >
-              {productImg && (
-                <Image
-                  source={productImg}
-                  style={{ width: 46, height: 46, borderRadius: 12 }}
-                  resizeMode="cover"
-                />
-              )}
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={{ fontSize: 13, fontFamily: FONTS.bodySemibold, color: COLORS.onSurface }}
-                  numberOfLines={1}
-                >
-                  {conversation.product.name}
-                </Text>
-                <Text style={{ fontSize: 13, fontFamily: FONTS.serif, color: COLORS.onSurface, marginTop: 1 }}>
-                  {priceTagLabel(conversation.product)}
-                </Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.outline} />
-            </TouchableOpacity>
-          )}
-
-          {/* Messages */}
           {messagesLoading && messages.length === 0 ? (
             <View style={{ alignItems: "center", justifyContent: "center", paddingTop: 60 }}>
-              <ActivityIndicator color={COLORS.primary} />
+              <ActivityIndicator color={BRAND.blue} />
             </View>
           ) : (
             messages.map((msg, idx) => {
-              const prevMsg = idx > 0 ? messages[idx - 1] : null;
-              const showAvatar = !prevMsg || prevMsg.sender !== msg.sender;
+              const prev = idx > 0 ? messages[idx - 1] : null;
+              const next = idx < messages.length - 1 ? messages[idx + 1] : null;
+
+              const at = new Date(msg.createdAt).getTime();
+              const startsRun =
+                !prev ||
+                prev.sender !== msg.sender ||
+                at - new Date(prev.createdAt).getTime() > RUN_GAP_MS;
+              const endsRun =
+                !next ||
+                next.sender !== msg.sender ||
+                new Date(next.createdAt).getTime() - at > RUN_GAP_MS;
+
+              const newDay =
+                !prev || !sameDay(new Date(prev.createdAt), new Date(msg.createdAt));
+
               return (
-                <MessageBubble key={msg.id} message={msg} showAvatar={showAvatar} />
+                <React.Fragment key={msg.id}>
+                  {newDay && <DaySeparator label={dayLabel(msg.createdAt)} />}
+                  <MessageBubble
+                    message={msg}
+                    showAvatar={startsRun}
+                    showTime={endsRun}
+                  />
+                </React.Fragment>
               );
             })
           )}
         </ScrollView>
 
-        {/* Input */}
+        {/* Composer */}
         <SafeAreaView edges={["bottom"]} style={{ backgroundColor: COLORS.surfaceContainerLowest }}>
           <MessageInput onSend={handleSend} disabled={sendMessage.isPending} />
         </SafeAreaView>

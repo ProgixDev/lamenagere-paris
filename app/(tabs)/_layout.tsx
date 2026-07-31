@@ -9,7 +9,7 @@ import {
 import { Tabs } from "expo-router";
 import { BlurView } from "expo-blur";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { COLORS } from "../../lib/constants";
+import { COLORS, BRAND } from "../../lib/constants";
 import { useCartItemCount } from "../../features/cart/store";
 import { useMessagingStore } from "../../features/messaging/store";
 
@@ -25,7 +25,7 @@ export default function TabLayout() {
       <NativeTabs
         tintColor={COLORS.primary}
         minimizeBehavior="onScrollDown"
-        badgeBackgroundColor={COLORS.secondary}
+        badgeBackgroundColor={BRAND.blue}
       >
         <NativeTabs.Trigger name="index">
           <Label>Accueil</Label>
@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: COLORS.secondary,
+    backgroundColor: BRAND.blue,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: COLORS.secondary,
+    backgroundColor: BRAND.blue,
     borderWidth: 2,
     borderColor: "#ffffff",
   },

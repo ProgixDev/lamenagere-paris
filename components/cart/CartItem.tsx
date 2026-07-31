@@ -2,7 +2,9 @@ import React from "react";
 import { View, Text, TouchableOpacity, Image } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { COLORS } from "../../lib/constants";
+import Icon from "../ui/Icon";
+import { COLORS, BRAND } from "../../lib/constants";
+import { FONTS } from "../../lib/typography";
 import { formatPrice, formatDimensions } from "../../lib/utils";
 import { openingTypeLabel } from "../../lib/opening-types";
 import { summarizeConfiguration } from "../../lib/config-blocks";
@@ -119,7 +121,7 @@ export default function CartItem({
               style={{
                 fontSize: 11,
                 fontFamily: "Inter_500Medium",
-                color: COLORS.secondary,
+                color: COLORS.onSurfaceVariant,
                 marginTop: 2,
               }}
             >
@@ -143,9 +145,9 @@ export default function CartItem({
 
           <Text
             style={{
-              fontSize: 16,
-              fontFamily: "Manrope_700Bold",
-              color: COLORS.secondary,
+              fontSize: 20,
+              fontFamily: FONTS.serifBold,
+              color: BRAND.blue,
               marginTop: 4,
             }}
           >
@@ -170,7 +172,7 @@ export default function CartItem({
           onPress={handleRemove}
           style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
         >
-          <MaterialCommunityIcons name="trash-can-outline" size={15} color={COLORS.outline} />
+          <Icon name="trash-can-outline" size={15} color={COLORS.outline} />
           <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline }}>
             Supprimer
           </Text>

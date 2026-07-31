@@ -27,117 +27,122 @@ export default function ConversationItem({ conversation }: ConversationItemProps
   return (
     <PressableScale
       onPress={() => router.push(`/(main)/messages/${conversation.id}`)}
+      // The shadow lives on the outer node and the clipping on the inner one:
+      // put `overflow: hidden` and a shadow on the same view and iOS clips the
+      // shadow away with it.
       style={{
-        flexDirection: "row",
         backgroundColor: COLORS.surfaceContainerLowest,
         borderRadius: 16,
-        overflow: "hidden",
         ...SHADOW.card,
       }}
     >
-      {/* Unread rule — flush to the card's leading edge */}
-      <View style={{ width: 3, backgroundColor: hasUnread ? BRAND.blue : "transparent" }} />
+      <View style={{ flexDirection: "row", borderRadius: 16, overflow: "hidden" }}>
+        {/* Unread rule — flush to the card's leading edge */}
+        <View style={{ width: 3, backgroundColor: hasUnread ? BRAND.blue : "transparent" }} />
 
-      <View style={{ flex: 1, flexDirection: "row", gap: 14, padding: 14 }}>
-        {/* The piece being discussed */}
-        <View
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: 14,
-            overflow: "hidden",
-            backgroundColor: COLORS.surfaceContainer,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          {productImg ? (
-            <Image source={productImg} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
-          ) : (
-            <Icon name="store-outline" size={22} color={COLORS.outline} />
-          )}
-        </View>
-
-        <View style={{ flex: 1, minWidth: 0 }}>
-          {/* Vendor + time */}
+        <View style={{ flex: 1, flexDirection: "row", gap: 14, padding: 14 }}>
+          {/* The piece being discussed */}
           <View
             style={{
-              flexDirection: "row",
+              width: 56,
+              height: 56,
+              // Fixed, so a tall product shot can't stretch the tile with the row.
+              alignSelf: "flex-start",
+              borderRadius: 14,
+              overflow: "hidden",
+              backgroundColor: COLORS.surfaceContainer,
               alignItems: "center",
-              justifyContent: "space-between",
-              gap: 8,
-              marginBottom: 2,
+              justifyContent: "center",
             }}
           >
-            <Text
-              style={{
-                flex: 1,
-                fontSize: 10,
-                letterSpacing: 1.4,
-                textTransform: "uppercase",
-                fontFamily: FONTS.bodySemibold,
-                color: COLORS.outline,
-              }}
-              numberOfLines={1}
-            >
-              {conversation.vendorName}
-            </Text>
-            <Text
-              style={{
-                fontSize: 11,
-                fontFamily: hasUnread ? FONTS.bodySemibold : FONTS.body,
-                color: hasUnread ? BRAND.blue : COLORS.outline,
-              }}
-            >
-              {relativeTime(conversation.lastMessageAt)}
-            </Text>
+            {productImg ? (
+              <Image source={productImg} style={{ width: 56, height: 56 }} resizeMode="cover" />
+            ) : (
+              <Icon name="store-outline" size={22} color={COLORS.outline} />
+            )}
           </View>
 
-          {/* Subject — the dossier title */}
-          <Text
-            style={{
-              fontFamily: hasUnread ? FONTS.serifBold : FONTS.serif,
-              fontSize: 19,
-              lineHeight: 23,
-              color: COLORS.onSurface,
-              marginBottom: 3,
-            }}
-            numberOfLines={1}
-          >
-            {conversation.subject}
-          </Text>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            {/* Who it's with, and when it last moved */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+                marginBottom: 2,
+              }}
+            >
+              <Text
+                style={{
+                  flex: 1,
+                  fontSize: 10,
+                  letterSpacing: 1.4,
+                  textTransform: "uppercase",
+                  fontFamily: FONTS.bodySemibold,
+                  color: COLORS.outline,
+                }}
+                numberOfLines={1}
+              >
+                {conversation.vendorName}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontFamily: hasUnread ? FONTS.bodySemibold : FONTS.body,
+                  color: hasUnread ? BRAND.blue : COLORS.outline,
+                }}
+              >
+                {relativeTime(conversation.lastMessageAt)}
+              </Text>
+            </View>
 
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            {/* Subject — the dossier title */}
             <Text
               style={{
-                flex: 1,
-                fontSize: 13,
-                lineHeight: 18,
-                fontFamily: FONTS.body,
-                color: hasUnread ? COLORS.onSurfaceVariant : COLORS.outline,
+                fontFamily: hasUnread ? FONTS.serifBold : FONTS.serif,
+                fontSize: 19,
+                lineHeight: 23,
+                color: COLORS.onSurface,
+                marginBottom: 3,
               }}
               numberOfLines={1}
             >
-              {conversation.lastMessage}
+              {conversation.subject}
             </Text>
 
-            {hasUnread && (
-              <View
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text
                 style={{
-                  minWidth: 20,
-                  height: 20,
-                  borderRadius: 10,
-                  backgroundColor: BRAND.blue,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  paddingHorizontal: 6,
+                  flex: 1,
+                  fontSize: 13,
+                  lineHeight: 18,
+                  fontFamily: FONTS.body,
+                  color: hasUnread ? COLORS.onSurfaceVariant : COLORS.outline,
                 }}
+                numberOfLines={1}
               >
-                <Text style={{ fontSize: 10, fontFamily: FONTS.bodyBold, color: "#fff" }}>
-                  {conversation.unreadCount}
-                </Text>
-              </View>
-            )}
+                {conversation.lastMessage}
+              </Text>
+
+              {hasUnread && (
+                <View
+                  style={{
+                    minWidth: 20,
+                    height: 20,
+                    borderRadius: 10,
+                    backgroundColor: BRAND.blue,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    paddingHorizontal: 6,
+                  }}
+                >
+                  <Text style={{ fontSize: 10, fontFamily: FONTS.bodyBold, color: "#fff" }}>
+                    {conversation.unreadCount}
+                  </Text>
+                </View>
+              )}
+            </View>
           </View>
         </View>
       </View>

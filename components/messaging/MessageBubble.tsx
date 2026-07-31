@@ -178,18 +178,18 @@ export default function MessageBubble({
           </View>
         ))}
 
-        {/* Text bubble */}
+        {/* Text bubble — corners nest so a run reads as one block */}
         {hasText && (
           <View
             style={{
               paddingHorizontal: 14,
               paddingVertical: 10,
-              backgroundColor: isUser ? COLORS.primary : "#ffffff",
-              borderTopLeftRadius: 16,
-              borderTopRightRadius: 16,
-              borderBottomLeftRadius: isUser ? 16 : 4,
-              borderBottomRightRadius: isUser ? 4 : 16,
-              shadowColor: isUser ? "transparent" : "rgba(0,0,0,0.04)",
+              backgroundColor: isUser ? BRAND.blue : COLORS.surfaceContainerLowest,
+              borderTopLeftRadius: !isUser && !showAvatar ? 6 : 16,
+              borderTopRightRadius: isUser && !showAvatar ? 6 : 16,
+              borderBottomLeftRadius: isUser ? 16 : showTime ? 4 : 6,
+              borderBottomRightRadius: isUser ? (showTime ? 4 : 6) : 16,
+              shadowColor: isUser ? "transparent" : "rgba(15,23,42,0.10)",
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 1,
               shadowRadius: 8,
@@ -198,29 +198,32 @@ export default function MessageBubble({
           >
             <Text
               style={{
-                fontSize: 14,
-                fontFamily: "Inter_400Regular",
+                fontSize: 15,
+                fontFamily: FONTS.body,
                 color: isUser ? "#ffffff" : COLORS.onSurface,
-                lineHeight: 20,
+                lineHeight: 22,
               }}
             >
               {message.content}
             </Text>
           </View>
         )}
-        <Text
-          style={{
-            fontSize: 10,
-            fontFamily: "Inter_400Regular",
-            color: COLORS.outline,
-            marginTop: 4,
-            textAlign: isUser ? "right" : "left",
-            marginLeft: isUser ? 0 : 2,
-            marginRight: isUser ? 2 : 0,
-          }}
-        >
-          {time}
-        </Text>
+
+        {showTime && (
+          <Text
+            style={{
+              fontSize: 10,
+              fontFamily: FONTS.body,
+              color: COLORS.outline,
+              marginTop: 4,
+              textAlign: isUser ? "right" : "left",
+              marginLeft: isUser ? 0 : 2,
+              marginRight: isUser ? 2 : 0,
+            }}
+          >
+            {time}
+          </Text>
+        )}
       </View>
     </View>
   );

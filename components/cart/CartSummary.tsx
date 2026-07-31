@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text } from "react-native";
-import { COLORS, TVA_RATE } from "../../lib/constants";
+import { COLORS, BRAND, TVA_RATE } from "../../lib/constants";
+import { FONTS, SHADOW } from "../../lib/typography";
 import { formatPrice, formatPrice2, splitTtc } from "../../lib/utils";
 
 interface CartSummaryProps {
@@ -45,9 +46,10 @@ export default function CartSummary({ subtotal, shipping, total, isB2b }: CartSu
   return (
     <View
       style={{
-        backgroundColor: "#ffffff",
-        borderRadius: 14,
-        padding: 16,
+        backgroundColor: COLORS.surfaceContainerLowest,
+        borderRadius: 16,
+        padding: 18,
+        ...SHADOW.card,
       }}
     >
       {isB2b ? (
@@ -66,13 +68,21 @@ export default function CartSummary({ subtotal, shipping, total, isB2b }: CartSu
         muted
       />
 
-      <View style={{ height: 1, backgroundColor: "#f0f0f0", marginBottom: 12 }} />
+      <View style={{ height: 1, backgroundColor: COLORS.outlineVariant, marginBottom: 12 }} />
 
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Text style={{ fontSize: 15, fontFamily: "Manrope_700Bold", color: COLORS.primary }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
+        <Text
+          style={{
+            fontSize: 11,
+            letterSpacing: 1.6,
+            textTransform: "uppercase",
+            fontFamily: FONTS.bodySemibold,
+            color: COLORS.onSurfaceVariant,
+          }}
+        >
           {isB2b ? "Total TTC" : "Total"}
         </Text>
-        <Text style={{ fontSize: 18, fontFamily: "Manrope_700Bold", color: COLORS.secondary }}>
+        <Text style={{ fontSize: 28, fontFamily: FONTS.serifBold, color: BRAND.blue }}>
           {formatPrice(total)}
         </Text>
       </View>
