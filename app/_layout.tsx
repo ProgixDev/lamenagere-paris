@@ -19,6 +19,7 @@ import { useGuestStore } from "../features/auth/guest";
 import { useOnboardingStore } from "../features/onboarding/store";
 import AnimatedSplash from "../components/AnimatedSplash";
 import GuestModeChrome from "../components/GuestModeChrome";
+import ImmersiveMode from "../components/ImmersiveMode";
 import PopupGate from "../components/PopupGate";
 import {
   buildDeepLinkFromTarget,
@@ -230,6 +231,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
+        <ImmersiveMode />
         <QueryClientProvider client={queryClient}>
           <StripeGate>
             <AuthGate>

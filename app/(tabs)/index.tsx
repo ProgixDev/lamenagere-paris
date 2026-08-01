@@ -1,21 +1,28 @@
-import React, { useMemo, useState, useCallback, useEffect } from "react";
+import React, {
+  useMemo,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  useContext,
+  createContext,
+} from "react";
 import {
   View,
   Text,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   Dimensions,
-  Image,
   RefreshControl,
   ActivityIndicator,
-  type NativeSyntheticEvent,
-  type NativeScrollEvent,
 } from "react-native";
+import { Image } from "expo-image";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   Easing,
+  type SharedValue,
 } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -57,50 +64,94 @@ const COL_W = (W - H_PAD * 2 - GUTTER) / 2;
 // Consistent, curated 4:5 portrait imagery (replaces the chaotic random-height
 // "masonry" that read as a discount marketplace).
 const IMG_H = Math.round(COL_W * 1.25);
+// Cards are fixed-height by design (image + 36px title + 26px price row and
+// fixed padding), so we can hand the list an exact row height and let it skip
+// measurement entirely.
+const CARD_BODY_H = 88;
+const ROW_H = IMG_H + CARD_BODY_H + GUTTER;
+
+// The grid reveals itself in slices as the customer scrolls instead of
+// mounting the whole response at once.
+const FIRST_SLICE = 8;
+const SLICE = 8;
+// Minimum gap between two "load more" reactions, so a fast fling can't burn
+// through the whole list in a single frame.
+const END_REACHED_COOLDOWN_MS = 350;
+
+/**
+ * Category-switch crossfade, shared with the virtualized cells.
+ *
+ * The transition used to live on a single `Animated.View` wrapping the feed —
+ * impossible now that the cards are list items. Passing the shared value down
+ * costs one worklet read per visible card and keeps the animation identical.
+ */
+const FeedFade = createContext<SharedValue<number> | null>(null);
 
 // ─── Top category rail (icon tiles + labels) ──────────────
-function TopCategoryTabs({
+const CAT_ITEM_W = 80;
+
+type Cat = { id: string; name: string; icon?: string; image?: string };
+
+const TopCategoryTabs = React.memo(function TopCategoryTabs({
   active,
   onSelect,
   categories,
 }: {
   active: string;
   onSelect: (id: string) => void;
-  categories: { id: string; name: string; icon?: string; image?: string }[];
+  categories: Cat[];
 }) {
-  const cats = [
-    { id: "all", name: "Tout", icon: "view-grid", image: undefined },
-    ...categories,
-  ];
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 14, paddingTop: 8, paddingBottom: 14 }}
-    >
-      {cats.map((cat) => (
-        <CategoryCircle
-          key={cat.id}
-          cat={cat}
-          isActive={cat.id === active}
-          onPress={() => {
-            Haptics.selectionAsync();
-            onSelect(cat.id);
-          }}
-        />
-      ))}
-    </ScrollView>
+  const cats = useMemo<Cat[]>(
+    () => [{ id: "all", name: "Tout", icon: "view-grid" }, ...categories],
+    [categories],
   );
-}
 
-const CAT_ITEM_W = 80;
+  const renderItem = useCallback(
+    ({ item }: { item: Cat }) => (
+      <CategoryCircle
+        cat={item}
+        isActive={item.id === active}
+        onPress={() => {
+          Haptics.selectionAsync();
+          onSelect(item.id);
+        }}
+      />
+    ),
+    [active, onSelect],
+  );
 
-function CategoryCircle({
+  return (
+    <FlatList
+      horizontal
+      data={cats}
+      keyExtractor={(c) => c.id}
+      renderItem={renderItem}
+      extraData={active}
+      showsHorizontalScrollIndicator={false}
+      initialNumToRender={6}
+      maxToRenderPerBatch={4}
+      windowSize={3}
+      getItemLayout={(_, index) => ({
+        length: CAT_ITEM_W + 14,
+        offset: (CAT_ITEM_W + 14) * index,
+        index,
+      })}
+      contentContainerStyle={{
+        paddingHorizontal: H_PAD,
+        gap: 14,
+        paddingTop: 8,
+        paddingBottom: 14,
+      }}
+    />
+  );
+});
+
+const CategoryCircle = React.memo(function CategoryCircle({
   cat,
   isActive,
   onPress,
 }: {
-  cat: { id: string; name: string; icon?: string; image?: string };
+  cat: Cat;
   isActive: boolean;
   onPress: () => void;
 }) {
@@ -161,7 +212,14 @@ function CategoryCircle({
           }}
         >
           {imgSource ? (
-            <Image source={imgSource} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+            <Image
+              source={imgSource}
+              style={{ width: "100%", height: "100%" }}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              recyclingKey={cat.id}
+              transition={150}
+            />
           ) : (
             <Icon name={cat.icon || "view-grid"} size={24} color={COLORS.primary} />
           )}
@@ -186,19 +244,24 @@ function CategoryCircle({
       </View>
     </TouchableOpacity>
   );
-}
+});
 
 // ─── Product card (premium / boutique) ────────────────────
-function ProductCard({ product }: { product: Product }) {
+const ProductCard = React.memo(function ProductCard({ product }: { product: Product }) {
   const router = useRouter();
   const isFav = useFavoritesStore((s) => s.favorites.includes(product.id));
   const toggleFav = useFavoritesStore((s) => s.toggleFavorite);
   const imgSource = productCoverSource(product);
+  const fade = useContext(FeedFade);
 
   const scale = useSharedValue(1);
-  const cardStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
+  const cardStyle = useAnimatedStyle(() => {
+    const f = fade ? fade.value : 1;
+    return {
+      opacity: f,
+      transform: [{ scale: scale.value }, { translateY: (1 - f) * 14 }],
+    };
+  });
 
   const handleFav = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -230,7 +293,12 @@ function ProductCard({ product }: { product: Product }) {
             <Image
               source={imgSource}
               style={{ width: "100%", height: "100%" }}
-              resizeMode="cover"
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              // Tells expo-image the view was recycled onto another product so
+              // it clears the previous bitmap instead of flashing it.
+              recyclingKey={product.id}
+              transition={200}
             />
           )}
           <TouchableOpacity
@@ -305,10 +373,10 @@ function ProductCard({ product }: { product: Product }) {
       </TouchableOpacity>
     </Animated.View>
   );
-}
+});
 
 // ─── Promo banners (admin-curated) ────────────────────────
-function PromoBanners() {
+const PromoBanners = React.memo(function PromoBanners() {
   const banners = usePromoBanners();
   if (banners.length === 0) return null;
   return (
@@ -370,11 +438,65 @@ function PromoBanners() {
       ))}
     </View>
   );
-}
+});
 
 // ─── Featured "Sélection" rail (admin-curated) ────────────
-function FeaturedRail({ products }: { products: Product[] }) {
+const RAIL_CARD_W = 168;
+
+const FeaturedCard = React.memo(function FeaturedCard({ product }: { product: Product }) {
   const router = useRouter();
+  const source = productCoverSource(product);
+  return (
+    <TouchableOpacity
+      activeOpacity={0.95}
+      onPress={() => router.push(`/(main)/products/${product.id}`)}
+      style={{
+        width: RAIL_CARD_W,
+        backgroundColor: COLORS.surfaceContainerLowest,
+        borderRadius: 10,
+        overflow: "hidden",
+        ...SHADOW.card,
+      }}
+    >
+      <View style={{ width: "100%", height: 200, backgroundColor: COLORS.surfaceContainer }}>
+        {source && (
+          <Image
+            source={source}
+            style={{ width: "100%", height: "100%" }}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={product.id}
+            transition={200}
+          />
+        )}
+      </View>
+      <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12 }}>
+        <Text
+          numberOfLines={2}
+          style={{
+            fontSize: 13,
+            lineHeight: 18,
+            height: 36,
+            fontFamily: FONTS.bodyMedium,
+            color: COLORS.onSurface,
+          }}
+        >
+          {product.name}
+        </Text>
+
+        {/* Price — navy text, no filled bar. */}
+        <Text
+          style={[TYPE.price, { fontSize: 17, color: COLORS.primary, textAlign: "right", marginTop: 6 }]}
+          numberOfLines={1}
+        >
+          {priceTagLabel(product)}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+const FeaturedRail = React.memo(function FeaturedRail({ products }: { products: Product[] }) {
   if (products.length === 0) return null;
   return (
     <View style={{ marginBottom: SPACE.xxl }}>
@@ -382,95 +504,97 @@ function FeaturedRail({ products }: { products: Product[] }) {
         <Text style={TYPE.overline}>Curation</Text>
         <Text style={[TYPE.sectionTitle, { marginTop: 2 }]}>Notre sélection</Text>
       </View>
-      <ScrollView
+      <FlatList
         horizontal
+        data={products}
+        keyExtractor={(p) => p.id}
+        renderItem={({ item }) => <FeaturedCard product={item} />}
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: H_PAD, gap: 14, paddingTop: 2, paddingBottom: 12 }}
-      >
-        {products.map((product) => {
-          const source = productCoverSource(product);
-          return (
-            <TouchableOpacity
-              key={product.id}
-              activeOpacity={0.95}
-              onPress={() => router.push(`/(main)/products/${product.id}`)}
-              style={{
-                width: 168,
-                backgroundColor: COLORS.surfaceContainerLowest,
-                borderRadius: 10,
-                overflow: "hidden",
-                ...SHADOW.card,
-              }}
-            >
-              <View style={{ width: "100%", height: 200, backgroundColor: COLORS.surfaceContainer }}>
-                {source && (
-                  <Image source={source} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
-                )}
-              </View>
-              <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12 }}>
-                <Text
-                  numberOfLines={2}
-                  style={{
-                    fontSize: 13,
-                    lineHeight: 18,
-                    height: 36,
-                    fontFamily: FONTS.bodyMedium,
-                    color: COLORS.onSurface,
-                  }}
-                >
-                  {product.name}
-                </Text>
-
-                {/* Price — navy text, no filled bar. */}
-                <Text
-                  style={[TYPE.price, { fontSize: 17, color: COLORS.primary, textAlign: "right", marginTop: 6 }]}
-                  numberOfLines={1}
-                >
-                  {priceTagLabel(product)}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          );
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        windowSize={3}
+        getItemLayout={(_, index) => ({
+          length: RAIL_CARD_W + 14,
+          offset: (RAIL_CARD_W + 14) * index,
+          index,
         })}
-      </ScrollView>
+        contentContainerStyle={{
+          paddingHorizontal: H_PAD,
+          gap: 14,
+          paddingTop: 2,
+          paddingBottom: 12,
+        }}
+      />
     </View>
   );
-}
+});
 
-// ─── Two-column product grid (uniform, curated) ───────────
-type FeedItem = { key: string; product: Product };
-
-function ProductGrid({ items }: { items: FeedItem[] }) {
-  const left: { it: FeedItem; index: number }[] = [];
-  const right: { it: FeedItem; index: number }[] = [];
-  items.forEach((it, i) => {
-    (i % 2 === 0 ? left : right).push({ it, index: i });
-  });
-
+// ─── Scrollable header above the grid ─────────────────────
+const HomeHeader = React.memo(function HomeHeader({
+  activeCategory,
+  categories,
+  onSelectCategory,
+  onFilterPress,
+  filterActive,
+  showCurated,
+  featured,
+  sectionOverline,
+  sectionTitle,
+  showSection,
+}: {
+  activeCategory: string;
+  categories: Cat[];
+  onSelectCategory: (id: string) => void;
+  onFilterPress: () => void;
+  filterActive: boolean;
+  showCurated: boolean;
+  featured: Product[];
+  sectionOverline: string;
+  sectionTitle: string;
+  showSection: boolean;
+}) {
   return (
-    <View style={{ flexDirection: "row", paddingHorizontal: H_PAD, gap: GUTTER }}>
-      <View style={{ flex: 1 }}>
-        {left.map(({ it }) => (
-          <ProductCard key={it.key} product={it.product} />
-        ))}
+    <View>
+      <LogoHeader />
+      <GreetingHeader />
+      <SearchBar onFilterPress={onFilterPress} filterActive={filterActive} />
+
+      <View style={{ backgroundColor: COLORS.background }}>
+        <TopCategoryTabs
+          active={activeCategory}
+          onSelect={onSelectCategory}
+          categories={categories}
+        />
       </View>
-      <View style={{ flex: 1 }}>
-        {right.map(({ it }) => (
-          <ProductCard key={it.key} product={it.product} />
-        ))}
-      </View>
+
+      <HeroCarousel />
+
+      {showCurated && (
+        <>
+          <PromoBanners />
+          <FeaturedRail products={featured} />
+        </>
+      )}
+
+      {showSection && (
+        <View style={{ paddingHorizontal: H_PAD, marginBottom: 14 }}>
+          <Text style={TYPE.overline}>{sectionOverline}</Text>
+          <Text style={[TYPE.sectionTitle, { marginTop: 2 }]}>{sectionTitle}</Text>
+        </View>
+      )}
     </View>
   );
-}
+});
 
 // ─── Home screen ──────────────────────────────────────────
-const NEAR_BOTTOM_PX = 600;
-
 export default function HomeScreen() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [refreshing, setRefreshing] = useState(false);
+  // How much of the loaded list is actually mounted; grows as the customer
+  // reaches the bottom.
+  const [visibleCount, setVisibleCount] = useState(FIRST_SLICE);
   const featured = useFeaturedProducts();
 
   const isAll = activeCategory === "all";
@@ -481,13 +605,16 @@ export default function HomeScreen() {
 
   // Active product source depends on selected top tab.
   const baseProducts = useMemo<Product[]>(() => {
-    if (isAll) return popularQuery.data ?? [];
-    return categoryQuery.data?.pages.flatMap((p) => p.items) ?? [];
+    const list = isAll
+      ? popularQuery.data ?? []
+      : categoryQuery.data?.pages.flatMap((p) => p.items) ?? [];
+    // The list is keyed by product id now (no index suffix), so an id repeated
+    // across two fetched pages would collide.
+    const seen = new Set<string>();
+    return list.filter((p) => !seen.has(p.id) && seen.add(p.id));
   }, [isAll, popularQuery.data, categoryQuery.data]);
 
-  const isLoading = isAll
-    ? popularQuery.isLoading
-    : categoryQuery.isLoading;
+  const isLoading = isAll ? popularQuery.isLoading : categoryQuery.isLoading;
 
   // Price bounds + histogram for the filter sheet, derived from the loaded list.
   const priceBounds = useMemo(() => {
@@ -540,39 +667,44 @@ export default function HomeScreen() {
     return list;
   }, [baseProducts, filters, priceBounds]);
 
-  // Build the grid feed from the real product list.
-  const feed = useMemo<FeedItem[]>(() => {
-    return products.map((product, i) => ({
-      key: `${product.id}-${i}`,
-      product,
-    }));
-  }, [products]);
+  // Anything that changes what the grid shows restarts the reveal window.
+  useEffect(() => {
+    setVisibleCount(FIRST_SLICE);
+  }, [activeCategory, filters]);
+
+  // Only this slice is handed to the list; the list then windows it further.
+  const feed = useMemo(
+    () => products.slice(0, visibleCount),
+    [products, visibleCount],
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    if (isAll) {
-      await popularQuery.refetch();
-    } else {
-      await categoryQuery.refetch();
+    setVisibleCount(FIRST_SLICE);
+    try {
+      if (isAll) await popularQuery.refetch();
+      else await categoryQuery.refetch();
+    } finally {
+      setRefreshing(false);
     }
-    setRefreshing(false);
   }, [isAll, popularQuery, categoryQuery]);
 
-  const onScroll = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-      const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
-      if (
-        distanceFromBottom < NEAR_BOTTOM_PX &&
-        !isAll &&
-        categoryQuery.hasNextPage &&
-        !categoryQuery.isFetchingNextPage
-      ) {
-        categoryQuery.fetchNextPage();
-      }
-    },
-    [isAll, categoryQuery],
-  );
+  // Reaching the bottom first reveals more of what's already in memory, and
+  // only asks the server for another page once the local list is exhausted.
+  const lastEndReachedRef = useRef(0);
+  const onEndReached = useCallback(() => {
+    const now = Date.now();
+    if (now - lastEndReachedRef.current < END_REACHED_COOLDOWN_MS) return;
+    lastEndReachedRef.current = now;
+
+    if (visibleCount < products.length) {
+      setVisibleCount((c) => Math.min(c + SLICE, products.length));
+      return;
+    }
+    if (!isAll && categoryQuery.hasNextPage && !categoryQuery.isFetchingNextPage) {
+      categoryQuery.fetchNextPage();
+    }
+  }, [visibleCount, products.length, isAll, categoryQuery]);
 
   // Premium category rail uses real photography. Prefer the admin's category
   // image; otherwise borrow the first product image of that category as a cover
@@ -607,80 +739,95 @@ export default function HomeScreen() {
       easing: Easing.out(Easing.cubic),
     });
   }, [activeCategory, contentAnim]);
-  const feedStyle = useAnimatedStyle(() => ({
-    opacity: contentAnim.value,
-    transform: [{ translateY: (1 - contentAnim.value) * 14 }],
-  }));
+
+  const openSheet = useCallback(() => setSheetOpen(true), []);
+  const filtersActive = isNonDefault(filters);
+
+  const renderItem = useCallback(
+    ({ item }: { item: Product }) => <ProductCard product={item} />,
+    [],
+  );
+
+  const header = (
+    <HomeHeader
+      activeCategory={activeCategory}
+      categories={categories}
+      onSelectCategory={setActiveCategory}
+      onFilterPress={openSheet}
+      filterActive={filtersActive}
+      showCurated={isAll && !filtersActive}
+      featured={featured}
+      sectionOverline={isAll ? "Catalogue" : "Sélection"}
+      sectionTitle={
+        isAll
+          ? "Tous nos produits"
+          : categories.find((c) => c.id === activeCategory)?.name ?? "Produits"
+      }
+      showSection={products.length > 0}
+    />
+  );
+
+  const empty =
+    isLoading && products.length === 0 ? (
+      <ProductGridSkeleton count={6} />
+    ) : (
+      <View style={{ alignItems: "center", paddingTop: 56, paddingHorizontal: 32 }}>
+        <Text style={[TYPE.sectionTitle, { fontSize: 20, textAlign: "center" }]}>
+          Aucun produit
+        </Text>
+        <Text
+          style={{
+            fontSize: 13,
+            fontFamily: FONTS.body,
+            color: COLORS.outline,
+            textAlign: "center",
+            marginTop: 6,
+          }}
+        >
+          Essayez une autre catégorie ou ajustez vos filtres.
+        </Text>
+      </View>
+    );
+
+  const footer =
+    visibleCount < products.length ||
+    (!isAll && categoryQuery.isFetchingNextPage) ? (
+      <View style={{ paddingVertical: 24, alignItems: "center" }}>
+        <ActivityIndicator size="small" color={COLORS.primary} />
+      </View>
+    ) : null;
 
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: COLORS.background }}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 100 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        onScroll={onScroll}
-        scrollEventThrottle={64}
-      >
-        <LogoHeader />
-        <GreetingHeader />
-        <SearchBar
-          onFilterPress={() => setSheetOpen(true)}
-          filterActive={isNonDefault(filters)}
+      <FeedFade.Provider value={contentAnim}>
+        <FlatList
+          data={feed}
+          renderItem={renderItem}
+          keyExtractor={(p) => p.id}
+          numColumns={2}
+          columnWrapperStyle={{ paddingHorizontal: H_PAD, gap: GUTTER }}
+          ListHeaderComponent={header}
+          ListEmptyComponent={empty}
+          ListFooterComponent={footer}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 100 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          onEndReached={onEndReached}
+          onEndReachedThreshold={0.6}
+          // Rows are a known fixed height, so the list can position everything
+          // without measuring a single cell.
+          getItemLayout={(_, index) => ({
+            length: ROW_H,
+            offset: ROW_H * index,
+            index,
+          })}
+          initialNumToRender={FIRST_SLICE / 2}
+          maxToRenderPerBatch={4}
+          updateCellsBatchingPeriod={60}
+          windowSize={5}
+          removeClippedSubviews
         />
-
-        <View style={{ backgroundColor: COLORS.background }}>
-          <TopCategoryTabs active={activeCategory} onSelect={setActiveCategory} categories={categories} />
-        </View>
-
-        <HeroCarousel />
-
-        {isAll && !isNonDefault(filters) && (
-          <>
-            <PromoBanners />
-            <FeaturedRail products={featured} />
-          </>
-        )}
-
-        <Animated.View style={feedStyle}>
-          {isLoading && feed.length === 0 ? (
-            <ProductGridSkeleton count={6} />
-          ) : products.length === 0 ? (
-            <View style={{ alignItems: "center", paddingTop: 56, paddingHorizontal: 32 }}>
-              <Text style={[TYPE.sectionTitle, { fontSize: 20, textAlign: "center" }]}>
-                Aucun produit
-              </Text>
-              <Text
-                style={{
-                  fontSize: 13,
-                  fontFamily: FONTS.body,
-                  color: COLORS.outline,
-                  textAlign: "center",
-                  marginTop: 6,
-                }}
-              >
-                Essayez une autre catégorie ou ajustez vos filtres.
-              </Text>
-            </View>
-          ) : (
-            <>
-              <View style={{ paddingHorizontal: H_PAD, marginBottom: 14 }}>
-                <Text style={TYPE.overline}>{isAll ? "Catalogue" : "Sélection"}</Text>
-                <Text style={[TYPE.sectionTitle, { marginTop: 2 }]}>
-                  {isAll
-                    ? "Tous nos produits"
-                    : categories.find((c) => c.id === activeCategory)?.name ?? "Produits"}
-                </Text>
-              </View>
-              <ProductGrid items={feed} />
-              {!isAll && categoryQuery.isFetchingNextPage ? (
-                <View style={{ paddingVertical: 24, alignItems: "center" }}>
-                  <ActivityIndicator size="small" color={COLORS.primary} />
-                </View>
-              ) : null}
-            </>
-          )}
-        </Animated.View>
-      </ScrollView>
+      </FeedFade.Provider>
 
       <SortFilterSheet
         visible={sheetOpen}

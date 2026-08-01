@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { useRouter, useSegments } from "expo-router";
-import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "./ui/Icon";
 import { COLORS } from "../lib/constants";
 import { FONTS } from "../lib/typography";
@@ -12,8 +12,10 @@ import { useGuestStore } from "../features/auth/guest";
  * Wraps the navigation stack and, whenever the visitor is browsing as a guest
  * (ghost mode) on a main/tab screen, pins a persistent top banner reminding
  * them they are not signed in. The banner consumes the top safe-area inset and
- * we hand the children a top inset of 0 so screens sit flush below it (no
- * double gap). On auth / onboarding screens nothing is added.
+ * the children sit inside a nested SafeAreaProvider, which re-measures the area
+ * left below the banner — so screens (whose `SafeAreaView` is a native view and
+ * therefore ignores any JS context override) get top: 0 and sit flush, with no
+ * leftover gap. On auth / onboarding screens nothing is added.
  */
 export default function GuestModeChrome({ children }: { children: React.ReactNode }) {
   const insets = useSafeAreaInsets();
@@ -61,9 +63,9 @@ export default function GuestModeChrome({ children }: { children: React.ReactNod
           </View>
         </View>
       )}
-      <SafeAreaInsetsContext.Provider value={show ? { ...insets, top: 0 } : insets}>
-        {children}
-      </SafeAreaInsetsContext.Provider>
+      {/* Always mounted (never keyed on `show`) so toggling the banner never
+          remounts the navigation stack. */}
+      <SafeAreaProvider style={{ flex: 1 }}>{children}</SafeAreaProvider>
     </View>
   );
 }
