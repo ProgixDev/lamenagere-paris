@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, Image, ActivityIndicator, Alert } from "react-native";
+import { View, Text, TouchableOpacity, Image, ActivityIndicator, Alert, Modal } from "react-native";
 import * as Haptics from "expo-haptics";
 import Icon from "../ui/Icon";
 import Input from "../ui/Input";
@@ -110,6 +110,35 @@ function Pill({ active, label, sub, onPress }: { active: boolean; label: string;
   );
 }
 
+// Small "view fullscreen" badge + modal, meant to sit inside a relatively
+// positioned image box. Tapping it never bubbles to the box's own onPress.
+function ImageZoomOverlay({ uri }: { uri: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <TouchableOpacity
+        onPress={() => setOpen(true)}
+        hitSlop={6}
+        style={{ position: "absolute", bottom: 2, right: 2, width: 18, height: 18, borderRadius: 9, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center" }}
+      >
+        <Icon name="fullscreen" size={12} color="#fff" />
+      </TouchableOpacity>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.96)", alignItems: "center", justifyContent: "center" }}>
+          <Image source={{ uri }} style={{ width: "100%", height: "70%" }} resizeMode="contain" />
+          <TouchableOpacity
+            onPress={() => setOpen(false)}
+            hitSlop={10}
+            style={{ position: "absolute", top: 50, right: 20, width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" }}
+          >
+            <Icon name="close" size={22} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
 function ShapeBlock({ block, sel, patch }: { block: ConfigBlock; sel: Sel; patch: Patch }) {
   const options = block.options ?? [];
   return (
@@ -139,7 +168,10 @@ function ShapeBlock({ block, sel, patch }: { block: ConfigBlock; sel: Sel; patch
               }}
             >
               {o.image ? (
-                <Image source={{ uri: o.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                <>
+                  <Image source={{ uri: o.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                  <ImageZoomOverlay uri={o.image} />
+                </>
               ) : (
                 <Text style={{ fontSize: 22, fontFamily: "Manrope_800ExtraBold", color: COLORS.outline }}>{o.label}</Text>
               )}
@@ -218,8 +250,15 @@ function AccessoriesBlock({ block, sel, patch }: { block: ConfigBlock; sel: Sel;
             onPress={() => toggle(it.id)}
             style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 8, borderRadius: 10, borderWidth: 1, borderColor: active ? COLORS.primary : COLORS.outlineVariant, backgroundColor: active ? `${COLORS.primary}0D` : "transparent" }}
           >
-            <View style={{ width: 48, height: 48, borderRadius: 8, backgroundColor: COLORS.surfaceContainer, overflow: "hidden" }}>
-              {it.image ? <Image source={{ uri: it.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" /> : null}
+            <View style={{ width: 48, height: 48, borderRadius: 8, backgroundColor: COLORS.surfaceContainer, overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
+              {it.image ? (
+                <>
+                  <Image source={{ uri: it.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                  <ImageZoomOverlay uri={it.image} />
+                </>
+              ) : (
+                <Icon name="image-off-outline" size={18} color={COLORS.outline} />
+              )}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>{it.title}</Text>
@@ -250,9 +289,16 @@ function OpeningBlock({ block, sel, patch }: { block: ConfigBlock; sel: Sel; pat
             }}
             style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 8, borderRadius: 10, borderWidth: 1, borderColor: active ? COLORS.primary : COLORS.outlineVariant, backgroundColor: active ? `${COLORS.primary}0D` : "transparent" }}
           >
-            {o.image ? (
-              <Image source={{ uri: o.image }} style={{ width: 56, height: 56, borderRadius: 8, backgroundColor: COLORS.surfaceContainer }} resizeMode="cover" />
-            ) : null}
+            <View style={{ width: 56, height: 56, borderRadius: 8, backgroundColor: COLORS.surfaceContainer, overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
+              {o.image ? (
+                <>
+                  <Image source={{ uri: o.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                  <ImageZoomOverlay uri={o.image} />
+                </>
+              ) : (
+                <Icon name="image-off-outline" size={20} color={COLORS.outline} />
+              )}
+            </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>{o.label}</Text>
               {o.surchargeCents ? (
@@ -288,8 +334,15 @@ function OptionsBlock({ block, sel, patch }: { block: ConfigBlock; sel: Sel; pat
             onPress={() => toggle(o.key)}
             style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 8, borderRadius: 10, borderWidth: 1, borderColor: active ? COLORS.primary : COLORS.outlineVariant, backgroundColor: active ? `${COLORS.primary}0D` : "transparent" }}
           >
-            <View style={{ width: 48, height: 48, borderRadius: 8, backgroundColor: COLORS.surfaceContainer, overflow: "hidden" }}>
-              {o.image ? <Image source={{ uri: o.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" /> : null}
+            <View style={{ width: 48, height: 48, borderRadius: 8, backgroundColor: COLORS.surfaceContainer, overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
+              {o.image ? (
+                <>
+                  <Image source={{ uri: o.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                  <ImageZoomOverlay uri={o.image} />
+                </>
+              ) : (
+                <Icon name="image-off-outline" size={18} color={COLORS.outline} />
+              )}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>{o.label}</Text>
