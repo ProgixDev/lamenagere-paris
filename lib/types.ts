@@ -95,7 +95,8 @@ export type ConfigBlockType =
   | "colors"
   | "accessories"
   | "opening_details"
-  | "photos";
+  | "photos"
+  | "options";
 
 export interface ConfigBlockField {
   key: string;
@@ -140,6 +141,7 @@ export interface ConfigSelectionEntry {
   colors?: { key: string; label: string; surchargeCents?: number }[];
   accessories?: { id: string; title: string; priceCents?: number }[];
   opening?: { key: string; label: string; surchargeCents?: number };
+  options?: { key: string; label: string; surchargeCents?: number; image?: string }[];
   photos?: { url: string; type: "image" | "video" }[];
 }
 export type ItemConfiguration = ConfigSelectionEntry[];

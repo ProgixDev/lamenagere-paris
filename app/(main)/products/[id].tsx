@@ -354,7 +354,7 @@ export default function ProductDetailScreen() {
             gap: 14,
           }}
         >
-          <TrustItem icon="truck-outline" label="Livraison France & DOM" />
+          <TrustItem icon="truck-outline" label="Livraison DOM-TOM gratuite" />
           <View style={{ width: 1, backgroundColor: COLORS.outlineVariant }} />
           <TrustItem icon="shield-check-outline" label="Garantie 2 ans" />
           <View style={{ width: 1, backgroundColor: COLORS.outlineVariant }} />
@@ -443,6 +443,34 @@ export default function ProductDetailScreen() {
                 </Text>
               </View>
             )}
+          </View>
+
+          {/* ── DOM-TOM Delivery Info ───────────────── */}
+          <View
+            style={{
+              marginTop: 16,
+              backgroundColor: "rgba(231, 240, 255, 0.4)",
+              borderRadius: 12,
+              padding: 12,
+              flexDirection: "row",
+              gap: 12,
+              borderWidth: 1,
+              borderColor: `${BRAND.blue}30`,
+              alignItems: "center"
+            }}
+          >
+            <View style={{ backgroundColor: "#fff", padding: 8, borderRadius: 10, ...SHADOW.soft }}>
+              <Icon name="airplane" size={20} color={BRAND.blue} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: BRAND.blueDeep, marginBottom: 2 }}>
+                Livraison gratuite DOM-TOM
+              </Text>
+              <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.onSurfaceVariant, lineHeight: 16 }}>
+                Mayotte, Île de La Réunion, Martinique, Guyane.{"\n"}
+                <Text style={{ fontSize: 11, color: COLORS.outline }}>*Frais de douane non inclus</Text>
+              </Text>
+            </View>
           </View>
         </View>
 

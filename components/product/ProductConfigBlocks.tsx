@@ -39,6 +39,9 @@ export default function ProductConfigBlocks({ blocks, value, onChange }: Props) 
           {block.type === "opening_details" && (
             <OpeningBlock block={block} sel={value[block.id]} patch={(p) => patch(block.id, p)} />
           )}
+          {block.type === "options" && (
+            <OptionsBlock block={block} sel={value[block.id]} patch={(p) => patch(block.id, p)} />
+          )}
           {block.type === "photos" && (
             <PhotosBlock block={block} sel={value[block.id]} patch={(p) => patch(block.id, p)} />
           )}
@@ -257,6 +260,44 @@ function OpeningBlock({ block, sel, patch }: { block: ConfigBlock; sel: Sel; pat
               ) : null}
             </View>
             <Icon name={active ? "radiobox-marked" : "radiobox-blank"} size={22} color={active ? COLORS.primary : COLORS.outline} />
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function OptionsBlock({ block, sel, patch }: { block: ConfigBlock; sel: Sel; patch: Patch }) {
+  const options = block.options ?? [];
+  const selected = sel?.optionKeys ?? [];
+  const toggle = (key: string) => {
+    Haptics.selectionAsync();
+    if (block.multiple === false) {
+      patch({ optionKeys: selected.includes(key) ? [] : [key] });
+    } else {
+      patch({ optionKeys: selected.includes(key) ? selected.filter((k) => k !== key) : [...selected, key] });
+    }
+  };
+  return (
+    <View style={{ gap: 10 }}>
+      {options.map((o) => {
+        const active = selected.includes(o.key);
+        return (
+          <TouchableOpacity
+            key={o.key}
+            onPress={() => toggle(o.key)}
+            style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 8, borderRadius: 10, borderWidth: 1, borderColor: active ? COLORS.primary : COLORS.outlineVariant, backgroundColor: active ? `${COLORS.primary}0D` : "transparent" }}
+          >
+            <View style={{ width: 48, height: 48, borderRadius: 8, backgroundColor: COLORS.surfaceContainer, overflow: "hidden" }}>
+              {o.image ? <Image source={{ uri: o.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" /> : null}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>{o.label}</Text>
+              {o.surchargeCents ? (
+                <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.secondary }}>+{formatPrice(o.surchargeCents / 100)}</Text>
+              ) : null}
+            </View>
+            <Icon name={active ? (block.multiple ? "checkbox-marked-circle" : "radiobox-marked") : (block.multiple ? "checkbox-blank-circle-outline" : "radiobox-blank")} size={22} color={active ? COLORS.primary : COLORS.outline} />
           </TouchableOpacity>
         );
       })}

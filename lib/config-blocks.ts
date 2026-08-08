@@ -11,6 +11,7 @@ export interface BlockSelection {
   colorKeys?: string[];
   accessoryIds?: string[];
   openingKey?: string;
+  optionKeys?: string[];
   photos?: { url: string; type: "image" | "video" }[];
 }
 export type ConfigState = Record<string, BlockSelection>; // blockId -> selection
@@ -77,6 +78,14 @@ export function buildConfiguration(
         entry.opening = { key: opt.key, label: opt.label, surchargeCents: opt.surchargeCents };
         touched = true;
       }
+    } else if (block.type === "options") {
+      const options = (block.options ?? [])
+        .filter((o) => sel.optionKeys?.includes(o.key))
+        .map((o) => ({ key: o.key, label: o.label, surchargeCents: o.surchargeCents, image: o.image }));
+      if (options.length) {
+        entry.options = options;
+        touched = true;
+      }
     } else if (block.type === "photos") {
       if (sel.photos?.length) {
         entry.photos = sel.photos;
@@ -95,6 +104,7 @@ export function configSurchargeEuros(configuration: ItemConfiguration): number {
   for (const e of configuration) {
     e.colors?.forEach((c) => (cents += c.surchargeCents ?? 0));
     e.accessories?.forEach((a) => (cents += a.priceCents ?? 0));
+    e.options?.forEach((o) => (cents += o.surchargeCents ?? 0));
     if (e.opening?.surchargeCents) cents += e.opening.surchargeCents;
   }
   return cents / 100;
@@ -124,6 +134,8 @@ export function configValidation(
       if (!sel?.accessoryIds?.length) return missing();
     } else if (block.type === "opening_details") {
       if (!sel?.openingKey) return missing();
+    } else if (block.type === "options") {
+      if (!sel?.optionKeys?.length) return missing();
     } else if (block.type === "photos") {
       if (!sel?.photos?.length) return missing();
     }
@@ -141,6 +153,7 @@ export function summarizeConfiguration(config: ItemConfiguration): string {
     if (e.shape) parts.push(e.shape.label);
     if (e.colors?.length) parts.push(e.colors.map((c) => c.label).join("/"));
     if (e.opening) parts.push(e.opening.label);
+    if (e.options?.length) parts.push(e.options.map((o) => o.label).join(", "));
     if (e.accessories?.length) parts.push(`${e.accessories.length} accessoire(s)`);
     if (e.photos?.length) parts.push(`${e.photos.length} photo(s)`);
   }

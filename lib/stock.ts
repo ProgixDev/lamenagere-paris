@@ -1,7 +1,7 @@
 import type { Product } from "./types";
 
 /** Ceiling for a quantity stepper when neither stock nor a cap is set. */
-export const MAX_QTY = 99;
+export const MAX_QTY = 9999;
 
 /**
  * How many units of a product one order may hold. Two limits bound it and the

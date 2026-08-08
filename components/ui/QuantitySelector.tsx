@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity, TextInput } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { COLORS } from "../../lib/constants";
@@ -25,13 +25,41 @@ export default function QuantitySelector({
   quantity,
   onQuantityChange,
   min = 1,
-  max = 99,
+  max = 9999,
   compact = false,
   outlined = false,
   disabled = false,
 }: QuantitySelectorProps) {
   const canDecrement = !disabled && quantity > min;
   const canIncrement = !disabled && quantity < max;
+
+  const [localText, setLocalText] = React.useState(String(quantity));
+
+  React.useEffect(() => {
+    setLocalText(String(quantity));
+  }, [quantity]);
+
+  const handleTextChange = (text: string) => {
+    const cleaned = text.replace(/[^0-9]/g, "");
+    setLocalText(cleaned);
+    const val = parseInt(cleaned, 10);
+    if (!isNaN(val)) {
+      if (val > max) {
+        setLocalText(String(max));
+        onQuantityChange(max);
+      } else {
+        onQuantityChange(val);
+      }
+    }
+  };
+
+  const handleBlur = () => {
+    const val = parseInt(localText, 10);
+    if (isNaN(val) || val < min) {
+      setLocalText(String(min));
+      onQuantityChange(min);
+    }
+  };
 
   const handleDecrement = async () => {
     if (!canDecrement) return;
@@ -87,17 +115,21 @@ export default function QuantitySelector({
       </TouchableOpacity>
 
       <View style={{ paddingHorizontal: compact ? 8 : 4 }}>
-        <Text
+        <TextInput
+          value={localText}
+          onChangeText={handleTextChange}
+          onBlur={handleBlur}
+          keyboardType="numeric"
+          editable={!disabled}
           style={{
-            minWidth: outlined ? 26 : 20,
+            minWidth: outlined ? 46 : 28,
             textAlign: "center",
             fontFamily: FONTS.bodyBold,
             fontSize: outlined ? 16 : 14,
             color: COLORS.onSurface,
+            padding: 0,
           }}
-        >
-          {quantity}
-        </Text>
+        />
       </View>
 
       <TouchableOpacity
