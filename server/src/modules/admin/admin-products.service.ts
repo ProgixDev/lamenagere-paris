@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { eurosToCents } from '../../common/serialization/money.util';
+import { DEFAULT_AREA_FORMULA } from '../../common/pricing/area-formulas';
 import {
   buildPaginated,
   PaginatedResponse,
@@ -157,6 +158,9 @@ export class AdminProductsService {
         label: t.label,
         price_per_sqm_cents: eurosToCents(t.pricePerSqm ?? 0),
       })),
+      // upsertRow writes every column, so an omitted formula must fall back to
+      // the default rather than nulling a product's existing choice.
+      area_formula: dto.areaFormula ?? DEFAULT_AREA_FORMULA,
       dim_width: dto.dimWidth,
       dim_height: dto.dimHeight,
       dim_depth: dto.dimDepth,

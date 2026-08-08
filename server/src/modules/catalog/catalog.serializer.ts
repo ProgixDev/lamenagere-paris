@@ -1,8 +1,13 @@
+import type { DimensionRole } from '../../common/pricing/area-formulas';
 import {
   centsToEuros,
   formatEUR,
   formatEURFromCents,
 } from '../../common/serialization/money.util';
+import {
+  DEFAULT_AREA_FORMULA,
+  type AreaFormulaKey,
+} from '../../common/pricing/area-formulas';
 
 export type ProductType = 'standard' | 'quote_only' | 'configurable';
 export type PriceMode = 'fixed' | 'calculated' | 'per_sqm' | 'quote';
@@ -25,6 +30,11 @@ export interface ConfigBlockField {
   unit?: string;
   min?: number;
   max?: number;
+  /**
+   * For per-m² products priced by shape: what this measurement contributes to
+   * the billed surface. Untagged fields are recorded but never billed.
+   */
+  priceRole?: DimensionRole | null;
 }
 
 export interface ConfigBlockOption {
@@ -33,6 +43,8 @@ export interface ConfigBlockOption {
   image?: string;
   hex?: string;
   surchargeCents?: number;
+  /** Shape options only: how many pans this shape bills (I = 1, L = 2, U = 3). */
+  runs?: number | null;
 }
 
 export interface ConfigBlockItem {
@@ -127,6 +139,7 @@ export interface ProductRow {
   width_coef_cents: number | null;
   height_coef_cents: number | null;
   price_per_sqm_cents: number | null;
+  area_formula: AreaFormulaKey | null;
   opening_types: { type: string; surcharge_cents: number }[] | null;
   quality_tiers:
     | { key: string; label: string; price_per_sqm_cents: number }[]
@@ -184,6 +197,11 @@ export interface ProductDto {
   price?: number;
   /** €/m² for per_sqm products, so the client can show a live price. */
   pricePerSqm?: number;
+  /**
+   * Which dimensions a per_sqm product is billed on, and therefore which inputs
+   * the app asks for. Always sent for per_sqm products.
+   */
+  areaFormula?: AreaFormulaKey;
   images: string[];
   videos?: string[];
   dimensions?: { width: number; height: number; depth?: number; unit: string };
@@ -268,6 +286,10 @@ export function toProductDto(row: ProductRow): ProductDto {
     pricePerSqm:
       row.price_per_sqm_cents != null
         ? centsToEuros(row.price_per_sqm_cents)
+        : undefined,
+    areaFormula:
+      row.price_mode === 'per_sqm'
+        ? (row.area_formula ?? DEFAULT_AREA_FORMULA)
         : undefined,
     images,
     videos: videos.length ? videos : undefined,
@@ -423,7 +445,7 @@ export function toAdminCategoryDto(
 }
 
 export const PRODUCT_SELECT =
-  'id, sku, name, slug, description, short_description, category_id, product_type, price_mode, status, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, opening_types, quality_tiers, dim_width, dim_height, dim_depth, dim_unit, ref_width, ref_height, ref_unit, min_width, min_height, max_width, max_height, customizable, delivery_metropole, delivery_outremer, stock_qty, low_stock_threshold, max_per_order, config_blocks, colors, created_at, rating_avg, rating_count, category:categories(*), media:product_media(*)';
+  'id, sku, name, slug, description, short_description, category_id, product_type, price_mode, status, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, area_formula, opening_types, quality_tiers, dim_width, dim_height, dim_depth, dim_unit, ref_width, ref_height, ref_unit, min_width, min_height, max_width, max_height, customizable, delivery_metropole, delivery_outremer, stock_qty, low_stock_threshold, max_per_order, config_blocks, colors, created_at, rating_avg, rating_count, category:categories(*), media:product_media(*)';
 
 export const CATEGORY_SELECT =
   'id, name, slug, icon, image_url, description, accent_color, parent_id, sort_order, is_visible, is_featured_home, b2b_only, delivery_override, config_blocks';

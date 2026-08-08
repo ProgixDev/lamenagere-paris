@@ -1,3 +1,4 @@
+import { formatAreaDimensions } from "../../lib/area-formulas";
 import React from "react";
 import { View, Text, TouchableOpacity, Image } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -97,7 +98,7 @@ export default function CartItem({
               }}
             >
               {customDimensions
-                ? formatDimensions(customDimensions.width, customDimensions.height)
+                ? formatAreaDimensions(product.areaFormula, customDimensions)
                 : product.dimensions
                   ? formatDimensions(product.dimensions.width, product.dimensions.height)
                   : ""}

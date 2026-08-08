@@ -1,10 +1,12 @@
 import type { Product } from "./types";
 import { formatPrice } from "./utils";
+import { areaFormula, type AreaDimensions } from "./area-formulas";
 
-export interface Dimensions {
-  width: number;
-  height: number;
-}
+/**
+ * Customer-entered dimensions in centimetres. Which keys matter is decided by
+ * the product's area formula, not by this type.
+ */
+export type Dimensions = AreaDimensions;
 
 /**
  * Short price label for cards / lists, where the customer hasn't entered
@@ -81,19 +83,32 @@ export function computeConfiguredPrice(
     case "per_sqm": {
       const rate = perSqmRate(product, qualityTier);
       if (rate == null || !dims) return undefined;
-      const w = clamp(
-        dims.width,
-        product.minDimensions?.width,
-        product.maxDimensions?.width,
-      );
-      const h = clamp(
-        dims.height,
-        product.minDimensions?.height,
-        product.maxDimensions?.height,
-      );
-      const areaM2 = (w / 100) * (h / 100);
+      const formula = areaFormula(product.areaFormula);
+
+      // Shape-driven products have no inputs of their own: their dimensions are
+      // derived from the configuration blocks (dimensionsFromConfigState) and
+      // arrive already resolved, so they're used as-is.
+      if (formula.fields.length === 0) {
+        if (!((dims.width ?? 0) > 0) || !((dims.height ?? 0) > 0)) return undefined;
+        return Math.max(0, Math.round(formula.areaM2(dims) * rate)) + surcharge;
+      }
+
+      // Every dimension the formula bills must be present, else there's no
+      // price to show yet. Horizontal dimensions share the width bounds; the
+      // vertical one uses the height bounds (mirrors PricingService).
+      const checked: AreaDimensions = {};
+      for (const field of formula.fields) {
+        const value = dims[field.key];
+        if (value == null || !Number.isFinite(value)) return undefined;
+        const [min, max] =
+          field.axis === "vertical"
+            ? [product.minDimensions?.height, product.maxDimensions?.height]
+            : [product.minDimensions?.width, product.maxDimensions?.width];
+        checked[field.key] = clamp(value, min, max);
+      }
+
       // Round to whole euros (matches server PricingService).
-      const base = Math.max(0, Math.round(areaM2 * rate));
+      const base = Math.max(0, Math.round(formula.areaM2(checked) * rate));
       return base + surcharge;
     }
 

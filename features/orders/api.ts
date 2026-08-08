@@ -1,3 +1,4 @@
+import type { AreaDimensions } from "../../lib/area-formulas";
 import { apiClient } from "../../lib/api";
 import type { Order, ItemConfiguration } from "../../lib/types";
 import type { TrackingInfo } from "./types";
@@ -16,7 +17,7 @@ export const createOrderApi = async (payload: {
   items: {
     productId: string;
     quantity: number;
-    customDimensions?: { width: number; height: number };
+    customDimensions?: AreaDimensions;
     openingType?: string;
     qualityTier?: string;
     configuration?: ItemConfiguration;

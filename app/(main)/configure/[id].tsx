@@ -12,11 +12,17 @@ import { COLORS, PRODUCT_TYPES, PRICE_MODES } from "../../../lib/constants";
 import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import { formatPrice } from "../../../lib/utils";
 import { computeConfiguredPrice, perSqmRate } from "../../../lib/pricing";
+import {
+  areaFormula,
+  formatAreaDimensions,
+  type AreaDimensions,
+} from "../../../lib/area-formulas";
 import { openingTypeLabel } from "../../../lib/opening-types";
 import {
   buildConfiguration,
   configSurchargeEuros,
   configValidation,
+  dimensionsFromConfigState,
   summarizeConfiguration,
   type ConfigState,
 } from "../../../lib/config-blocks";
@@ -32,19 +38,37 @@ export default function ConfigureScreen() {
   const addItem = useCartStore((s) => s.addItem);
 
   const [stepIdx, setStepIdx] = useState(0);
-  const [customWidth, setCustomWidth] = useState("");
-  const [customHeight, setCustomHeight] = useState("");
+  // Keyed by dimension: the product's area formula decides which are asked for.
+  const [dimInputs, setDimInputs] = useState<Record<string, string>>({});
   const [openingType, setOpeningType] = useState<string | null>(null);
   const [qualityTier, setQualityTier] = useState<string | null>(null);
   const [configState, setConfigState] = useState<ConfigState>({});
   const [quantity, setQuantity] = useState(1);
 
   const blocks = product?.configBlocks ?? product?.category.configBlocks ?? [];
-  const measurementBlocks = useMemo(() => blocks.filter((b) => b.type === "measurements"), [blocks]);
-  const optionBlocks = useMemo(() => blocks.filter((b) => b.type !== "measurements"), [blocks]);
-
   const isPerSqm = product?.priceMode === PRICE_MODES.PER_SQM;
-  const needsDims = product?.productType === PRODUCT_TYPES.CONFIGURABLE || isPerSqm;
+  // Shape-driven pricing: the shape decides how many pans are billed, so it is
+  // asked for alongside the measurements it scales — not after them.
+  const byShape = isPerSqm && product?.areaFormula === "by_shape";
+  const measurementBlocks = useMemo(
+    () =>
+      blocks.filter(
+        (b) => b.type === "measurements" || (byShape && b.type === "shape"),
+      ),
+    [blocks, byShape],
+  );
+  const optionBlocks = useMemo(
+    () =>
+      blocks.filter(
+        (b) => b.type !== "measurements" && !(byShape && b.type === "shape"),
+      ),
+    [blocks, byShape],
+  );
+
+  // by_shape products take their dimensions from the blocks above, so they show
+  // no separate largeur/hauteur inputs — that was the double entry.
+  const needsDims =
+    !byShape && (product?.productType === PRODUCT_TYPES.CONFIGURABLE || isPerSqm);
   const openingTypes = product?.openingTypes ?? [];
   const hasOpening = openingTypes.length > 0;
   const qualityTiers = product?.qualityTiers ?? [];
@@ -66,9 +90,22 @@ export default function ConfigureScreen() {
     );
   }
 
-  const dims =
-    needsDims && customWidth && customHeight
-      ? { width: parseFloat(customWidth), height: parseFloat(customHeight) }
+  // Non per-m² configurable products keep the historical largeur × hauteur,
+  // since areaFormula() falls back to it when no formula is set.
+  const formula = areaFormula(product.areaFormula);
+  const entered: AreaDimensions = {};
+  for (const field of formula.fields) {
+    const value = parseFloat(dimInputs[field.key] ?? "");
+    if (Number.isFinite(value)) entered[field.key] = value;
+  }
+  const dimsComplete = formula.fields.every((f) => (entered[f.key] ?? 0) > 0);
+  const shapeDims = byShape ? dimensionsFromConfigState(blocks, configState) : undefined;
+  const shapeDimsReady =
+    !!shapeDims && (shapeDims.width ?? 0) > 0 && (shapeDims.height ?? 0) > 0;
+  const dims = byShape
+    ? (shapeDimsReady ? shapeDims : undefined)
+    : needsDims && dimsComplete
+      ? entered
       : undefined;
   const configuration = buildConfiguration(blocks, configState);
   const surcharge = configSurchargeEuros(configuration);
@@ -88,7 +125,9 @@ export default function ConfigureScreen() {
   function stepError(): string | null {
     if (step === "measures") {
       if (hasTiers && !qualityTier) return "Choisissez une gamme";
-      if (needsDims && !dims) return "Renseignez la largeur et la hauteur";
+      if (byShape && !dims) return "Choisissez la forme et renseignez vos mesures";
+      if (needsDims && !dims)
+        return `Renseignez ${formula.fields.map((f) => f.label.toLowerCase()).join(", ")}`;
       const v = configValidation(measurementBlocks, configState);
       if (!v.ok) return v.hint ?? "Complétez les mesures";
     }
@@ -203,26 +242,59 @@ export default function ConfigureScreen() {
               {needsDims && (
                 <View style={{ paddingHorizontal: 16 }}>
                   <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, ...SHADOW.card }}>
-                    <View style={{ flexDirection: "row", gap: 12 }}>
-                      <View style={{ flex: 1 }}>
-                        <Input label="LARGEUR" value={customWidth} onChangeText={setCustomWidth} keyboardType="numeric" suffix="cm" />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Input label="HAUTEUR" value={customHeight} onChangeText={setCustomHeight} keyboardType="numeric" suffix="cm" />
-                      </View>
+                    {/* One input per dimension the product's formula bills. */}
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+                      {formula.fields.map((field) => (
+                        <View key={field.key} style={{ flexGrow: 1, flexBasis: "45%" }}>
+                          <Input
+                            label={field.label.toUpperCase()}
+                            value={dimInputs[field.key] ?? ""}
+                            onChangeText={(t) =>
+                              setDimInputs((d) => ({ ...d, [field.key]: t }))
+                            }
+                            keyboardType="numeric"
+                            suffix="cm"
+                          />
+                        </View>
+                      ))}
                     </View>
                     {isPerSqm && liveRate != null && (
                       <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.secondary, marginTop: 8 }}>
                         {formatPrice(liveRate)}/m²
+                        {formula.key !== "width_height" ? ` · ${formula.expression}` : ""}
                         {product.minDimensions && product.maxDimensions
-                          ? ` · de ${product.minDimensions.width}×${product.minDimensions.height} à ${product.maxDimensions.width}×${product.maxDimensions.height} cm`
+                          ? ` · de ${product.minDimensions.width} à ${product.maxDimensions.width} cm`
                           : ""}
+                      </Text>
+                    )}
+                    {isPerSqm && dimsComplete && (
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.onSurfaceVariant, marginTop: 6 }}>
+                        Surface : {formula.areaM2(entered).toFixed(2)} m²
                       </Text>
                     )}
                   </View>
                 </View>
               )}
               <ProductConfigBlocks blocks={measurementBlocks} value={configState} onChange={setConfigState} />
+            {byShape && liveRate != null && (
+              <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
+                <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, ...SHADOW.card }}>
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.secondary }}>
+                    {formatPrice(liveRate)}/m² · {formula.expression}
+                  </Text>
+                  {shapeDimsReady ? (
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.onSurfaceVariant, marginTop: 6 }}>
+                      Pans facturés : {shapeDims!.width} cm · Hauteur : {shapeDims!.height} cm ·
+                      Surface : {formula.areaM2(shapeDims!).toFixed(2)} m²
+                    </Text>
+                  ) : (
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 6 }}>
+                      Choisissez la forme et renseignez vos mesures pour voir le prix.
+                    </Text>
+                  )}
+                </View>
+              </View>
+            )}
             </View>
           )}
 
@@ -283,7 +355,9 @@ export default function ConfigureScreen() {
                       value={qualityTiers.find((t) => t.key === qualityTier)?.label ?? qualityTier}
                     />
                   )}
-                  {dims && <SummaryRow label="Dimensions" value={`${dims.width} × ${dims.height} cm`} />}
+                  {dims && (
+              <SummaryRow label="Dimensions" value={formatAreaDimensions(formula.key, dims)} />
+            )}
                   {openingType && <SummaryRow label="Ouverture" value={openingTypeLabel(openingType)} />}
                   {configuration.length > 0 && <SummaryRow label="Configuration" value={summarizeConfiguration(configuration)} />}
                   <SummaryRow label="Quantité" value={String(quantity)} />

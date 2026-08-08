@@ -27,6 +27,11 @@ import { COLORS, BRAND, PRODUCT_TYPES, PRICE_MODES } from "../../../lib/constant
 import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import { formatPrice } from "../../../lib/utils";
 import { priceTagLabel, computeConfiguredPrice, perSqmRate } from "../../../lib/pricing";
+import {
+  areaFormula,
+  formatAreaDimensions,
+  type AreaDimensions,
+} from "../../../lib/area-formulas";
 import { isOutOfStock, maxOrderableQty } from "../../../lib/stock";
 import Button from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
@@ -91,9 +96,10 @@ export default function ProductDetailScreen() {
   // stepper has gone back to one.
   const [quantity, setQuantity] = useState(1);
   const [addedCount, setAddedCount] = useState(1);
-  // Inline made-to-measure inputs (cm) for per-m² products.
-  const [customWidth, setCustomWidth] = useState("");
-  const [customHeight, setCustomHeight] = useState("");
+  // Inline made-to-measure inputs (cm) for per-m² products. Which fields are
+  // shown is decided by the product's area formula, so this is keyed by
+  // dimension rather than fixed to width/height.
+  const [dimInputs, setDimInputs] = useState<Record<string, string>>({});
   const [qualityTier, setQualityTier] = useState<string | null>(null);
   const [toast, setToast] = useState({
     visible: false,
@@ -175,16 +181,14 @@ export default function ProductDetailScreen() {
   // enters width × height right here and we price + add it to the cart inline.
   const optionBlocks = configBlocks.filter((b) => b.type !== "measurements");
   const inlineSqm = isPerSqm && !hasOpeningTypes && optionBlocks.length === 0;
-  const dims =
-    customWidth && customHeight
-      ? { width: parseFloat(customWidth), height: parseFloat(customHeight) }
-      : undefined;
-  const validDims =
-    !!dims &&
-    Number.isFinite(dims.width) &&
-    Number.isFinite(dims.height) &&
-    dims.width > 0 &&
-    dims.height > 0;
+  // The formula decides which dimensions to collect and how they make a surface.
+  const formula = areaFormula(product.areaFormula);
+  const dims: AreaDimensions = {};
+  for (const field of formula.fields) {
+    const value = parseFloat(dimInputs[field.key] ?? "");
+    if (Number.isFinite(value)) dims[field.key] = value;
+  }
+  const validDims = formula.fields.every((f) => (dims[f.key] ?? 0) > 0);
   // Effective €/m² rate for the entered/selected tier (flat rate if no tiers).
   const effectiveRate = isPerSqm
     ? perSqmRate(product, qualityTier ?? undefined)
@@ -212,7 +216,11 @@ export default function ProductDetailScreen() {
       }
       if (!validDims || livePrice == null) {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        setToast({ visible: true, message: "Renseignez la largeur et la hauteur", type: "error" });
+        setToast({
+          visible: true,
+          message: `Renseignez ${formula.fields.map((f) => f.label.toLowerCase()).join(", ")}`,
+          type: "error",
+        });
         return;
       }
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -401,8 +409,8 @@ export default function ProductDetailScreen() {
                   {livePrice != null ? formatPrice(livePrice) : priceTagLabel(product)}
                 </Text>
                 <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline, marginTop: 4 }}>
-                  {livePrice != null && dims && effectiveRate != null
-                    ? `Soit ${formatPrice(effectiveRate)}/m² · ${dims.width} × ${dims.height} cm`
+                  {livePrice != null && validDims && effectiveRate != null
+                    ? `Soit ${formatPrice(effectiveRate)}/m² · ${formatAreaDimensions(formula.key, dims)}`
                     : hasTiers && !qualityTier
                       ? "Choisissez une gamme et vos dimensions ci-dessous"
                       : "Indiquez vos dimensions ci-dessous pour obtenir le prix"}
@@ -552,13 +560,16 @@ export default function ProductDetailScreen() {
         </Section>
 
         {/* ── Made-to-measure calculator (per-m² products) ─── */}
-        {isPerSqm && (
+        {/* Shape-driven products are priced from their configuration blocks, so
+            the inline calculator can't stand alone — the guided flow owns it. */}
+        {isPerSqm && formula.key !== "by_shape" && (
           <View style={{ paddingHorizontal: 16, marginTop: 20 }}>
             <Text style={{ fontSize: 20, fontFamily: FONTS.serif, color: COLORS.onSurface, marginBottom: 4 }}>
               Calculez votre prix
             </Text>
             <Text style={{ fontSize: 13, fontFamily: FONTS.body, color: COLORS.outline, marginBottom: 12 }}>
-              Entrez la largeur et la hauteur souhaitées — le prix se calcule automatiquement.
+              Entrez vos mesures — le prix se calcule automatiquement.
+              {formula.key !== "width_height" ? ` Surface facturée : ${formula.expression.toLowerCase()}.` : ""}
             </Text>
             <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, ...SHADOW.card }}>
               {hasTiers && (
@@ -594,21 +605,30 @@ export default function ProductDetailScreen() {
                   </View>
                 </View>
               )}
-              <View style={{ flexDirection: "row", gap: 12 }}>
-                <View style={{ flex: 1 }}>
-                  <Input label="LARGEUR" value={customWidth} onChangeText={setCustomWidth} keyboardType="numeric" suffix="cm" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Input label="HAUTEUR" value={customHeight} onChangeText={setCustomHeight} keyboardType="numeric" suffix="cm" />
-                </View>
+              {/* One input per dimension the formula bills, two per row. */}
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+                {formula.fields.map((field) => (
+                  <View key={field.key} style={{ flexGrow: 1, flexBasis: "45%" }}>
+                    <Input
+                      label={field.label.toUpperCase()}
+                      value={dimInputs[field.key] ?? ""}
+                      onChangeText={(t) => setDimInputs((d) => ({ ...d, [field.key]: t }))}
+                      keyboardType="numeric"
+                      suffix="cm"
+                    />
+                  </View>
+                ))}
               </View>
               {product.minDimensions && product.maxDimensions && (
                 <Text style={{ fontSize: 12, fontFamily: FONTS.body, color: COLORS.outline, marginTop: 4 }}>
-                  De {product.minDimensions.width}×{product.minDimensions.height} à{" "}
-                  {product.maxDimensions.width}×{product.maxDimensions.height} cm
+                  De {product.minDimensions.width} à {product.maxDimensions.width} cm
+                  {formula.fields.some((f) => f.axis === "horizontal") ? " (largeurs)" : ""}
+                  {formula.fields.some((f) => f.axis === "vertical")
+                    ? ` · de ${product.minDimensions.height} à ${product.maxDimensions.height} cm (hauteur)`
+                    : ""}
                 </Text>
               )}
-              {validDims && dims && (
+              {validDims && (
                 <View
                   style={{
                     flexDirection: "row",
@@ -621,7 +641,7 @@ export default function ProductDetailScreen() {
                     Surface
                   </Text>
                   <Text style={{ fontSize: 13, fontFamily: FONTS.bodySemibold, color: COLORS.onSurfaceVariant }}>
-                    {((dims.width / 100) * (dims.height / 100)).toFixed(2)} m²
+                    {formula.areaM2(dims).toFixed(2)} m²
                     {effectiveRate != null ? ` · ${formatPrice(effectiveRate)}/m²` : ""}
                   </Text>
                 </View>

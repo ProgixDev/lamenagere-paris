@@ -12,6 +12,7 @@ import {
   ItemConfiguration,
 } from '../catalog/catalog.serializer';
 import { AddressDto } from '../auth/auth.serializer';
+import type { AreaDimensions } from '../../common/pricing/area-formulas';
 
 // ── Rows ────────────────────────────────────────────────────────────────────
 export type RefundStatus = 'none' | 'requested' | 'refunded' | 'rejected';
@@ -30,6 +31,10 @@ export interface OrderItemRow {
   unit_price_cents: number;
   custom_width: number | null;
   custom_height: number | null;
+  custom_length: number | null;
+  custom_left: number | null;
+  custom_back: number | null;
+  custom_right: number | null;
   opening_type: string | null;
   quality_tier: string | null;
   configuration: ConfigSelectionEntry[] | null;
@@ -96,7 +101,7 @@ export interface OrderItemDto {
   product: ProductDto;
   quantity: number;
   price: number;
-  customDimensions?: { width: number; height: number };
+  customDimensions?: AreaDimensions;
   openingType?: string;
   qualityTier?: string;
   configuration?: ItemConfiguration;
@@ -155,6 +160,23 @@ export interface AdminOrderDto {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 /** Minimal Product stub built from an order-item snapshot. */
+/**
+ * Rebuilds the dimensions the customer entered, keeping only the ones actually
+ * recorded. Which columns are filled depends on the product's area formula, so
+ * a tiled floor line carries width+length and a U-shaped kitchen line carries
+ * left+back+right+height. Returns undefined when the line has no dimensions.
+ */
+function toCustomDimensions(it: OrderItemRow): AreaDimensions | undefined {
+  const dims: AreaDimensions = {};
+  if (it.custom_width != null) dims.width = Number(it.custom_width);
+  if (it.custom_height != null) dims.height = Number(it.custom_height);
+  if (it.custom_length != null) dims.length = Number(it.custom_length);
+  if (it.custom_left != null) dims.left = Number(it.custom_left);
+  if (it.custom_back != null) dims.back = Number(it.custom_back);
+  if (it.custom_right != null) dims.right = Number(it.custom_right);
+  return Object.keys(dims).length ? dims : undefined;
+}
+
 function stubProduct(item: OrderItemRow): ProductDto {
   return {
     id: item.product_id ?? item.id,
@@ -214,10 +236,7 @@ export function toOrderDto(row: OrderRow): OrderDto {
     product: stubProduct(it),
     quantity: it.quantity,
     price: centsToEuros(it.unit_price_cents),
-    customDimensions:
-      it.custom_width != null && it.custom_height != null
-        ? { width: Number(it.custom_width), height: Number(it.custom_height) }
-        : undefined,
+    customDimensions: toCustomDimensions(it),
     openingType: it.opening_type ?? undefined,
     qualityTier: it.quality_tier ?? undefined,
     configuration: it.configuration?.length ? it.configuration : undefined,

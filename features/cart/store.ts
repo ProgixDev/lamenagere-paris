@@ -1,3 +1,4 @@
+import type { AreaDimensions } from "../../lib/area-formulas";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { persistStorage } from "../../lib/persist-storage";
@@ -18,7 +19,7 @@ interface CartStore {
   addItem: (
     product: Product,
     quantity?: number,
-    customDimensions?: { width: number; height: number },
+    customDimensions?: AreaDimensions,
     openingType?: string,
     qualityTier?: string,
     extra?: AddItemExtra,

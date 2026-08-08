@@ -3,6 +3,7 @@ import type {
   ConfigSelectionEntry,
   ItemConfiguration,
 } from "./types";
+import { dimensionsFromShape, type AreaDimensions } from "./area-formulas";
 
 /** Raw, per-block input the customer is editing on the product screen. */
 export interface BlockSelection {
@@ -158,4 +159,36 @@ export function summarizeConfiguration(config: ItemConfiguration): string {
     if (e.photos?.length) parts.push(`${e.photos.length} photo(s)`);
   }
   return parts.join(" · ");
+}
+
+/**
+ * Billable dimensions for a shape-driven per-m² product, read straight from
+ * what the customer is typing into the configuration blocks. Mirrors the
+ * server's PricingService.dimensionsFromSelection so the live price and the
+ * charged price agree.
+ */
+export function dimensionsFromConfigState(
+  blocks: ConfigBlock[],
+  state: ConfigState,
+): AreaDimensions {
+  const values: Record<string, number> = {};
+  let shapeKey: string | undefined;
+
+  for (const block of blocks) {
+    const sel = state[block.id];
+    if (!sel) continue;
+    if (block.type === "measurements") {
+      for (const field of block.fields ?? []) {
+        const raw = sel.measurements?.[field.key];
+        let v = parseFloat(raw ?? "");
+        if (!Number.isFinite(v)) continue;
+        if (field.min != null && v < field.min) v = field.min;
+        if (field.max != null && v > field.max) v = field.max;
+        values[field.key] = v;
+      }
+    }
+    if (block.type === "shape" && sel.shapeKey) shapeKey = sel.shapeKey;
+  }
+
+  return dimensionsFromShape(blocks, values, shapeKey);
 }

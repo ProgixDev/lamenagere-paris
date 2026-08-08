@@ -1,3 +1,7 @@
+import {
+  AREA_FORMULA_KEYS,
+  type AreaFormulaKey,
+} from '../../../common/pricing/area-formulas';
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -55,6 +59,10 @@ export class UpsertProductDto {
   @IsOptional() @IsNumber() widthCoef?: number; // €/cm
   @IsOptional() @IsNumber() heightCoef?: number; // €/cm
   @IsOptional() @IsNumber() pricePerSqm?: number; // €/m²
+  /** Which dimensions a per_sqm product is billed on. */
+  @IsOptional()
+  @IsEnum(AREA_FORMULA_KEYS)
+  areaFormula?: AreaFormulaKey;
 
   // Allowed opening types + per-type surcharge (euros).
   @IsOptional()

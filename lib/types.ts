@@ -1,3 +1,5 @@
+import type { DimensionRole } from "./area-formulas";
+import type { AreaDimensions, AreaFormulaKey } from "./area-formulas";
 export type AccountType = "particulier" | "professionnel";
 export type ProductType = "standard" | "quote_only" | "configurable";
 
@@ -104,6 +106,11 @@ export interface ConfigBlockField {
   unit?: string;
   min?: number;
   max?: number;
+  /**
+   * For per-m² products priced by shape: what this measurement contributes to
+   * the billed surface. Untagged fields are recorded but never billed.
+   */
+  priceRole?: DimensionRole | null;
 }
 export interface ConfigBlockOption {
   key: string;
@@ -111,6 +118,8 @@ export interface ConfigBlockOption {
   image?: string;
   hex?: string;
   surchargeCents?: number;
+  /** Shape options only: how many pans this shape bills (I = 1, L = 2, U = 3). */
+  runs?: number | null;
 }
 export interface ConfigBlockItem {
   id: string;
@@ -157,6 +166,11 @@ export interface Product {
   price?: number;
   /** €/m² for per_sqm products (drives the live price preview). */
   pricePerSqm?: number;
+  /**
+   * Which dimensions this per_sqm product is billed on, and therefore which
+   * inputs the customer is asked for. Defaults to largeur × hauteur.
+   */
+  areaFormula?: AreaFormulaKey;
   images: string[];
   videos?: string[];
   dimensions?: {
@@ -216,10 +230,9 @@ export interface CartItem {
   id: string;
   product: Product;
   quantity: number;
-  customDimensions?: {
-    width: number;
-    height: number;
-  };
+  /** Dimensions entered by the customer; which keys are set depends on the
+   *  product's area formula. */
+  customDimensions?: AreaDimensions;
   /** Chosen opening type key (e.g. "coulissante"), when the product offers them. */
   openingType?: string;
   /** Chosen quality tier key, when the product offers tiers. */
@@ -268,10 +281,9 @@ export interface OrderItem {
   product: Product;
   quantity: number;
   price: number;
-  customDimensions?: {
-    width: number;
-    height: number;
-  };
+  /** Dimensions entered by the customer; which keys are set depends on the
+   *  product's area formula. */
+  customDimensions?: AreaDimensions;
   openingType?: string;
   qualityTier?: string;
   configuration?: ItemConfiguration;

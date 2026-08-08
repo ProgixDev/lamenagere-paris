@@ -44,6 +44,7 @@ interface ProductForOrder {
   width_coef_cents: number | null;
   height_coef_cents: number | null;
   price_per_sqm_cents: number | null;
+  area_formula: string | null;
   ref_width: number | null;
   ref_height: number | null;
   min_width: number | null;
@@ -224,7 +225,7 @@ export class OrdersService {
     const { data: products } = await this.supabase.client
       .from('products')
       .select(
-        'id, name, price_mode, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, ref_width, ref_height, min_width, min_height, max_width, max_height, opening_types, quality_tiers, delivery_metropole, delivery_outremer, config_blocks, colors, media:product_media(url,type,is_primary), category:categories(config_blocks)',
+        'id, name, price_mode, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, area_formula, ref_width, ref_height, min_width, min_height, max_width, max_height, opening_types, quality_tiers, delivery_metropole, delivery_outremer, config_blocks, colors, media:product_media(url,type,is_primary), category:categories(config_blocks)',
       )
       .in('id', productIds.length ? productIds : ['00000000-0000-0000-0000-000000000000'])
       .returns<ProductForOrder[]>();
@@ -265,6 +266,10 @@ export class OrdersService {
           unit_price_cents: q.quoted_price_cents,
           custom_width: null,
           custom_height: null,
+          custom_length: null,
+          custom_left: null,
+          custom_back: null,
+          custom_right: null,
           opening_type: null,
           quality_tier: null,
           configuration: [],
@@ -275,17 +280,27 @@ export class OrdersService {
       if (!product) {
         throw new BadRequestException(`Produit introuvable: ${item.productId}`);
       }
+      const effectiveBlocks = product.config_blocks?.length
+        ? product.config_blocks
+        : product.category?.config_blocks ?? [];
+      // Shape-driven products (a kitchen billed on its developed run) take
+      // their dimensions from what the customer already entered in the config
+      // blocks, so nothing is asked for twice and nothing is client-supplied.
+      const dims =
+        product.area_formula === 'by_shape'
+          ? this.pricing.dimensionsFromSelection(
+              effectiveBlocks,
+              item.configuration,
+            )
+          : item.customDimensions;
       const baseUnit = this.pricing.resolveUnitPriceCents(
         product,
-        item.customDimensions,
+        dims,
         item.openingType,
         item.qualityTier,
       );
       // Re-price config-block add-ons (colors/accessories/openings) server-side
       // and snapshot the selection for the order line.
-      const effectiveBlocks = product.config_blocks?.length
-        ? product.config_blocks
-        : product.category?.config_blocks ?? [];
       const { surchargeCents, snapshot } = this.pricing.priceConfiguration(
         effectiveBlocks,
         item.configuration,
@@ -305,8 +320,12 @@ export class OrdersService {
         product_image: primaryUrl ?? null,
         quantity: item.quantity,
         unit_price_cents: unit,
-        custom_width: item.customDimensions?.width ?? null,
-        custom_height: item.customDimensions?.height ?? null,
+        custom_width: dims?.width ?? null,
+        custom_height: dims?.height ?? null,
+        custom_length: dims?.length ?? null,
+        custom_left: dims?.left ?? null,
+        custom_back: dims?.back ?? null,
+        custom_right: dims?.right ?? null,
         opening_type: item.openingType ?? null,
         quality_tier: item.qualityTier ?? null,
         configuration: snapshot,

@@ -21,9 +21,18 @@ const ZONES: ShippingZone[] = [
   'mayotte',
 ];
 
+/**
+ * Dimensions in centimetres. All optional: the product's area formula decides
+ * which ones are required, and PricingService rejects a missing one by name.
+ * Sending extras is harmless — only the formula's own fields are billed.
+ */
 export class CustomDimensionsDto {
-  @IsNumber() width!: number;
-  @IsNumber() height!: number;
+  @IsOptional() @IsNumber() width?: number;
+  @IsOptional() @IsNumber() height?: number;
+  @IsOptional() @IsNumber() length?: number;
+  @IsOptional() @IsNumber() left?: number;
+  @IsOptional() @IsNumber() back?: number;
+  @IsOptional() @IsNumber() right?: number;
 }
 
 export class OrderItemInputDto {

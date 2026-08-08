@@ -5,6 +5,12 @@ import type {
   ConfigBlockOption,
   ConfigSelectionEntry,
 } from '../../modules/catalog/catalog.serializer';
+import {
+  areaFormula,
+  dimensionsFromShape,
+  type AreaDimensions,
+  type AreaFormulaKey,
+} from './area-formulas';
 
 export type PriceMode = 'fixed' | 'calculated' | 'per_sqm' | 'quote';
 
@@ -36,12 +42,20 @@ export interface PricingProduct {
   max_height: number | null;
   opening_types?: OpeningTypeOption[] | null;
   quality_tiers?: QualityTierOption[] | null;
+  /**
+   * Which dimensions a per_sqm product is billed on. Absent/unknown falls back
+   * to the historical largeur × hauteur.
+   */
+  area_formula?: AreaFormulaKey | string | null;
 }
 
-export interface CustomDimensions {
-  width: number;
-  height: number;
-}
+/**
+ * Customer-entered dimensions in centimetres. Every field is optional: which
+ * ones are required depends on the product's area formula (per_sqm) or is
+ * width + height (calculated). Missing required dimensions are rejected at
+ * pricing time with a message naming the field.
+ */
+export type CustomDimensions = AreaDimensions;
 
 /**
  * Resolves the authoritative unit price (in cents) for a product. Always called
@@ -164,6 +178,45 @@ export class PricingService {
     return { surchargeCents, snapshot };
   }
 
+  /**
+   * Billable dimensions for a shape-driven product, read from the customer's
+   * own config-block answers rather than from a separate set of inputs.
+   *
+   * Measurement values are taken from the client selection but the *roles* come
+   * from the authoritative blocks, so a client can't retag which measurement
+   * counts as a billed pan. Values are clamped to each field's bounds, exactly
+   * as priceConfiguration does when snapshotting them.
+   */
+  dimensionsFromSelection(
+    blocks: ConfigBlock[],
+    selection?: ConfigSelectionEntry[] | null,
+  ): AreaDimensions {
+    const values: Record<string, number> = {};
+    let shapeKey: string | undefined;
+
+    const byId = new Map((blocks ?? []).map((b) => [b.id, b]));
+    for (const sel of selection ?? []) {
+      const block = byId.get(sel.blockId);
+      if (!block) continue;
+      if (block.type === 'measurements') {
+        const fields = new Map((block.fields ?? []).map((f) => [f.key, f]));
+        for (const m of sel.measurements ?? []) {
+          const field = fields.get(m.key);
+          let v = Number(m.value);
+          if (!field || !Number.isFinite(v)) continue;
+          if (field.min != null && v < field.min) v = field.min;
+          if (field.max != null && v > field.max) v = field.max;
+          values[field.key] = v;
+        }
+      }
+      if (block.type === 'shape' && sel.shape?.key) {
+        shapeKey = sel.shape.key;
+      }
+    }
+
+    return dimensionsFromShape(blocks, values, shapeKey);
+  }
+
   private resolveBaseCents(
     product: PricingProduct,
     customDimensions?: CustomDimensions | null,
@@ -227,22 +280,46 @@ export class PricingService {
     if (!dims) {
       throw new BadRequestException('Dimensions requises');
     }
-    const width = this.clamp(
-      dims.width,
-      product.min_width,
-      product.max_width,
-      'largeur',
-    );
-    const height = this.clamp(
-      dims.height,
-      product.min_height,
-      product.max_height,
-      'hauteur',
-    );
-    const areaM2 = (width / 100) * (height / 100);
-    const raw = areaM2 * rate;
+    const formula = areaFormula(product.area_formula);
+
+    // Formulas with no fields of their own (by_shape) are fed dimensions this
+    // service already derived from the customer's configuration, which were
+    // clamped to each measurement field's own bounds on the way in. There is
+    // nothing further to collect or re-validate here.
+    if (formula.fields.length === 0) {
+      if (!((dims.width ?? 0) > 0) || !((dims.height ?? 0) > 0)) {
+        throw new BadRequestException(
+          'Renseignez la forme et les mesures pour obtenir le prix',
+        );
+      }
+      return Math.max(0, Math.round((formula.areaM2(dims) * rate) / 100) * 100);
+    }
+
+    // Only the dimensions this formula asks for are read, validated and billed.
+    // Anything else the client sent is ignored, so a stale app that still posts
+    // width+height can't smuggle an unpriced dimension into the total.
+    const checked: AreaDimensions = {};
+    for (const field of formula.fields) {
+      const value = dims[field.key];
+      if (value == null || !Number.isFinite(value)) {
+        throw new BadRequestException(
+          `${this.capitalize(field.errorLabel)} est requise`,
+        );
+      }
+      const [min, max] =
+        field.axis === 'vertical'
+          ? [product.min_height, product.max_height]
+          : [product.min_width, product.max_width];
+      checked[field.key] = this.checkRange(value, min, max, field.errorLabel);
+    }
+
+    const raw = formula.areaM2(checked) * rate;
     // Round to whole euros.
     return Math.max(0, Math.round(raw / 100) * 100);
+  }
+
+  private capitalize(s: string): string {
+    return s.charAt(0).toUpperCase() + s.slice(1);
   }
 
   /** Resolves the effective €/m² rate (cents), validating the chosen tier. */
@@ -277,17 +354,20 @@ export class PricingService {
       return base;
     }
 
-    const width = this.clamp(
+    if (dims.width == null || dims.height == null) {
+      throw new BadRequestException('Largeur et hauteur requises');
+    }
+    const width = this.checkRange(
       dims.width,
       product.min_width,
       product.max_width,
-      'largeur',
+      'la largeur',
     );
-    const height = this.clamp(
+    const height = this.checkRange(
       dims.height,
       product.min_height,
       product.max_height,
-      'hauteur',
+      'la hauteur',
     );
 
     const refW = product.ref_width ?? 0;
@@ -302,18 +382,25 @@ export class PricingService {
     return Math.max(0, Math.round(raw / 100) * 100);
   }
 
-  private clamp(
+  /**
+   * Rejects an out-of-range dimension. `label` carries its own article
+   * ("la largeur", "la longueur du fond") because the formulas name several
+   * dimensions and not all of them read well after a fixed "La ".
+   */
+  private checkRange(
     value: number,
     min: number | null,
     max: number | null,
     label: string,
   ): number {
     if (min != null && value < min) {
-      throw new BadRequestException(`La ${label} doit être au moins ${min} cm`);
+      throw new BadRequestException(
+        `${this.capitalize(label)} doit être au moins ${min} cm`,
+      );
     }
     if (max != null && value > max) {
       throw new BadRequestException(
-        `La ${label} ne peut pas dépasser ${max} cm`,
+        `${this.capitalize(label)} ne peut pas dépasser ${max} cm`,
       );
     }
     return value;

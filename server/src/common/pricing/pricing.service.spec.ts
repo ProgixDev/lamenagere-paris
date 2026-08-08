@@ -150,4 +150,104 @@ describe('PricingService', () => {
       svc.resolveUnitPriceCents(tiered, { width: 200, height: 200 }, null, 'bogus'),
     ).toThrow(BadRequestException);
   });
+
+  // ── Area formulas ────────────────────────────────────────────────────────
+  describe('area formulas', () => {
+    it('defaults to largeur × hauteur when no formula is set', () => {
+      // 2 m × 2 m = 4 m² × 100 €/m² = 400 €
+      expect(svc.resolveUnitPriceCents(perSqm, { width: 200, height: 200 })).toBe(
+        40000,
+      );
+    });
+
+    it('treats an unknown formula as largeur × hauteur', () => {
+      const bogus: PricingProduct = { ...perSqm, area_formula: 'not_a_formula' };
+      expect(svc.resolveUnitPriceCents(bogus, { width: 200, height: 200 })).toBe(
+        40000,
+      );
+    });
+
+    it('prices tiles on the floor area (largeur × longueur)', () => {
+      const tiles: PricingProduct = { ...perSqm, area_formula: 'width_length' };
+      // 3 m × 2 m = 6 m² × 100 €/m² = 600 €
+      expect(
+        svc.resolveUnitPriceCents(tiles, { width: 300, length: 200 }),
+      ).toBe(60000);
+    });
+
+    it('ignores a height that the tile formula does not bill', () => {
+      const tiles: PricingProduct = { ...perSqm, area_formula: 'width_length' };
+      expect(
+        svc.resolveUnitPriceCents(tiles, { width: 300, length: 200, height: 999 }),
+      ).toBe(60000);
+    });
+
+    it('prices an L-shaped kitchen on the developed run', () => {
+      const kitchen: PricingProduct = { ...perSqm, area_formula: 'l_shape' };
+      // (3 m + 2 m) × 2.4 m = 12 m² × 100 €/m² = 1 200 €
+      expect(
+        svc.resolveUnitPriceCents(kitchen, {
+          width: 300,
+          length: 200,
+          height: 240,
+        }),
+      ).toBe(120000);
+    });
+
+    it('prices a U-shaped kitchen on all three runs', () => {
+      const kitchen: PricingProduct = { ...perSqm, area_formula: 'u_shape' };
+      // (2 m + 3 m + 2 m) × 2.5 m = 17.5 m² × 100 €/m² = 1 750 €
+      expect(
+        svc.resolveUnitPriceCents(kitchen, {
+          left: 200,
+          back: 300,
+          right: 200,
+          height: 250,
+        }),
+      ).toBe(175000);
+    });
+
+    it('requires every dimension the formula asks for, naming the missing one', () => {
+      const kitchen: PricingProduct = { ...perSqm, area_formula: 'u_shape' };
+      expect(() =>
+        svc.resolveUnitPriceCents(kitchen, { left: 200, back: 300, height: 250 }),
+      ).toThrow(/longueur droite/i);
+    });
+
+    it('validates every horizontal dimension against the width bounds', () => {
+      // max_width is 400 on the perSqm fixture.
+      const kitchen: PricingProduct = { ...perSqm, area_formula: 'l_shape' };
+      expect(() =>
+        svc.resolveUnitPriceCents(kitchen, {
+          width: 300,
+          length: 999,
+          height: 240,
+        }),
+      ).toThrow(/longueur/i);
+    });
+
+    it('validates the vertical dimension against the height bounds', () => {
+      const kitchen: PricingProduct = { ...perSqm, area_formula: 'l_shape' };
+      expect(() =>
+        svc.resolveUnitPriceCents(kitchen, {
+          width: 300,
+          length: 200,
+          height: 999,
+        }),
+      ).toThrow(/hauteur/i);
+    });
+
+    it('applies the chosen quality tier to a formula price', () => {
+      const kitchen: PricingProduct = { ...tiered, area_formula: 'l_shape' };
+      // (3 m + 2 m) × 2.4 m = 12 m² × 80 €/m² = 960 €
+      expect(
+        svc.resolveUnitPriceCents(
+          kitchen,
+          { width: 300, length: 200, height: 240 },
+          null,
+          'bas',
+        ),
+      ).toBe(96000);
+    });
+  });
 });

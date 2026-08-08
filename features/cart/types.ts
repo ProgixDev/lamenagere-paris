@@ -1,3 +1,4 @@
+import type { AreaDimensions } from "../../lib/area-formulas";
 import type { CartItem, Product } from "../../lib/types";
 
 export interface CartState {
@@ -9,7 +10,7 @@ export interface CartActions {
   addItem: (
     product: Product,
     quantity?: number,
-    customDimensions?: { width: number; height: number },
+    customDimensions?: AreaDimensions,
     openingType?: string,
     qualityTier?: string,
   ) => void;
