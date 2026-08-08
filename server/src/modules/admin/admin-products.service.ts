@@ -50,7 +50,8 @@ export class AdminProductsService {
     if (opts.status) query = query.eq('status', opts.status);
     if (opts.categoryId) query = query.eq('category_id', opts.categoryId);
     if (opts.q && opts.q.trim()) {
-      query = query.ilike('name', `%${opts.q.trim()}%`);
+      const term = opts.q.trim().replace(/[%,]/g, '');
+      query = query.or(`name.ilike.%${term}%,sku.ilike.%${term}%`);
     }
 
     const { data, count } = await query
