@@ -17,9 +17,15 @@ describe('money.util', () => {
     expect(s.replace(/[  \s]/g, '')).toBe('2890€');
   });
 
-  it('formats from cents with no decimals', () => {
+  it('formats from cents with no decimals when whole', () => {
     expect(formatEURFromCents(446100).replace(/[  \s]/g, '')).toBe(
       '4461€',
+    );
+  });
+
+  it('formats from cents with 2 decimals when has cents', () => {
+    expect(formatEURFromCents(1180).replace(/[  \s]/g, '')).toBe(
+      '11,80€',
     );
   });
 });

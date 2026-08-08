@@ -1,11 +1,14 @@
 export const formatPrice = (amount: number, currency = "EUR"): string => {
+  const hasCents = Math.round(amount * 100) % 100 !== 0;
+  const decimals = hasCents ? 2 : 0;
   return new Intl.NumberFormat("fr-FR", {
     style: "currency",
     currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   }).format(amount);
 };
+
 
 /**
  * Splits a VAT-inclusive (TTC) amount into its excl.-VAT (HT) base and the VAT

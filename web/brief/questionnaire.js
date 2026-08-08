@@ -24,7 +24,7 @@
 /* Montants en euros HT. C'est le seul endroit à retoucher pour ajuster le devis :
    chaque option porte son prix, le total est leur somme + SOCLE.            */
 const SOCLE = 400;       // direction artistique, intégration responsive, mise en ligne
-const CURRENCY = new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0});
+const CURRENCY = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 });
 
 /**
  * Le questionnaire envoyé au prospect n'affiche aucun montant : il choisit un
