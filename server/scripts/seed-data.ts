@@ -20,7 +20,7 @@ export interface SeedProduct {
   categorySlug: string;
   productType: 'standard' | 'configurable';
   priceMode: 'fixed' | 'per_sqm';
-  price?: number; // euros
+  price?: number; // euros yes
   pricePerSqm?: number; // euros per m² (per_sqm mode)
   minDimensions?: { width: number; height: number };
   maxDimensions?: { width: number; height: number };
