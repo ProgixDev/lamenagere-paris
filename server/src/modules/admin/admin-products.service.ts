@@ -8,6 +8,8 @@ import { eurosToCents } from '../../common/serialization/money.util';
 import { DEFAULT_AREA_FORMULA } from '../../common/pricing/area-formulas';
 import {
   buildPaginated,
+  clampLimit,
+  fetchAllRows,
   PaginatedResponse,
   pageRange,
 } from '../../common/serialization/pagination';
@@ -43,7 +45,8 @@ export class AdminProductsService {
     categoryId?: string;
     q?: string;
   }): Promise<PaginatedResponse<AdminProductDto>> {
-    const { from, to } = pageRange(opts.page, opts.limit);
+    const limit = clampLimit(opts.limit, 20);
+    const { from, to } = pageRange(opts.page, limit);
     let query = this.supabase.client
       .from('products')
       .select(PRODUCT_SELECT, { count: 'exact' });
@@ -61,7 +64,54 @@ export class AdminProductsService {
       .returns<ProductRow[]>();
 
     const items = (data ?? []).map(toAdminProductDto);
-    return buildPaginated(items, count ?? items.length, opts.page, opts.limit);
+    return buildPaginated(items, count ?? items.length, opts.page, limit);
+  }
+
+  /**
+   * Status + per-category tallies over the WHOLE catalogue, so the admin list
+   * can show honest filter counts while only rendering one page at a time.
+   * Respects `q` so the counts track an active search.
+   */
+  async facets(q?: string): Promise<{
+    total: number;
+    byStatus: Record<ProductStatus, number>;
+    byCategory: { categoryId: string; count: number }[];
+  }> {
+    const term = q?.trim() ? q.trim().replace(/[%,]/g, '') : null;
+
+    const rows = await fetchAllRows<{
+      status: ProductStatus;
+      category_id: string;
+    }>((from, to) => {
+      let query = this.supabase.client
+        .from('products')
+        .select('status, category_id');
+      if (term) query = query.or(`name.ilike.%${term}%,sku.ilike.%${term}%`);
+      return query
+        .order('id', { ascending: true })
+        .range(from, to)
+        .returns<{ status: ProductStatus; category_id: string }[]>();
+    });
+
+    const byStatus: Record<ProductStatus, number> = {
+      publie: 0,
+      brouillon: 0,
+      archive: 0,
+    };
+    const byCategory = new Map<string, number>();
+    for (const r of rows) {
+      if (r.status in byStatus) byStatus[r.status] += 1;
+      byCategory.set(r.category_id, (byCategory.get(r.category_id) ?? 0) + 1);
+    }
+
+    return {
+      total: rows.length,
+      byStatus,
+      byCategory: [...byCategory.entries()].map(([categoryId, count]) => ({
+        categoryId,
+        count,
+      })),
+    };
   }
 
   async getRaw(id: string): Promise<ProductRow> {

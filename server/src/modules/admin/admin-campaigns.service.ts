@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
+import { fetchAllRows } from '../../common/serialization/pagination';
 import { DevicesService } from '../notifications/devices.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UpsertCampaignDto } from './dto/campaign-admin.dto';
@@ -31,12 +32,16 @@ export class AdminCampaignsService {
   ) {}
 
   async list(status?: string): Promise<CampaignRow[]> {
-    let q = this.supabase.client.from('campaigns').select('*');
-    if (status) q = q.eq('status', status);
-    const { data } = await q
-      .order('created_at', { ascending: false })
-      .returns<CampaignRow[]>();
-    return data ?? [];
+    // Campaigns only ever accumulate, so this outgrows the row cap eventually.
+    return fetchAllRows<CampaignRow>((from, to) => {
+      let q = this.supabase.client.from('campaigns').select('*');
+      if (status) q = q.eq('status', status);
+      return q
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+        .returns<CampaignRow[]>();
+    });
   }
 
   async get(id: string): Promise<CampaignRow> {

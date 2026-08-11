@@ -40,6 +40,12 @@ export class AdminProductsController {
     });
   }
 
+  /** Catalogue-wide filter counts. Must stay declared above `@Get(':id')`. */
+  @Get('facets')
+  facets(@Query('q') q?: string) {
+    return this.products.facets(q);
+  }
+
   @Post('bulk')
   @HttpCode(200)
   bulk(@Body() dto: BulkActionDto) {

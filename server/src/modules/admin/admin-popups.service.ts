@@ -1,6 +1,14 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
+import { fetchAllRows } from '../../common/serialization/pagination';
 import { ReorderPopupsDto, UpsertPopupDto } from './dto/popup-admin.dto';
+
+/** Raw `app_popups` row; `toPopup` maps it to the DTO. */
+interface PopupRow {
+  id: string;
+  position: number;
+  [key: string]: unknown;
+}
 
 export interface AppPopupDto {
   id: string;
@@ -21,11 +29,16 @@ export class AdminPopupsService {
   constructor(private readonly supabase: SupabaseService) {}
 
   async list(): Promise<AppPopupDto[]> {
-    const { data } = await this.supabase.client
-      .from('app_popups')
-      .select('*')
-      .order('position', { ascending: true });
-    return (data ?? []).map(this.toPopup);
+    const data = await fetchAllRows<PopupRow>((from, to) =>
+      this.supabase.client
+        .from('app_popups')
+        .select('*')
+        .order('position', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+        .returns<PopupRow[]>(),
+    );
+    return data.map(this.toPopup);
   }
 
   /**

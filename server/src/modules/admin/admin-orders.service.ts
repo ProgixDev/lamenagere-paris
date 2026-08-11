@@ -14,6 +14,8 @@ import {
 } from '../../common/serialization/status-labels';
 import {
   buildPaginated,
+  clampLimit,
+  fetchAllRows,
   PaginatedResponse,
   pageRange,
 } from '../../common/serialization/pagination';
@@ -50,7 +52,7 @@ export class AdminOrdersService {
 
   async list(query: OrderListQuery): Promise<PaginatedResponse<AdminOrderDto>> {
     const page = Number(query.page ?? 1);
-    const limit = Number(query.limit ?? 20);
+    const limit = clampLimit(Number(query.limit ?? 20), 20);
     const { from, to } = pageRange(page, limit);
 
     let q = this.supabase.client.from('orders').select(ORDER_SELECT, {
@@ -61,15 +63,18 @@ export class AdminOrdersService {
     if (query.q && query.q.trim()) {
       q = q.ilike('order_number', `%${query.q.trim()}%`);
     }
+    // Must filter in the query, not on the returned page: filtering afterwards
+    // would drop rows from the current slice while `count` still reported the
+    // unfiltered total, breaking both the list and its pagination.
+    if (query.accountType === 'professionnel') q = q.eq('is_b2b', true);
+    if (query.accountType === 'particulier') q = q.eq('is_b2b', false);
 
     const { data, count } = await q
       .order('created_at', { ascending: false })
       .range(from, to)
       .returns<OrderRow[]>();
 
-    let rows = data ?? [];
-    if (query.accountType === 'professionnel') rows = rows.filter((r) => r.is_b2b);
-    if (query.accountType === 'particulier') rows = rows.filter((r) => !r.is_b2b);
+    const rows = data ?? [];
 
     return buildPaginated(
       rows.map(toAdminOrderDto),
@@ -237,13 +242,18 @@ export class AdminOrdersService {
   }
 
   async exportCsv(): Promise<string> {
-    const { data } = await this.supabase.client
-      .from('orders')
-      .select(ORDER_SELECT)
-      .order('created_at', { ascending: false })
-      .returns<OrderRow[]>();
+    // An export that silently stops at 1000 orders is worse than no export.
+    const data = await fetchAllRows<OrderRow>((from, to) =>
+      this.supabase.client
+        .from('orders')
+        .select(ORDER_SELECT)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+        .returns<OrderRow[]>(),
+    );
     const header = 'order_number,client,total,status,territory,created_at';
-    const lines = (data ?? []).map((r) => {
+    const lines = data.map((r) => {
       const dto = toAdminOrderDto(r);
       return [
         dto.id,

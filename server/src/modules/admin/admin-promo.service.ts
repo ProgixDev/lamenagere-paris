@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
+import { fetchAllRows } from '../../common/serialization/pagination';
 import { UpsertPromoCodeDto } from './dto/promo-admin.dto';
 
 interface PromoRow {
@@ -45,12 +46,17 @@ export class AdminPromoService {
   constructor(private readonly supabase: SupabaseService) {}
 
   async list(): Promise<AdminPromoCodeDto[]> {
-    const { data } = await this.supabase.client
-      .from('promo_codes')
-      .select(SELECT)
-      .order('created_at', { ascending: false })
-      .returns<PromoRow[]>();
-    return (data ?? []).map(toDto);
+    // Expired codes are kept for history, so the table only grows.
+    const rows = await fetchAllRows<PromoRow>((from, to) =>
+      this.supabase.client
+        .from('promo_codes')
+        .select(SELECT)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+        .returns<PromoRow[]>(),
+    );
+    return rows.map(toDto);
   }
 
   async create(dto: UpsertPromoCodeDto): Promise<AdminPromoCodeDto> {

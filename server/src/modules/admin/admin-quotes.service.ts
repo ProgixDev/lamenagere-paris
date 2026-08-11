@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
+import { fetchAllRows } from '../../common/serialization/pagination';
 import { eurosToCents } from '../../common/serialization/money.util';
 import { QuoteStatus } from '../../common/serialization/status-labels';
 import {
@@ -22,12 +23,16 @@ export class AdminQuotesService {
   constructor(private readonly supabase: SupabaseService) {}
 
   async list(status?: QuoteStatus): Promise<AdminQuoteDto[]> {
-    let q = this.supabase.client.from('quotes').select(QUOTE_SELECT);
-    if (status) q = q.eq('status', status);
-    const { data } = await q
-      .order('created_at', { ascending: false })
-      .returns<QuoteRow[]>();
-    return (data ?? []).map(toAdminQuoteDto);
+    const rows = await fetchAllRows<QuoteRow>((from, to) => {
+      let q = this.supabase.client.from('quotes').select(QUOTE_SELECT);
+      if (status) q = q.eq('status', status);
+      return q
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+        .returns<QuoteRow[]>();
+    });
+    return rows.map(toAdminQuoteDto);
   }
 
   async detail(idOrNumber: string): Promise<QuoteRow> {

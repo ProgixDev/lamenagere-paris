@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
+import { fetchAllRows } from '../../common/serialization/pagination';
 import {
   AdminConversationDto,
   AdminMessageDto,
@@ -41,12 +42,16 @@ export class AdminConversationsService {
   constructor(private readonly supabase: SupabaseService) {}
 
   async list(): Promise<AdminConversationDto[]> {
-    const { data } = await this.supabase.client
-      .from('conversations')
-      .select(ADMIN_CONVO_SELECT)
-      .order('last_message_at', { ascending: false, nullsFirst: false })
-      .returns<ConvoWithProfile[]>();
-    return (data ?? []).map((c) =>
+    const rows = await fetchAllRows<ConvoWithProfile>((from, to) =>
+      this.supabase.client
+        .from('conversations')
+        .select(ADMIN_CONVO_SELECT)
+        .order('last_message_at', { ascending: false, nullsFirst: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+        .returns<ConvoWithProfile[]>(),
+    );
+    return rows.map((c) =>
       toAdminConversationDto(
         c as never,
         c.profile?.full_name ?? '',
@@ -56,13 +61,19 @@ export class AdminConversationsService {
 
   async messages(conversationId: string): Promise<AdminMessageDto[]> {
     await this.assertExists(conversationId);
-    const { data } = await this.supabase.client
-      .from('messages')
-      .select(MESSAGE_SELECT)
-      .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true })
-      .returns<MessageRow[]>();
-    return (data ?? []).map(toAdminMessageDto);
+    // A long-running thread can exceed 1000 messages; truncating it would drop
+    // the newest ones, which are the ones the admin is replying to.
+    const rows = await fetchAllRows<MessageRow>((from, to) =>
+      this.supabase.client
+        .from('messages')
+        .select(MESSAGE_SELECT)
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+        .returns<MessageRow[]>(),
+    );
+    return rows.map(toAdminMessageDto);
   }
 
   async reply(

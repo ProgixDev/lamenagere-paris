@@ -2,6 +2,10 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { formatEURFromCents } from '../../common/serialization/money.util';
 import { initialsFromName } from '../../common/serialization/initials.util';
+import { fetchAllRows } from '../../common/serialization/pagination';
+
+/** Recent orders / quotes shown on a customer's detail panel. Display size. */
+const RECENT_PER_CUSTOMER_SHOWN = 5;
 import { AccountType, ShippingZone } from '../../common/serialization/status-labels';
 import { toAddressDto, AddressRow } from '../auth/auth.serializer';
 
@@ -46,22 +50,23 @@ export class AdminCustomersService {
     type?: AccountType;
     q?: string;
   }): Promise<AdminCustomerDto[]> {
-    let query = this.supabase.client
-      .from('profiles')
-      .select(PROFILE_COLS)
-      .neq('role', 'super_admin');
-    if (opts.type) query = query.eq('account_type', opts.type);
-    if (opts.q && opts.q.trim()) {
-      const term = `%${opts.q.trim()}%`;
-      query = query.or(
-        `full_name.ilike.${term},email.ilike.${term}`,
-      );
-    }
-    const { data } = await query
-      .order('created_at', { ascending: false })
-      .returns<CustomerProfileRow[]>();
+    const rows = await fetchAllRows<CustomerProfileRow>((from, to) => {
+      let query = this.supabase.client
+        .from('profiles')
+        .select(PROFILE_COLS)
+        .neq('role', 'super_admin');
+      if (opts.type) query = query.eq('account_type', opts.type);
+      if (opts.q && opts.q.trim()) {
+        const term = `%${opts.q.trim()}%`;
+        query = query.or(`full_name.ilike.${term},email.ilike.${term}`);
+      }
+      return query
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+        .returns<CustomerProfileRow[]>();
+    });
 
-    const rows = data ?? [];
     const territories = await this.territories(rows.map((r) => r.id));
     return rows.map((r) => this.toDto(r, territories.get(r.id)));
   }
@@ -88,7 +93,7 @@ export class AdminCustomersService {
           .select('order_number, total_cents, status, created_at')
           .eq('profile_id', id)
           .order('created_at', { ascending: false })
-          .limit(5)
+          .limit(RECENT_PER_CUSTOMER_SHOWN)
           .returns<
             {
               order_number: string;
@@ -102,7 +107,7 @@ export class AdminCustomersService {
           .select('quote_number, status, quoted_price_cents, created_at')
           .eq('profile_id', id)
           .order('created_at', { ascending: false })
-          .limit(5)
+          .limit(RECENT_PER_CUSTOMER_SHOWN)
           .returns<
             {
               quote_number: string | null;
@@ -144,14 +149,24 @@ export class AdminCustomersService {
   ): Promise<Map<string, ShippingZone>> {
     const map = new Map<string, ShippingZone>();
     if (ids.length === 0) return map;
-    const { data } = await this.supabase.client
-      .from('addresses')
-      .select('profile_id, territory, is_default')
-      .in('profile_id', ids)
-      .returns<
-        { profile_id: string; territory: ShippingZone; is_default: boolean }[]
-      >();
-    for (const a of data ?? []) {
+    // One customer can have several addresses, so this outgrows the 1000-row
+    // cap well before the customer list itself does.
+    const data = await fetchAllRows<{
+      profile_id: string;
+      territory: ShippingZone;
+      is_default: boolean;
+    }>((from, to) =>
+      this.supabase.client
+        .from('addresses')
+        .select('profile_id, territory, is_default')
+        .in('profile_id', ids)
+        .order('id', { ascending: true })
+        .range(from, to)
+        .returns<
+          { profile_id: string; territory: ShippingZone; is_default: boolean }[]
+        >(),
+    );
+    for (const a of data) {
       if (a.is_default || !map.has(a.profile_id)) {
         map.set(a.profile_id, a.territory);
       }

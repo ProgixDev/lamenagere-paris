@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
+import { fetchAllRows } from '../../common/serialization/pagination';
 import { UserRole } from '../../common/auth/auth-user';
 import {
   AdminUserDto,
@@ -44,17 +45,23 @@ export class AdminUsersService {
   constructor(private readonly supabase: SupabaseService) {}
 
   async list(): Promise<AdminUserDto[]> {
-    const { data, error } = await this.supabase.client
-      .from('profiles')
-      .select(
-        'id, email, full_name, role, last_activity_at, created_at',
-      )
-      .in('role', ADMIN_ROLES)
-      .order('created_at', { ascending: false })
-      .returns<ProfileRow[]>();
-
-    if (error) throw new BadRequestException('Impossible de charger les utilisateurs');
-    return (data ?? []).map(toDto);
+    const rows = await fetchAllRows<ProfileRow>(async (from, to) => {
+      const { data, error } = await this.supabase.client
+        .from('profiles')
+        .select(
+          'id, email, full_name, role, last_activity_at, created_at',
+        )
+        .in('role', ADMIN_ROLES)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+        .returns<ProfileRow[]>();
+      if (error) {
+        throw new BadRequestException('Impossible de charger les utilisateurs');
+      }
+      return { data };
+    });
+    return rows.map(toDto);
   }
 
   async create(dto: CreateAdminUserDto): Promise<AdminUserDto> {

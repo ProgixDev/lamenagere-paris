@@ -1,6 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { centsToEuros } from '../../common/serialization/money.util';
+import { fetchAllRows } from '../../common/serialization/pagination';
+
+/**
+ * How many rows each dashboard widget shows. These are display sizes, not data
+ * limits — the surrounding totals are computed over the full table.
+ */
+const RECENT_ORDERS_SHOWN = 8;
+const ACTIVITY_FEED_SHOWN = 12;
 import {
   AdminOrderDto,
   ORDER_SELECT,
@@ -44,8 +52,7 @@ export class AdminDashboardService {
     const [orders, pendingOrders, quotes, convos] = await Promise.all([
       this.supabase.client
         .from('orders')
-        .select('total_cents', { count: 'exact' })
-        .returns<{ total_cents: number }[]>(),
+        .select('id', { count: 'exact', head: true }),
       this.supabase.client
         .from('orders')
         .select('id', { count: 'exact', head: true })
@@ -54,17 +61,30 @@ export class AdminDashboardService {
         .from('quotes')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'en_attente_devis'),
-      this.supabase.client
-        .from('conversations')
-        .select('unread_admin')
-        .returns<{ unread_admin: number }[]>(),
+      // Summed client-side, so every row has to be read — not just the first page.
+      fetchAllRows<{ unread_admin: number }>((from, to) =>
+        this.supabase.client
+          .from('conversations')
+          .select('unread_admin')
+          .order('id', { ascending: true })
+          .range(from, to)
+          .returns<{ unread_admin: number }[]>(),
+      ),
     ]);
 
-    const totalRevenueCents = (orders.data ?? []).reduce(
+    const revenueRows = await fetchAllRows<{ total_cents: number }>((from, to) =>
+      this.supabase.client
+        .from('orders')
+        .select('total_cents')
+        .order('id', { ascending: true })
+        .range(from, to)
+        .returns<{ total_cents: number }[]>(),
+    );
+    const totalRevenueCents = revenueRows.reduce(
       (sum, o) => sum + (o.total_cents ?? 0),
       0,
     );
-    const unreadMessages = (convos.data ?? []).reduce(
+    const unreadMessages = convos.reduce(
       (sum, c) => sum + (c.unread_admin ?? 0),
       0,
     );
@@ -84,14 +104,21 @@ export class AdminDashboardService {
     const since = new Date();
     since.setDate(since.getDate() - 30);
 
-    const { data: orderRows } = await this.supabase.client
-      .from('orders')
-      .select('total_cents, created_at')
-      .gte('created_at', since.toISOString())
-      .returns<{ total_cents: number; created_at: string }[]>();
+    const orderRows = await fetchAllRows<{
+      total_cents: number;
+      created_at: string;
+    }>((from, to) =>
+      this.supabase.client
+        .from('orders')
+        .select('total_cents, created_at')
+        .gte('created_at', since.toISOString())
+        .order('id', { ascending: true })
+        .range(from, to)
+        .returns<{ total_cents: number; created_at: string }[]>(),
+    );
 
     const byDay = new Map<string, number>();
-    for (const o of orderRows ?? []) {
+    for (const o of orderRows) {
       const day = o.created_at.slice(0, 10);
       byDay.set(day, (byDay.get(day) ?? 0) + o.total_cents);
     }
@@ -100,20 +127,28 @@ export class AdminDashboardService {
       .map(([date, cents]) => ({ date, total: centsToEuros(cents) }));
 
     // Category breakdown from order items joined to products -> categories.
-    const { data: itemRows } = await this.supabase.client
-      .from('order_items')
-      .select(
-        'quantity, unit_price_cents, product:products(category:categories(name))',
-      )
-      .returns<
-        {
-          quantity: number;
-          unit_price_cents: number;
-          product: { category: { name: string } | null } | null;
-        }[]
-      >();
+    const itemRows = await fetchAllRows<{
+      quantity: number;
+      unit_price_cents: number;
+      product: { category: { name: string } | null } | null;
+    }>((from, to) =>
+      this.supabase.client
+        .from('order_items')
+        .select(
+          'quantity, unit_price_cents, product:products(category:categories(name))',
+        )
+        .order('id', { ascending: true })
+        .range(from, to)
+        .returns<
+          {
+            quantity: number;
+            unit_price_cents: number;
+            product: { category: { name: string } | null } | null;
+          }[]
+        >(),
+    );
     const byCat = new Map<string, number>();
-    for (const it of itemRows ?? []) {
+    for (const it of itemRows) {
       const name = it.product?.category?.name ?? 'Autres';
       byCat.set(name, (byCat.get(name) ?? 0) + it.unit_price_cents * it.quantity);
     }
@@ -125,14 +160,14 @@ export class AdminDashboardService {
       .from('orders')
       .select(ORDER_SELECT)
       .order('created_at', { ascending: false })
-      .limit(8)
+      .limit(RECENT_ORDERS_SHOWN)
       .returns<OrderRow[]>();
 
     const { data: activity } = await this.supabase.client
       .from('activity_log')
       .select('id, kind, summary, entity_ref, created_at')
       .order('created_at', { ascending: false })
-      .limit(12)
+      .limit(ACTIVITY_FEED_SHOWN)
       .returns<
         {
           id: string;

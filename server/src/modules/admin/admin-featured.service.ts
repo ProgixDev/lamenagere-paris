@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
+import { fetchAllRows } from '../../common/serialization/pagination';
 import {
   PRODUCT_SELECT,
   ProductDto,
@@ -12,6 +13,14 @@ import {
   UpsertBannerDto,
   UpsertSlideDto,
 } from './dto/featured-admin.dto';
+
+/** Raw rows for the curated rails; `toSlide` / `toBanner` map them to DTOs. */
+interface SlideRow {
+  id: string;
+  position: number;
+  [key: string]: unknown;
+}
+type BannerRow = SlideRow;
 
 export interface CarouselSlideDto {
   id: string;
@@ -55,15 +64,22 @@ export class AdminFeaturedService {
   }
 
   async listFeatured(categoryId?: string): Promise<ProductDto[]> {
-    const { data } = await this.scopeCategory(
-      this.supabase.client
-        .from('featured_products')
-        .select(`position, product:products(${PRODUCT_SELECT})`),
-      categoryId,
-    )
-      .order('position', { ascending: true })
-      .returns<{ position: number; product: ProductRow | null }[]>();
-    return (data ?? [])
+    const data = await fetchAllRows<{
+      position: number;
+      product: ProductRow | null;
+    }>((from, to) =>
+      this.scopeCategory(
+        this.supabase.client
+          .from('featured_products')
+          .select(`position, product:products(${PRODUCT_SELECT})`),
+        categoryId,
+      )
+        .order('position', { ascending: true })
+        .order('product_id', { ascending: true })
+        .range(from, to)
+        .returns<{ position: number; product: ProductRow | null }[]>(),
+    );
+    return data
       .map((r) => r.product)
       .filter((p): p is ProductRow => !!p)
       .map(toProductDto);
@@ -135,11 +151,16 @@ export class AdminFeaturedService {
 
   // ── carousel ───────────────────────────────────────────────────────────────
   async listSlides(): Promise<CarouselSlideDto[]> {
-    const { data } = await this.supabase.client
-      .from('carousel_slides')
-      .select('*')
-      .order('position', { ascending: true });
-    return (data ?? []).map(this.toSlide);
+    const data = await fetchAllRows<SlideRow>((from, to) =>
+      this.supabase.client
+        .from('carousel_slides')
+        .select('*')
+        .order('position', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+        .returns<SlideRow[]>(),
+    );
+    return data.map(this.toSlide);
   }
 
   async createSlide(dto: UpsertSlideDto): Promise<CarouselSlideDto> {
@@ -172,11 +193,16 @@ export class AdminFeaturedService {
 
   // ── banners ────────────────────────────────────────────────────────────────
   async listBanners(): Promise<PromoBannerDto[]> {
-    const { data } = await this.supabase.client
-      .from('promo_banners')
-      .select('*')
-      .order('position', { ascending: true });
-    return (data ?? []).map(this.toBanner);
+    const data = await fetchAllRows<BannerRow>((from, to) =>
+      this.supabase.client
+        .from('promo_banners')
+        .select('*')
+        .order('position', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+        .returns<BannerRow[]>(),
+    );
+    return data.map(this.toBanner);
   }
 
   async createBanner(dto: UpsertBannerDto): Promise<PromoBannerDto> {

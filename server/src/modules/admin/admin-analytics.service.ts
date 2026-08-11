@@ -1,12 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { centsToEuros } from '../../common/serialization/money.util';
+import { fetchAllRows } from '../../common/serialization/pagination';
 import {
   orderStatusLabel,
   OrderStatus,
 } from '../../common/serialization/status-labels';
 
 const DAY = 86400000;
+
+/**
+ * Leaderboard sizes. Ranking happens over every matching row; these only cap
+ * how many of the ranked entries the UI receives.
+ */
+const TOP_PRODUCTS_SHOWN = 10;
+const TOP_CUSTOMERS_SHOWN = 8;
 
 interface AnalyticsOrderRow {
   total_cents: number;
@@ -44,27 +52,40 @@ export class AdminAnalyticsService {
     const since = new Date(now - days * DAY);
     const prevSince = new Date(now - 2 * days * DAY);
 
-    const [{ data: orderData }, { data: custData }, { data: quoteData }] =
-      await Promise.all([
+    // Every figure below is aggregated in JS, so a truncated read silently
+    // understates the KPIs rather than failing — read all matching rows.
+    const [orderData, custData, quoteData] = await Promise.all([
+      fetchAllRows<AnalyticsOrderRow>((from, to) =>
         this.supabase.client
           .from('orders')
           .select(ANALYTICS_SELECT)
           .gte('created_at', prevSince.toISOString())
+          .order('id', { ascending: true })
+          .range(from, to)
           .returns<AnalyticsOrderRow[]>(),
+      ),
+      fetchAllRows<{ created_at: string }>((from, to) =>
         this.supabase.client
           .from('profiles')
           .select('created_at')
           .eq('role', 'customer')
           .gte('created_at', prevSince.toISOString())
+          .order('id', { ascending: true })
+          .range(from, to)
           .returns<{ created_at: string }[]>(),
+      ),
+      fetchAllRows<{ status: string; created_at: string }>((from, to) =>
         this.supabase.client
           .from('quotes')
           .select('status, created_at')
           .gte('created_at', prevSince.toISOString())
+          .order('id', { ascending: true })
+          .range(from, to)
           .returns<{ status: string; created_at: string }[]>(),
-      ]);
+      ),
+    ]);
 
-    const orders = orderData ?? [];
+    const orders = orderData;
     const sinceMs = since.getTime();
     const curOrders = orders.filter((o) => new Date(o.created_at).getTime() >= sinceMs);
     const prevOrders = orders.filter((o) => new Date(o.created_at).getTime() < sinceMs);
@@ -215,7 +236,7 @@ export class AdminAnalyticsService {
       weekday: weekdayCents.map((c) => centsToEuros(c)),
       topProducts: [...byProduct.values()]
         .sort((a, b) => b.revenueCents - a.revenueCents)
-        .slice(0, 10)
+        .slice(0, TOP_PRODUCTS_SHOWN)
         .map((p) => ({
           name: p.name,
           image: p.image,
@@ -225,7 +246,7 @@ export class AdminAnalyticsService {
         })),
       topCustomers: [...byCustomer.values()]
         .sort((a, b) => b.spentCents - a.spentCents)
-        .slice(0, 8)
+        .slice(0, TOP_CUSTOMERS_SHOWN)
         .map((c) => ({ name: c.name, totalSpent: centsToEuros(c.spentCents), orders: c.orders })),
       customers: { distinct: distinctCustomers, repeat: repeatCustomers },
     };

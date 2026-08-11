@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
+import { fetchAllRows } from '../../common/serialization/pagination';
 import {
   AdminCategoryDto,
   CATEGORY_SELECT,
@@ -26,13 +27,17 @@ export class AdminCategoriesService {
   constructor(private readonly supabase: SupabaseService) {}
 
   async list(): Promise<AdminCategoryDto[]> {
-    const { data } = await this.supabase.client
-      .from('categories')
-      .select(CATEGORY_SELECT)
-      .order('sort_order', { ascending: true })
-      .returns<CategoryRow[]>();
+    const data = await fetchAllRows<CategoryRow>((from, to) =>
+      this.supabase.client
+        .from('categories')
+        .select(CATEGORY_SELECT)
+        .order('sort_order', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+        .returns<CategoryRow[]>(),
+    );
     const counts = await this.counts();
-    return (data ?? []).map((r) => toAdminCategoryDto(r, counts.get(r.id) ?? 0));
+    return data.map((r) => toAdminCategoryDto(r, counts.get(r.id) ?? 0));
   }
 
   async create(dto: UpsertCategoryDto): Promise<AdminCategoryDto> {
@@ -121,12 +126,16 @@ export class AdminCategoriesService {
   }
 
   private async counts(): Promise<Map<string, number>> {
-    const { data } = await this.supabase.client
-      .from('products')
-      .select('category_id')
-      .returns<{ category_id: string }[]>();
+    const rows = await fetchAllRows<{ category_id: string }>((from, to) =>
+      this.supabase.client
+        .from('products')
+        .select('category_id')
+        .order('id', { ascending: true })
+        .range(from, to)
+        .returns<{ category_id: string }[]>(),
+    );
     const counts = new Map<string, number>();
-    for (const r of data ?? []) {
+    for (const r of rows) {
       counts.set(r.category_id, (counts.get(r.category_id) ?? 0) + 1);
     }
     return counts;

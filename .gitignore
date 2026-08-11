@@ -47,7 +47,7 @@ yarn-error.*
 .env
 daily-report-2026-06-27.md
 daily-report-2026-07-01.md
-
+/web
 # Google Play submission credential
 play-service-account.json
 lamenagere-paris-preview.apk
