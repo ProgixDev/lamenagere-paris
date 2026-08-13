@@ -22,6 +22,34 @@ function parseCallback(url: string): {
   };
 }
 
+// A PKCE code is single-use. The same redirect can reach us twice — once
+// through the in-flight sign-in below, once through the /auth/callback route
+// Android's deep-link system opens — so exchanges are deduped by code and both
+// callers share one result instead of racing (the loser would get "invalid
+// request: code verifier should be non-empty").
+const exchanges = new Map<string, Promise<string>>();
+
+/** Trades an OAuth `code` for a Supabase access token, at most once per code. */
+export function exchangeAuthCode(code: string): Promise<string> {
+  const pending = exchanges.get(code);
+  if (pending) return pending;
+
+  const promise = (async () => {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error || !data.session) {
+      console.log("[oauth] exchange failed", error?.message);
+      throw new Error("Connexion Google échouée");
+    }
+    console.log("[oauth] session obtained");
+    return data.session.access_token;
+  })();
+
+  exchanges.set(code, promise);
+  // Let a failed attempt be retried; a successful one stays cached.
+  promise.catch(() => exchanges.delete(code));
+  return promise;
+}
+
 async function exchange(callbackUrl: string): Promise<string> {
   const { code, error, errorDescription } = parseCallback(callbackUrl);
   if (error) {
@@ -32,14 +60,16 @@ async function exchange(callbackUrl: string): Promise<string> {
     console.log("[oauth] no code in callback url", callbackUrl);
     throw new Error("Connexion Google échouée");
   }
-  const { data, error: exchangeError } =
-    await supabase.auth.exchangeCodeForSession(code);
-  if (exchangeError || !data.session) {
-    console.log("[oauth] exchange failed", exchangeError?.message);
-    throw new Error("Connexion Google échouée");
-  }
-  console.log("[oauth] session obtained");
-  return data.session.access_token;
+  return exchangeAuthCode(code);
+}
+
+// True while signInWithGoogle() is waiting for its redirect. The /auth/callback
+// screen uses this to know whether it should finish the sign-in itself (the app
+// was cold-started by the deep link) or just wait for the in-flight flow.
+let googleSignInPending = false;
+
+export function isGoogleSignInPending(): boolean {
+  return googleSignInPending;
 }
 
 /** True when the OS can present the Apple sheet (iOS 13+; never on Android). */
@@ -119,48 +149,53 @@ export async function signInWithApple(): Promise<{
  * store it and use it as the bearer token for every authenticated request.
  */
 export async function signInWithGoogle(): Promise<string> {
-  const redirectTo = Linking.createURL("auth/callback");
-  console.log("[oauth] redirectTo =", redirectTo);
-
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo, skipBrowserRedirect: true },
-  });
-  if (error || !data?.url) {
-    console.log("[oauth] signInWithOAuth error", error?.message);
-    throw new Error("Connexion Google échouée");
-  }
-
-  // Some platforms (notably Android) deliver the custom-scheme redirect through
-  // the OS deep-link system instead of closing the auth tab, so listen for that
-  // too and race it against the auth-session result.
-  let onLink: (url: string) => void = () => {};
-  const linkPromise = new Promise<string>((resolve) => {
-    onLink = resolve;
-  });
-  const sub = Linking.addEventListener("url", (e) => onLink(e.url));
-
+  googleSignInPending = true;
   try {
-    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-    console.log("[oauth] openAuthSession result", JSON.stringify(result));
+    const redirectTo = Linking.createURL("auth/callback");
+    console.log("[oauth] redirectTo =", redirectTo);
 
-    if (result.type === "success" && result.url) {
-      return await exchange(result.url);
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo, skipBrowserRedirect: true },
+    });
+    if (error || !data?.url) {
+      console.log("[oauth] signInWithOAuth error", error?.message);
+      throw new Error("Connexion Google échouée");
     }
 
-    // Browser closed without handing us a URL — give a deep-link redirect a
-    // brief window to arrive before treating it as a cancellation.
-    const deepLinkUrl = await Promise.race([
-      linkPromise,
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
-    ]);
-    if (deepLinkUrl) {
-      return await exchange(deepLinkUrl);
-    }
+    // Some platforms (notably Android) deliver the custom-scheme redirect
+    // through the OS deep-link system instead of closing the auth tab, so
+    // listen for that too and race it against the auth-session result.
+    let onLink: (url: string) => void = () => {};
+    const linkPromise = new Promise<string>((resolve) => {
+      onLink = resolve;
+    });
+    const sub = Linking.addEventListener("url", (e) => onLink(e.url));
 
-    console.log("[oauth] no redirect captured; result.type =", result.type);
-    throw new Error("Connexion Google annulée");
+    try {
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+      console.log("[oauth] openAuthSession result", JSON.stringify(result));
+
+      if (result.type === "success" && result.url) {
+        return await exchange(result.url);
+      }
+
+      // Browser closed without handing us a URL — give a deep-link redirect a
+      // brief window to arrive before treating it as a cancellation.
+      const deepLinkUrl = await Promise.race([
+        linkPromise,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+      ]);
+      if (deepLinkUrl) {
+        return await exchange(deepLinkUrl);
+      }
+
+      console.log("[oauth] no redirect captured; result.type =", result.type);
+      throw new Error("Connexion Google annulée");
+    } finally {
+      sub.remove();
+    }
   } finally {
-    sub.remove();
+    googleSignInPending = false;
   }
 }

@@ -40,6 +40,8 @@ export interface AuthState {
 export interface AuthActions {
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
+  /** Finishes a Google sign-in from an OAuth code delivered as a deep link. */
+  finishGoogleLogin: (code: string) => Promise<void>;
   loginWithApple: () => Promise<void>;
   register: (data: RegisterPayload) => Promise<void>;
   completeProfile: (data: CompleteProfilePayload) => Promise<void>;

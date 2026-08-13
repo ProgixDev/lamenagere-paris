@@ -140,6 +140,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (isLoading || !onboardingHydrated || !guestHydrated) return;
 
     const seg = segments as string[];
+    // The OAuth redirect lands on /auth/callback and needs to finish the code
+    // exchange there; redirecting it away would abort the sign-in. That screen
+    // navigates on its own once it resolves.
+    if (seg[0] === "auth" && seg[1] === "callback") return;
+
     const inAuthGroup = seg[0] === "(auth)";
     const inOnboarding = seg[0] === "(onboarding)";
     const onCompleteProfile =
@@ -252,6 +257,10 @@ export default function RootLayout() {
                     options={{ animation: "none" }}
                   />
                   <Stack.Screen name="(main)" />
+                  <Stack.Screen
+                    name="auth/callback"
+                    options={{ animation: "none" }}
+                  />
                 </Stack>
                 <PopupGate />
               </GuestModeChrome>

@@ -16,7 +16,7 @@ import {
   updateProfileApi,
   linkAppleApi,
 } from "./api";
-import { signInWithGoogle, signInWithApple } from "./oauth";
+import { signInWithGoogle, signInWithApple, exchangeAuthCode } from "./oauth";
 import { unregisterDeviceApi } from "../notifications/api";
 import { AUTH_TOKEN_KEY, PUSH_TOKEN_KEY, USER_KEY } from "../../lib/storage";
 
@@ -25,6 +25,21 @@ type AuthStore = AuthState & AuthActions;
 function errorMessage(e: unknown): string {
   const m = (e as { message?: string })?.message;
   return m ?? "Une erreur s’est produite";
+}
+
+/**
+ * Persists a Supabase access token obtained through OAuth and signs the user in
+ * with the profile it unlocks. The token is stored *before* the profile call so
+ * that request authenticates with it.
+ */
+async function adoptOAuthToken(
+  token: string,
+  set: (partial: Partial<AuthStore>) => void,
+): Promise<void> {
+  await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
+  const user = await getProfileApi();
+  await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
+  set({ user, token, isAuthenticated: true, isLoading: false });
 }
 
 export const useAuthStore = create<AuthStore>((set) => ({
@@ -54,10 +69,23 @@ export const useAuthStore = create<AuthStore>((set) => ({
       // which the backend accepts as a bearer token. Store it first so the
       // profile request below authenticates with it.
       const token = await signInWithGoogle();
-      await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
-      const user = await getProfileApi();
-      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
-      set({ user, token, isAuthenticated: true, isLoading: false });
+      await adoptOAuthToken(token, set);
+    } catch (e) {
+      await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
+      set({ isLoading: false, error: errorMessage(e), isAuthenticated: false });
+      throw e;
+    }
+  },
+
+  // Android often hands the OAuth redirect to the app as a deep link rather
+  // than closing the auth tab, which lands on the /auth/callback route. When
+  // that route has to finish the sign-in itself (e.g. the app was cold-started
+  // by the link), it comes through here with the code from the URL.
+  finishGoogleLogin: async (code: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const token = await exchangeAuthCode(code);
+      await adoptOAuthToken(token, set);
     } catch (e) {
       await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
       set({ isLoading: false, error: errorMessage(e), isAuthenticated: false });
