@@ -20,7 +20,7 @@ import ProductConfigBlocks from "../../../components/product/ProductConfigBlocks
 import ConfigRecap from "../../../components/product/ConfigRecap";
 import ShapePlan, { type PlanHighlight } from "../../../components/product/ShapePlan";
 import { COLORS, PRODUCT_TYPES, PRICE_MODES } from "../../../lib/constants";
-import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
+import { FONTS, TYPE, SHADOW, SPACE } from "../../../lib/typography";
 import { formatPrice } from "../../../lib/utils";
 import { computeConfiguredPrice, perSqmRate } from "../../../lib/pricing";
 import { areaFormula, type AreaDimensions } from "../../../lib/area-formulas";
@@ -409,40 +409,64 @@ export default function ConfigureScreen() {
                 <ShapePlan shapeKey={shapeKey} withIlot={ilotOn} highlight={ilotOn ? "ilot" : null} />
               </View>
               {!step.block.required && (
-                <View style={{ flexDirection: "row", gap: 10 }}>
-                  {[
-                    { label: "Oui, avec îlot", value: true },
-                    { label: "Non merci", value: false },
-                  ].map((c) => {
-                    const blockId = step.block.id;
-                    const active = configState[blockId]?.ilotIncluded === c.value;
-                    return (
-                      <PressableScale
-                        key={c.label}
-                        onPress={() => {
-                          Haptics.selectionAsync();
-                          setConfigState((s) => ({
-                            ...s,
-                            [blockId]: { ...s[blockId], ilotIncluded: c.value },
-                          }));
-                        }}
-                        style={{
-                          flex: 1,
-                          paddingVertical: 16,
-                          borderRadius: 16,
-                          alignItems: "center",
-                          backgroundColor: active ? COLORS.primary : COLORS.surfaceContainerLowest,
-                          borderWidth: active ? 2 : 1,
-                          borderColor: active ? COLORS.primary : COLORS.outlineVariant,
-                          ...SHADOW.card,
-                        }}
-                      >
-                        <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: active ? COLORS.onPrimary : COLORS.onSurface }}>
-                          {c.label}
-                        </Text>
-                      </PressableScale>
-                    );
-                  })}
+                <View style={{ alignItems: "center", paddingVertical: SPACE.sm }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "center",
+                      gap: SPACE.md,
+                      width: "100%",
+                      maxWidth: 320,
+                    }}
+                  >
+                    {[
+                      { label: "Oui, avec îlot", value: true },
+                      { label: "Non merci", value: false },
+                    ].map((c) => {
+                      const blockId = step.block.id;
+                      const active = configState[blockId]?.ilotIncluded === c.value;
+                      return (
+                        <PressableScale
+                          key={c.label}
+                          accessibilityRole="button"
+                          selected={active}
+                          onPress={() => {
+                            Haptics.selectionAsync();
+                            setConfigState((s) => ({
+                              ...s,
+                              [blockId]: { ...s[blockId], ilotIncluded: c.value },
+                            }));
+                          }}
+                          style={{
+                            flex: 1,
+                            minHeight: 56,
+                            paddingVertical: SPACE.lg,
+                            paddingHorizontal: SPACE.md,
+                            borderRadius: 16,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: active ? COLORS.primary : COLORS.surfaceContainerLowest,
+                            borderWidth: active ? 2 : 1,
+                            borderColor: active ? COLORS.primary : COLORS.outlineVariant,
+                            ...SHADOW.card,
+                          }}
+                        >
+                          <Text
+                            numberOfLines={2}
+                            style={{
+                              fontSize: 14,
+                              lineHeight: 18,
+                              textAlign: "center",
+                              fontFamily: "Inter_600SemiBold",
+                              color: active ? COLORS.onPrimary : COLORS.onSurface,
+                            }}
+                          >
+                            {c.label}
+                          </Text>
+                        </PressableScale>
+                      );
+                    })}
+                  </View>
                 </View>
               )}
               {ilotOn &&

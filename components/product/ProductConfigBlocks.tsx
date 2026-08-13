@@ -8,6 +8,7 @@ import { COLORS } from "../../lib/constants";
 import { formatPrice } from "../../lib/utils";
 import type { ConfigBlock } from "../../lib/types";
 import { ilotSurchargeCents, type ConfigState } from "../../lib/config-blocks";
+import { SPACE } from "../../lib/typography";
 import { pickMessageMedia, uploadMessageMedia } from "../../features/messaging/upload";
 
 interface Props {
@@ -173,41 +174,57 @@ function IlotBlock({ block, sel, patch }: { block: ConfigBlock; sel: Sel; patch:
       ) : null}
 
       {optional && (
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          {[
-            { label: "Oui", value: true },
-            { label: "Non", value: false },
-          ].map((c) => {
-            const active = sel?.ilotIncluded === c.value;
-            return (
-              <TouchableOpacity
-                key={c.label}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  patch({ ilotIncluded: c.value });
-                }}
-                style={{
-                  flex: 1,
-                  paddingVertical: 12,
-                  borderRadius: 12,
-                  alignItems: "center",
-                  backgroundColor: active ? COLORS.primary : COLORS.surfaceContainerLowest,
-                  borderWidth: 1,
-                  borderColor: active ? COLORS.primary : COLORS.outlineVariant,
-                }}
-              >
-                <Text
+        <View style={{ alignItems: "center", paddingVertical: SPACE.sm }}>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "center",
+              gap: SPACE.md,
+              width: "100%",
+              maxWidth: 320,
+            }}
+          >
+            {[
+              { label: "Oui", value: true },
+              { label: "Non", value: false },
+            ].map((c) => {
+              const active = sel?.ilotIncluded === c.value;
+              return (
+                <TouchableOpacity
+                  key={c.label}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    patch({ ilotIncluded: c.value });
+                  }}
                   style={{
-                    fontSize: 14,
-                    fontFamily: active ? "Inter_600SemiBold" : "Inter_500Medium",
-                    color: active ? COLORS.onPrimary : COLORS.onSurface,
+                    flex: 1,
+                    minHeight: 48,
+                    paddingVertical: SPACE.md,
+                    paddingHorizontal: SPACE.md,
+                    borderRadius: 12,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: active ? COLORS.primary : COLORS.surfaceContainerLowest,
+                    borderWidth: 1,
+                    borderColor: active ? COLORS.primary : COLORS.outlineVariant,
                   }}
                 >
-                  {c.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      textAlign: "center",
+                      fontFamily: active ? "Inter_600SemiBold" : "Inter_500Medium",
+                      color: active ? COLORS.onPrimary : COLORS.onSurface,
+                    }}
+                  >
+                    {c.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
       )}
 

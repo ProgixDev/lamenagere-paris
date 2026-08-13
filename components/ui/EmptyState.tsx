@@ -1,6 +1,5 @@
 import React from "react";
 import { View, Text } from "react-native";
-import { Image } from "expo-image";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
 import Icon from "./Icon";
 import Button from "./Button";
@@ -14,27 +13,6 @@ import { FONTS, TYPE } from "../../lib/typography";
  */
 export type EmptyArt = "cart" | "favorites" | "orders" | "messages" | "address" | "search";
 
-/**
- * Motion designs, for the states worth animating. Delivered as looping GIFs
- * because expo-image plays those on both platforms, unlike the WebM the source
- * ships as, and this ffmpeg has no WebP encoder.
- *
- * The background is baked in (no alpha), so rather than hide it behind a disc
- * the asset is rebased to exactly COLORS.background (#FAFBFC) and drawn with no
- * container at all — it dissolves into the page. It is also cropped to its
- * content, which only filled 55% of the original canvas, off-centre.
- *
- * Two consequences for anyone replacing this file:
- *  - re-run the same rebase, or a faint square reappears wherever the asset's
- *    background differs from the page by even a level or two;
- *  - it is therefore tied to COLORS.background. Every screen that shows an
- *    animated empty state uses that colour today. If one ever needs it on a
- *    white surface, give the asset real alpha instead of rebasing it.
- */
-const ANIMATED: Partial<Record<EmptyArt, number>> = {
-  cart: require("../../assets/animations/empty-cart.gif"),
-};
-
 function Art({ kind }: { kind: EmptyArt }) {
   const ink = COLORS.outlineVariant;
   const accent = BRAND.blue;
@@ -46,15 +24,10 @@ function Art({ kind }: { kind: EmptyArt }) {
   };
 
   switch (kind) {
+    // Plain cart glyph — the same Phosphor icon the rest of the app uses, just
+    // drawn large. A bespoke drawing here only made the screen look busier.
     case "cart":
-      return (
-        <Svg {...common}>
-          <Path d="M26 26h14l12 46h48" stroke={ink} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
-          <Path d="M46 40h58l-8 26H52" stroke={accent} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
-          <Circle cx={58} cy={88} r={6} stroke={ink} strokeWidth={3} />
-          <Circle cx={94} cy={88} r={6} stroke={ink} strokeWidth={3} />
-        </Svg>
-      );
+      return <Icon name="shopping-outline" size={72} color={COLORS.onSurfaceVariant} />;
     case "favorites":
       return (
         <Svg {...common}>
@@ -145,22 +118,7 @@ export default function EmptyState({
         paddingHorizontal: 32,
       }}
     >
-      {art && ANIMATED[art] ? (
-        // No disc, no ring: the asset's own background is COLORS.background, so
-        // it merges straight into the page. See the note on ANIMATED above.
-        <Image
-          source={ANIMATED[art]}
-          // 112 is the art's true pixel count — the crop that survives from the
-          // original 150px GIF. Drawn any larger it is visibly upscaled, so this
-          // is the ceiling until a higher-resolution source exists.
-          style={{ width: 112, height: 112 }}
-          contentFit="contain"
-          // expo-image plays animated sources on both platforms; React
-          // Native's own Image only does so on iOS.
-          autoplay
-          accessibilityLabel=""
-        />
-      ) : art ? (
+      {art ? (
         <Art kind={art} />
       ) : icon ? (
         <Icon name={icon as never} size={48} color={COLORS.surfaceDim} />

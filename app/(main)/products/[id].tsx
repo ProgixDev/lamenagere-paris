@@ -469,7 +469,7 @@ export default function ProductDetailScreen() {
             }}
           >
             <View style={{ backgroundColor: "#fff", padding: 8, borderRadius: 10, ...SHADOW.soft }}>
-              <Icon name="airplane" size={20} color={BRAND.blue} />
+              <Icon name="ferry" size={20} color={BRAND.blue} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: BRAND.blueDeep, marginBottom: 2 }}>

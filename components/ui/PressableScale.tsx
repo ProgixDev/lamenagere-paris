@@ -23,6 +23,8 @@ interface PressableScaleProps {
   /** Defaults to "button" so assistive tech announces it as tappable. */
   accessibilityRole?: AccessibilityRole;
   accessibilityHint?: string;
+  /** Announces the choice as picked — use on option cards and toggles. */
+  selected?: boolean;
 }
 
 /**
@@ -38,6 +40,7 @@ export default function PressableScale({
   accessibilityLabel,
   accessibilityRole = "button",
   accessibilityHint,
+  selected,
 }: PressableScaleProps) {
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({
@@ -51,7 +54,7 @@ export default function PressableScale({
       accessibilityLabel={accessibilityLabel}
       accessibilityRole={onPress ? accessibilityRole : undefined}
       accessibilityHint={accessibilityHint}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled, ...(selected != null ? { selected } : null) }}
       onPressIn={() => {
         if (disabled) return;
         scale.value = withTiming(scaleTo, { duration: 90 });

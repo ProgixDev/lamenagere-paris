@@ -122,6 +122,10 @@ export default function Button({
                   fontSize: TEXT_SIZE[size],
                   textTransform: "uppercase",
                   letterSpacing: 2,
+                  textAlign: "center",
+                  // letterSpacing also trails the last glyph, so the label
+                  // measures 2px wider than it looks and lands off-centre.
+                  marginLeft: 2,
                 }}
               >
                 {label}
@@ -176,6 +180,9 @@ export default function Button({
               textTransform: "uppercase",
               letterSpacing: 2,
               color: isDanger ? "#ffffff" : COLORS.secondary,
+              textAlign: "center",
+              // Same trailing-letterSpacing compensation as the primary variant.
+              marginLeft: 2,
             }}
           >
             {label}
