@@ -71,7 +71,7 @@ interface ProductForOrder {
   delivery_metropole: string;
   delivery_outremer: string;
   media: { url: string; type: string; is_primary: boolean }[];
-  colors: { key: string; name: string; images: string[] | null }[] | null;
+  colors: { key: string; name: string; hex: string | null; images: string[] | null }[] | null;
   config_blocks: ConfigBlock[] | null;
   category: { config_blocks: ConfigBlock[] | null } | null;
 }
@@ -335,7 +335,16 @@ export class OrdersService {
           blockId: PRODUCT_COLOR_BLOCK_ID,
           type: 'colors',
           label: 'Coloris',
-          colors: [{ key: variant.key, label: variant.name }],
+          colors: [
+            {
+              key: variant.key,
+              label: variant.name,
+              // The colourway's own photo, so the back office sees the finish
+              // that was sold rather than an empty swatch.
+              image: variant.images?.[0],
+              hex: variant.hex ?? undefined,
+            },
+          ],
         });
       }
       const tier = item.qualityTier
