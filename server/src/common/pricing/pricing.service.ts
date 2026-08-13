@@ -14,12 +14,6 @@ import {
 
 export type PriceMode = 'fixed' | 'calculated' | 'per_sqm' | 'quote';
 
-/** One allowed opening type for a product, with its per-type surcharge. */
-export interface OpeningTypeOption {
-  type: string;
-  surcharge_cents: number;
-}
-
 /** One quality tier for a per_sqm product, with its own €/m² rate. */
 export interface QualityTierOption {
   key: string;
@@ -40,7 +34,6 @@ export interface PricingProduct {
   min_height: number | null;
   max_width: number | null;
   max_height: number | null;
-  opening_types?: OpeningTypeOption[] | null;
   quality_tiers?: QualityTierOption[] | null;
   /**
    * Which dimensions a per_sqm product is billed on. Absent/unknown falls back
@@ -69,19 +62,17 @@ export type CustomDimensions = AreaDimensions;
  *               result rounded to whole euros.
  * - quote:      not purchasable directly -> caller must route to a devis.
  *
- * When the product offers opening types, the chosen type's surcharge is added
- * on top of the dimension-based price.
+ * Option surcharges (openings included) come from the product's configuration
+ * blocks and are priced by `priceConfiguration`, not from this method.
  */
 @Injectable()
 export class PricingService {
   resolveUnitPriceCents(
     product: PricingProduct,
     customDimensions?: CustomDimensions | null,
-    openingType?: string | null,
     qualityTier?: string | null,
   ): number {
-    const base = this.resolveBaseCents(product, customDimensions, qualityTier);
-    return base + this.openingSurchargeCents(product, openingType);
+    return this.resolveBaseCents(product, customDimensions, qualityTier);
   }
 
   /**
@@ -112,21 +103,22 @@ export class PricingService {
       let touched = false;
 
       if (block.type === 'measurements' && sel.measurements?.length) {
-        const fields = new Map((block.fields ?? []).map((f) => [f.key, f]));
-        const ms = sel.measurements
-          .map((m) => {
-            const f = fields.get(m.key);
-            let v = Number(m.value);
-            if (!f || !Number.isFinite(v)) return null;
-            if (f.min != null && v < f.min) v = f.min;
-            if (f.max != null && v > f.max) v = f.max;
-            return { key: f.key, label: f.label, value: v, unit: f.unit };
-          })
-          .filter((m): m is NonNullable<typeof m> => m != null);
+        const ms = this.clampMeasurements(block, sel.measurements);
         if (ms.length) {
           entry.measurements = ms;
           touched = true;
         }
+      } else if (block.type === 'ilot' && sel.ilot?.included) {
+        // The island is priced on its own measurements, at its own rate —
+        // never from the product's gamme. A declined island (included false,
+        // only possible when the block isn't required) bills nothing and is
+        // left out of the snapshot entirely.
+        const ms = this.clampMeasurements(block, sel.measurements);
+        const cents = this.ilotSurchargeCents(block, ms);
+        if (ms.length) entry.measurements = ms;
+        entry.ilot = { included: true, surchargeCents: cents };
+        surchargeCents += cents;
+        touched = true;
       } else if (block.type === 'shape' && sel.shape) {
         const opt = (block.options ?? []).find((o) => o.key === sel.shape!.key);
         if (opt) {
@@ -176,6 +168,56 @@ export class PricingService {
     }
 
     return { surchargeCents, snapshot };
+  }
+
+  /**
+   * Client-sent measurements, kept only when the authoritative block declares
+   * the field, and clamped to its bounds. Labels and units come from the block,
+   * never from the client.
+   */
+  private clampMeasurements(
+    block: ConfigBlock,
+    measurements?: ConfigSelectionEntry['measurements'],
+  ): NonNullable<ConfigSelectionEntry['measurements']> {
+    const fields = new Map((block.fields ?? []).map((f) => [f.key, f]));
+    return (measurements ?? [])
+      .map((m) => {
+        const f = fields.get(m.key);
+        let v = Number(m.value);
+        if (!f || !Number.isFinite(v)) return null;
+        if (f.min != null && v < f.min) v = f.min;
+        if (f.max != null && v > f.max) v = f.max;
+        return { key: f.key, label: f.label, value: v, unit: f.unit };
+      })
+      .filter((m): m is NonNullable<typeof m> => m != null);
+  }
+
+  /**
+   * What an island costs: either a flat supplement, or its own surface (built
+   * from the fields the block tags with a `dimensionKey`, through the block's
+   * own area formula) at its own €/m². Rounded like every other area price.
+   */
+  private ilotSurchargeCents(
+    block: ConfigBlock,
+    measurements: NonNullable<ConfigSelectionEntry['measurements']>,
+  ): number {
+    if (block.priceMode !== 'per_sqm') {
+      return Math.max(0, Math.round(block.priceCents ?? 0));
+    }
+    const rate = block.pricePerSqmCents ?? 0;
+    if (rate <= 0) return 0;
+
+    const byKey = new Map((block.fields ?? []).map((f) => [f.key, f]));
+    const dims: AreaDimensions = {};
+    for (const m of measurements) {
+      const key = byKey.get(m.key)?.dimensionKey;
+      if (key) dims[key] = m.value;
+    }
+    const formula = areaFormula(block.areaFormula);
+    // Every dimension the formula bills must be present, else the island isn't
+    // measurable yet and bills nothing rather than a partial surface.
+    if (formula.fields.some((f) => !((dims[f.key] ?? 0) > 0))) return 0;
+    return Math.max(0, Math.round(formula.areaM2(dims) * rate));
   }
 
   /**
@@ -243,25 +285,6 @@ export class PricingService {
       default:
         throw new BadRequestException('Mode de tarification inconnu');
     }
-  }
-
-  /** Looks up the surcharge for the chosen opening type, validating it. */
-  private openingSurchargeCents(
-    product: PricingProduct,
-    openingType?: string | null,
-  ): number {
-    const options = product.opening_types ?? [];
-    if (!openingType) {
-      if (options.length > 0) {
-        throw new BadRequestException("Type d'ouverture requis");
-      }
-      return 0;
-    }
-    const match = options.find((o) => o.type === openingType);
-    if (!match) {
-      throw new BadRequestException("Type d'ouverture invalide");
-    }
-    return match.surcharge_cents ?? 0;
   }
 
   /**

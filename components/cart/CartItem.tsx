@@ -7,7 +7,6 @@ import Icon from "../ui/Icon";
 import { COLORS, BRAND } from "../../lib/constants";
 import { FONTS } from "../../lib/typography";
 import { formatPrice, formatDimensions } from "../../lib/utils";
-import { openingTypeLabel } from "../../lib/opening-types";
 import { summarizeConfiguration } from "../../lib/config-blocks";
 import type { CartItem as CartItemType } from "../../lib/types";
 import QuantitySelector from "../ui/QuantitySelector";
@@ -25,7 +24,7 @@ export default function CartItem({
   onUpdateQuantity,
   onRemove,
 }: CartItemProps) {
-  const { product, quantity, customDimensions, openingType, qualityTier, configuration, calculatedPrice } = item;
+  const { product, quantity, customDimensions, qualityTier, configuration, calculatedPrice } = item;
   const price = calculatedPrice || product.price || 0;
   const imgSource = productCoverSource(product);
   const configSummary = configuration?.length ? summarizeConfiguration(configuration) : "";
@@ -102,19 +101,6 @@ export default function CartItem({
                 : product.dimensions
                   ? formatDimensions(product.dimensions.width, product.dimensions.height)
                   : ""}
-              {openingType ? ` · ${openingTypeLabel(openingType)}` : ""}
-            </Text>
-          )}
-          {openingType && !customDimensions && !product.dimensions && (
-            <Text
-              style={{
-                fontSize: 11,
-                fontFamily: "Inter_400Regular",
-                color: COLORS.outline,
-                marginTop: 2,
-              }}
-            >
-              {openingTypeLabel(openingType)}
             </Text>
           )}
 

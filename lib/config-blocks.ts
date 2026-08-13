@@ -3,7 +3,11 @@ import type {
   ConfigSelectionEntry,
   ItemConfiguration,
 } from "./types";
-import { dimensionsFromShape, type AreaDimensions } from "./area-formulas";
+import {
+  areaFormula,
+  dimensionsFromShape,
+  type AreaDimensions,
+} from "./area-formulas";
 
 /** Raw, per-block input the customer is editing on the product screen. */
 export interface BlockSelection {
@@ -13,6 +17,8 @@ export interface BlockSelection {
   accessoryIds?: string[];
   openingKey?: string;
   optionKeys?: string[];
+  /** `ilot` blocks: whether the customer wants an island at all. */
+  ilotIncluded?: boolean;
   photos?: { url: string; type: "image" | "video" }[];
 }
 export type ConfigState = Record<string, BlockSelection>; // blockId -> selection
@@ -49,6 +55,24 @@ export function buildConfiguration(
         .filter((m): m is NonNullable<typeof m> => m != null);
       if (measurements.length) {
         entry.measurements = measurements;
+        touched = true;
+      }
+    } else if (block.type === "ilot") {
+      // A required island is always in; an optional one only once the customer
+      // says yes. Declining bills nothing and records nothing.
+      const included = block.required ? true : sel.ilotIncluded === true;
+      if (included) {
+        const measurements = (block.fields ?? [])
+          .map((f) => {
+            const raw = sel.measurements?.[f.key];
+            const value = raw != null && raw !== "" ? parseFloat(raw) : NaN;
+            return Number.isFinite(value)
+              ? { key: f.key, label: f.label, value, unit: f.unit }
+              : null;
+          })
+          .filter((m): m is NonNullable<typeof m> => m != null);
+        if (measurements.length) entry.measurements = measurements;
+        entry.ilot = { included: true, surchargeCents: ilotSurchargeCents(block, measurements) };
         touched = true;
       }
     } else if (block.type === "shape") {
@@ -107,6 +131,7 @@ export function configSurchargeEuros(configuration: ItemConfiguration): number {
     e.accessories?.forEach((a) => (cents += a.priceCents ?? 0));
     e.options?.forEach((o) => (cents += o.surchargeCents ?? 0));
     if (e.opening?.surchargeCents) cents += e.opening.surchargeCents;
+    if (e.ilot?.included) cents += e.ilot.surchargeCents ?? 0;
   }
   return cents / 100;
 }
@@ -127,6 +152,15 @@ export function configValidation(
         return raw != null && raw !== "" && Number.isFinite(parseFloat(raw));
       });
       if (!fields.length || !allFilled) return missing();
+    } else if (block.type === "ilot") {
+      // Only reachable when the block is required, i.e. the island is part of
+      // the model: then every measurement it asks for must be filled.
+      const fields = block.fields ?? [];
+      const allFilled = fields.every((f) => {
+        const raw = sel?.measurements?.[f.key];
+        return raw != null && raw !== "" && Number.isFinite(parseFloat(raw));
+      });
+      if (!allFilled) return missing();
     } else if (block.type === "shape") {
       if (!sel?.shapeKey) return missing();
     } else if (block.type === "colors") {
@@ -151,6 +185,7 @@ export function summarizeConfiguration(config: ItemConfiguration): string {
     if (e.measurements?.length) {
       parts.push(e.measurements.map((m) => `${m.label} ${m.value}${m.unit ?? ""}`).join(", "));
     }
+    if (e.ilot?.included) parts.push("avec îlot");
     if (e.shape) parts.push(e.shape.label);
     if (e.colors?.length) parts.push(e.colors.map((c) => c.label).join("/"));
     if (e.opening) parts.push(e.opening.label);
@@ -191,4 +226,31 @@ export function dimensionsFromConfigState(
   }
 
   return dimensionsFromShape(blocks, values, shapeKey);
+}
+
+/**
+ * What an island costs, mirroring PricingService.ilotSurchargeCents so the live
+ * price and the charged price agree. Either a flat supplement, or its own
+ * surface — built from the fields tagged with a `dimensionKey` — at its own
+ * rate. An incomplete island bills nothing rather than a partial surface.
+ */
+export function ilotSurchargeCents(
+  block: ConfigBlock,
+  measurements: { key: string; value: number }[],
+): number {
+  if (block.priceMode !== "per_sqm") {
+    return Math.max(0, Math.round(block.priceCents ?? 0));
+  }
+  const rate = block.pricePerSqmCents ?? 0;
+  if (rate <= 0) return 0;
+
+  const byKey = new Map((block.fields ?? []).map((f) => [f.key, f]));
+  const dims: AreaDimensions = {};
+  for (const m of measurements) {
+    const key = byKey.get(m.key)?.dimensionKey;
+    if (key) dims[key] = m.value;
+  }
+  const formula = areaFormula(block.areaFormula);
+  if (formula.fields.some((f) => !((dims[f.key] ?? 0) > 0))) return 0;
+  return Math.max(0, Math.round(formula.areaM2(dims) * rate));
 }

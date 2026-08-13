@@ -11,7 +11,6 @@ export interface CartActions {
     product: Product,
     quantity?: number,
     customDimensions?: AreaDimensions,
-    openingType?: string,
     qualityTier?: string,
   ) => void;
   removeItem: (itemId: string) => void;

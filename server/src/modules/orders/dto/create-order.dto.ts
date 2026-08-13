@@ -42,7 +42,6 @@ export class OrderItemInputDto {
   @ValidateNested()
   @Type(() => CustomDimensionsDto)
   customDimensions?: CustomDimensionsDto;
-  @IsOptional() @IsString() openingType?: string;
   /** Chosen quality tier key (per_sqm products with tiers). */
   @IsOptional() @IsString() qualityTier?: string;
   /** Captured config-block selections (re-priced server-side). */

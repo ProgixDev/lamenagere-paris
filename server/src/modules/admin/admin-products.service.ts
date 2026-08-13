@@ -199,10 +199,8 @@ export class AdminProductsService {
         dto.heightCoef != null ? eurosToCents(dto.heightCoef) : null,
       price_per_sqm_cents:
         dto.pricePerSqm != null ? eurosToCents(dto.pricePerSqm) : null,
-      opening_types: (dto.openingTypes ?? []).map((o) => ({
-        type: o.type,
-        surcharge_cents: eurosToCents(o.surcharge ?? 0),
-      })),
+      // `opening_types` is no longer written: openings are configured as an
+      // `opening_details` block. Legacy values stay in the column, unread.
       quality_tiers: (dto.qualityTiers ?? []).map((t) => ({
         key: t.key,
         label: t.label,

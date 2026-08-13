@@ -137,8 +137,6 @@ export default function ProductDetailScreen() {
   // Made-to-measure: needs width/height before it can be priced/ordered.
   const needsDimensions =
     product.productType === PRODUCT_TYPES.CONFIGURABLE || isPerSqm;
-  const openingTypes = product.openingTypes ?? [];
-  const hasOpeningTypes = openingTypes.length > 0;
   // Effective blocks: product override wins, else the category template.
   const configBlocks = product.configBlocks ?? product.category.configBlocks ?? [];
   // Colour variants: picking one swaps the gallery to that colour's images.
@@ -159,10 +157,9 @@ export default function ProductDetailScreen() {
     galleryItems.push({ type: "image", key: "__placeholder__" });
   }
 
-  // Products that need any choice (dimensions, opening, or config blocks) are
-  // configured in the dedicated guided flow rather than inline on this page.
-  const hasConfiguration =
-    needsDimensions || hasOpeningTypes || configBlocks.length > 0;
+  // Products that need any choice (dimensions or config blocks) are configured
+  // in the dedicated guided flow rather than inline on this page.
+  const hasConfiguration = needsDimensions || configBlocks.length > 0;
 
   // Sold by the unit: nothing to configure, so the customer picks a quantity
   // with − / + and adds it straight to the cart. Two limits bound the stepper
@@ -180,7 +177,7 @@ export default function ProductDetailScreen() {
   // Pure made-to-measure (priced by area, no extra options): the customer
   // enters width × height right here and we price + add it to the cart inline.
   const optionBlocks = configBlocks.filter((b) => b.type !== "measurements");
-  const inlineSqm = isPerSqm && !hasOpeningTypes && optionBlocks.length === 0;
+  const inlineSqm = isPerSqm && optionBlocks.length === 0;
   // The formula decides which dimensions to collect and how they make a surface.
   const formula = areaFormula(product.areaFormula);
   const dims: AreaDimensions = {};
@@ -196,14 +193,14 @@ export default function ProductDetailScreen() {
   const tierReady = !hasTiers || !!qualityTier;
   const livePrice =
     inlineSqm && validDims && tierReady
-      ? computeConfiguredPrice(product, dims, undefined, qualityTier ?? undefined)
+      ? computeConfiguredPrice(product, dims, qualityTier ?? undefined)
       : undefined;
   // Estimate shown by the standalone calculator below "À propos". Covers every
   // per-m² product (even configurable ones); it's informational only — the
   // guided configure flow stays authoritative for products with extra options.
   const estimatePrice =
     isPerSqm && validDims && tierReady
-      ? computeConfiguredPrice(product, dims, undefined, qualityTier ?? undefined)
+      ? computeConfiguredPrice(product, dims, qualityTier ?? undefined)
       : undefined;
 
   const handlePrimaryAction = async () => {
@@ -224,7 +221,7 @@ export default function ProductDetailScreen() {
         return;
       }
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      addItem(product, 1, dims, undefined, qualityTier ?? undefined);
+      addItem(product, 1, dims, qualityTier ?? undefined);
       setAddedCount(1);
       setJustAdded(true);
       setTimeout(() => setJustAdded(false), 1500);

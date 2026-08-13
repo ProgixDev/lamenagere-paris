@@ -130,7 +130,6 @@ export default function CheckoutPaymentScreen() {
           productId: item.product.id,
           quantity: item.quantity,
           customDimensions: item.customDimensions,
-          openingType: item.openingType,
           qualityTier: item.qualityTier,
           configuration: item.configuration,
           quoteId: item.quoteId,

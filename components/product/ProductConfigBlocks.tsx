@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, Image, ActivityIndicator, Alert, Modal } from "react-native";
 import * as Haptics from "expo-haptics";
+import Svg, { Path } from "react-native-svg";
 import Icon from "../ui/Icon";
 import Input from "../ui/Input";
 import { COLORS } from "../../lib/constants";
 import { formatPrice } from "../../lib/utils";
 import type { ConfigBlock } from "../../lib/types";
-import type { ConfigState } from "../../lib/config-blocks";
+import { ilotSurchargeCents, type ConfigState } from "../../lib/config-blocks";
 import { pickMessageMedia, uploadMessageMedia } from "../../features/messaging/upload";
 
 interface Props {
@@ -29,6 +30,9 @@ export default function ProductConfigBlocks({ blocks, value, onChange }: Props) 
           )}
           {block.type === "shape" && (
             <ShapeBlock block={block} sel={value[block.id]} patch={(p) => patch(block.id, p)} />
+          )}
+          {block.type === "ilot" && (
+            <IlotBlock block={block} sel={value[block.id]} patch={(p) => patch(block.id, p)} />
           )}
           {block.type === "colors" && (
             <ColorsBlock block={block} sel={value[block.id]} patch={(p) => patch(block.id, p)} />
@@ -139,6 +143,110 @@ function ImageZoomOverlay({ uri }: { uri: string }) {
   );
 }
 
+/**
+ * The island: its own photo, its own measurements, its own price. When the
+ * block isn't required the customer is asked whether they want one at all —
+ * saying no hides the measurements and bills nothing.
+ */
+function IlotBlock({ block, sel, patch }: { block: ConfigBlock; sel: Sel; patch: Patch }) {
+  const fields = block.fields ?? [];
+  const optional = !block.required;
+  const included = optional ? sel?.ilotIncluded === true : true;
+
+  const entered = fields
+    .map((f) => {
+      const raw = sel?.measurements?.[f.key];
+      const value = raw != null && raw !== "" ? parseFloat(raw) : NaN;
+      return Number.isFinite(value) ? { key: f.key, value } : null;
+    })
+    .filter((m): m is { key: string; value: number } => m != null);
+  const cents = included ? ilotSurchargeCents(block, entered) : 0;
+
+  return (
+    <View style={{ gap: 12 }}>
+      {block.planImage ? (
+        <Image
+          source={{ uri: block.planImage }}
+          style={{ width: "100%", height: 150, borderRadius: 12, backgroundColor: COLORS.surfaceContainer }}
+          resizeMode="cover"
+        />
+      ) : null}
+
+      {optional && (
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          {[
+            { label: "Oui", value: true },
+            { label: "Non", value: false },
+          ].map((c) => {
+            const active = sel?.ilotIncluded === c.value;
+            return (
+              <TouchableOpacity
+                key={c.label}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  patch({ ilotIncluded: c.value });
+                }}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  alignItems: "center",
+                  backgroundColor: active ? COLORS.primary : COLORS.surfaceContainerLowest,
+                  borderWidth: 1,
+                  borderColor: active ? COLORS.primary : COLORS.outlineVariant,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontFamily: active ? "Inter_600SemiBold" : "Inter_500Medium",
+                    color: active ? COLORS.onPrimary : COLORS.onSurface,
+                  }}
+                >
+                  {c.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
+      {included && (
+        <View style={{ gap: 12 }}>
+          {fields.map((f) => (
+            <Input
+              key={f.key}
+              label={f.label.toUpperCase()}
+              value={sel?.measurements?.[f.key] ?? ""}
+              onChangeText={(t) =>
+                patch({ measurements: { ...(sel?.measurements ?? {}), [f.key]: t } })
+              }
+              keyboardType="numeric"
+              suffix={f.unit ?? "cm"}
+            />
+          ))}
+          {cents > 0 && (
+            <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.secondary }}>
+              + {formatPrice(cents / 100)}
+            </Text>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+/**
+ * The three runs seen from above. Drawn rather than uploaded: there are only
+ * ever three shapes, so a picture per product would be three identical files to
+ * maintain. The back office draws the same paths in its block editor.
+ */
+const SHAPE_PATH: Record<string, string> = {
+  i: "M26 8v30",
+  l: "M14 8v30h24",
+  u: "M12 8v30h28V8",
+};
+
 function ShapeBlock({ block, sel, patch }: { block: ConfigBlock; sel: Sel; patch: Patch }) {
   const options = block.options ?? [];
   return (
@@ -167,11 +275,16 @@ function ShapeBlock({ block, sel, patch }: { block: ConfigBlock; sel: Sel; patch
                 overflow: "hidden",
               }}
             >
-              {o.image ? (
-                <>
-                  <Image source={{ uri: o.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
-                  <ImageZoomOverlay uri={o.image} />
-                </>
+              {SHAPE_PATH[o.key] ? (
+                <Svg width={62} height={46} viewBox="0 0 52 46" fill="none">
+                  <Path
+                    d={SHAPE_PATH[o.key]}
+                    stroke={active ? COLORS.primary : COLORS.outline}
+                    strokeWidth={2.6}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </Svg>
               ) : (
                 <Text style={{ fontSize: 22, fontFamily: "Manrope_800ExtraBold", color: COLORS.outline }}>{o.label}</Text>
               )}

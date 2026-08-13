@@ -51,7 +51,6 @@ interface ProductForOrder {
   min_height: number | null;
   max_width: number | null;
   max_height: number | null;
-  opening_types: { type: string; surcharge_cents: number }[] | null;
   quality_tiers:
     | { key: string; label: string; price_per_sqm_cents: number }[]
     | null;
@@ -225,7 +224,7 @@ export class OrdersService {
     const { data: products } = await this.supabase.client
       .from('products')
       .select(
-        'id, name, price_mode, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, area_formula, ref_width, ref_height, min_width, min_height, max_width, max_height, opening_types, quality_tiers, delivery_metropole, delivery_outremer, config_blocks, colors, media:product_media(url,type,is_primary), category:categories(config_blocks)',
+        'id, name, price_mode, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, area_formula, ref_width, ref_height, min_width, min_height, max_width, max_height, quality_tiers, delivery_metropole, delivery_outremer, config_blocks, colors, media:product_media(url,type,is_primary), category:categories(config_blocks)',
       )
       .in('id', productIds.length ? productIds : ['00000000-0000-0000-0000-000000000000'])
       .returns<ProductForOrder[]>();
@@ -296,7 +295,6 @@ export class OrdersService {
       const baseUnit = this.pricing.resolveUnitPriceCents(
         product,
         dims,
-        item.openingType,
         item.qualityTier,
       );
       // Re-price config-block add-ons (colors/accessories/openings) server-side
@@ -326,7 +324,6 @@ export class OrdersService {
         custom_left: dims?.left ?? null,
         custom_back: dims?.back ?? null,
         custom_right: dims?.right ?? null,
-        opening_type: item.openingType ?? null,
         quality_tier: item.qualityTier ?? null,
         configuration: snapshot,
       };

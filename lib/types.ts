@@ -1,17 +1,15 @@
 import type { DimensionRole } from "./area-formulas";
-import type { AreaDimensions, AreaFormulaKey } from "./area-formulas";
+import type {
+  AreaDimensionKey,
+  AreaDimensions,
+  AreaFormulaKey,
+} from "./area-formulas";
 export type AccountType = "particulier" | "professionnel";
 export type ProductType = "standard" | "quote_only" | "configurable";
 
 /** Availability of a stock-tracked product, derived server-side. */
 export type StockLabel = "en_stock" | "stock_faible" | "rupture";
 export type PriceMode = "fixed" | "calculated" | "per_sqm" | "quote";
-
-export interface OpeningTypeOption {
-  type: string;
-  /** Surcharge added to the dimension price when this type is chosen (euros). */
-  surcharge: number;
-}
 
 export interface QualityTierOption {
   key: string;
@@ -94,6 +92,7 @@ export interface Category {
 export type ConfigBlockType =
   | "measurements"
   | "shape"
+  | "ilot"
   | "colors"
   | "accessories"
   | "opening_details"
@@ -111,6 +110,11 @@ export interface ConfigBlockField {
    * the billed surface. Untagged fields are recorded but never billed.
    */
   priceRole?: DimensionRole | null;
+  /**
+   * `ilot` blocks only: which dimension of the block's own area formula this
+   * measurement feeds. Untagged fields are recorded but never billed.
+   */
+  dimensionKey?: AreaDimensionKey | null;
 }
 export interface ConfigBlockOption {
   key: string;
@@ -138,6 +142,15 @@ export interface ConfigBlock {
   fields?: ConfigBlockField[];
   options?: ConfigBlockOption[];
   items?: ConfigBlockItem[];
+  /**
+   * `ilot` blocks only — the island carries its own price, independent of the
+   * product's gamme. "fixed" bills `priceCents` flat; "per_sqm" bills the
+   * surface built from the tagged fields through `areaFormula`.
+   */
+  priceMode?: "fixed" | "per_sqm";
+  priceCents?: number;
+  pricePerSqmCents?: number;
+  areaFormula?: AreaFormulaKey;
 }
 
 // ── Captured selection snapshot (stored on cart + order lines) ──────────────
@@ -152,6 +165,8 @@ export interface ConfigSelectionEntry {
   opening?: { key: string; label: string; surchargeCents?: number };
   options?: { key: string; label: string; surchargeCents?: number; image?: string }[];
   photos?: { url: string; type: "image" | "video" }[];
+  /** `ilot` blocks: whether the customer wants one, and what it costs. */
+  ilot?: { included: boolean; surchargeCents?: number };
 }
 export type ItemConfiguration = ConfigSelectionEntry[];
 
@@ -193,8 +208,6 @@ export interface Product {
     width: number;
     height: number;
   };
-  /** Allowed opening types + per-type surcharge (euros). */
-  openingTypes?: OpeningTypeOption[];
   /** Quality tiers for per_sqm products, each with its own €/m² rate. */
   qualityTiers?: QualityTierOption[];
   /** Colour variants; selecting one swaps the gallery to its images. */
@@ -233,8 +246,6 @@ export interface CartItem {
   /** Dimensions entered by the customer; which keys are set depends on the
    *  product's area formula. */
   customDimensions?: AreaDimensions;
-  /** Chosen opening type key (e.g. "coulissante"), when the product offers them. */
-  openingType?: string;
   /** Chosen quality tier key, when the product offers tiers. */
   qualityTier?: string;
   /** Captured selections for the category's config blocks. */
@@ -284,7 +295,6 @@ export interface OrderItem {
   /** Dimensions entered by the customer; which keys are set depends on the
    *  product's area formula. */
   customDimensions?: AreaDimensions;
-  openingType?: string;
   qualityTier?: string;
   configuration?: ItemConfiguration;
 }
@@ -305,7 +315,6 @@ export interface QuoteRequest {
     height: number;
   };
   notes?: string;
-  openingType?: string;
   images?: string[];
   status: QuoteStatus;
   quotedPrice?: number;

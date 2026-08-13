@@ -1,5 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
 import { PricingService, PricingProduct } from './pricing.service';
+import type {
+  ConfigBlock,
+  ConfigSelectionEntry,
+} from '../../modules/catalog/catalog.serializer';
 
 const calculated: PricingProduct = {
   price_mode: 'calculated',
@@ -86,40 +90,6 @@ describe('PricingService', () => {
     ).toThrow(BadRequestException);
   });
 
-  it('adds the chosen opening-type surcharge on top of the dimension price', () => {
-    const withTypes: PricingProduct = {
-      ...perSqm,
-      opening_types: [
-        { type: 'fixe', surcharge_cents: 0 },
-        { type: 'coulissante', surcharge_cents: 15000 }, // +150 €
-      ],
-    };
-    // 400 € base + 150 € surcharge = 550 €
-    expect(
-      svc.resolveUnitPriceCents(withTypes, { width: 200, height: 200 }, 'coulissante'),
-    ).toBe(55000);
-  });
-
-  it('requires an opening type when the product offers them', () => {
-    const withTypes: PricingProduct = {
-      ...perSqm,
-      opening_types: [{ type: 'fixe', surcharge_cents: 0 }],
-    };
-    expect(() =>
-      svc.resolveUnitPriceCents(withTypes, { width: 200, height: 200 }),
-    ).toThrow(BadRequestException);
-  });
-
-  it('rejects an unknown opening type', () => {
-    const withTypes: PricingProduct = {
-      ...perSqm,
-      opening_types: [{ type: 'fixe', surcharge_cents: 0 }],
-    };
-    expect(() =>
-      svc.resolveUnitPriceCents(withTypes, { width: 200, height: 200 }, 'bogus'),
-    ).toThrow(BadRequestException);
-  });
-
   const tiered: PricingProduct = {
     ...perSqm,
     price_per_sqm_cents: null, // no flat rate — tiers drive the price
@@ -132,10 +102,10 @@ describe('PricingService', () => {
   it('prices per m² using the chosen quality tier rate', () => {
     // 4 m² × 80 €/m² = 320 € ; 4 m² × 180 €/m² = 720 €
     expect(
-      svc.resolveUnitPriceCents(tiered, { width: 200, height: 200 }, null, 'bas'),
+      svc.resolveUnitPriceCents(tiered, { width: 200, height: 200 }, 'bas'),
     ).toBe(32000);
     expect(
-      svc.resolveUnitPriceCents(tiered, { width: 200, height: 200 }, null, 'haute'),
+      svc.resolveUnitPriceCents(tiered, { width: 200, height: 200 }, 'haute'),
     ).toBe(72000);
   });
 
@@ -147,7 +117,7 @@ describe('PricingService', () => {
 
   it('rejects an unknown quality tier', () => {
     expect(() =>
-      svc.resolveUnitPriceCents(tiered, { width: 200, height: 200 }, null, 'bogus'),
+      svc.resolveUnitPriceCents(tiered, { width: 200, height: 200 }, 'bogus'),
     ).toThrow(BadRequestException);
   });
 
@@ -244,10 +214,104 @@ describe('PricingService', () => {
         svc.resolveUnitPriceCents(
           kitchen,
           { width: 300, length: 200, height: 240 },
-          null,
           'bas',
         ),
       ).toBe(96000);
+    });
+  });
+
+  // ── Îlot ─────────────────────────────────────────────────────────────────
+  // The island is priced on its own measurements, at its own rate, and is
+  // independent of the product's gamme.
+  describe('îlot', () => {
+    const fields = [
+      { key: 'lo', label: 'Longueur îlot', unit: 'cm', max: 280, dimensionKey: 'width' as const },
+      { key: 'la', label: 'Largeur îlot', unit: 'cm', max: 100, dimensionKey: 'length' as const },
+      { key: 'ht', label: 'Hauteur îlot', unit: 'cm' },
+    ];
+    const perSqmBlock: ConfigBlock = {
+      id: 'blk_ilot',
+      type: 'ilot',
+      label: 'Îlot',
+      fields,
+      priceMode: 'per_sqm',
+      areaFormula: 'width_length',
+      pricePerSqmCents: 45000, // 450 €/m²
+    };
+    const sel = (
+      included: boolean,
+      measurements: { key: string; label: string; value: number }[],
+    ): ConfigSelectionEntry[] => [
+      { blockId: 'blk_ilot', type: 'ilot', label: 'Îlot', ilot: { included }, measurements },
+    ];
+    const full = [
+      { key: 'lo', label: 'Longueur îlot', value: 200 },
+      { key: 'la', label: 'Largeur îlot', value: 100 },
+    ];
+
+    it('bills its own surface at its own rate', () => {
+      // 200 × 100 cm = 2 m² × 450 €/m² = 900 €
+      const { surchargeCents } = svc.priceConfiguration([perSqmBlock], sel(true, full));
+      expect(surchargeCents).toBe(90000);
+    });
+
+    it('bills a flat supplement in fixed mode', () => {
+      const block: ConfigBlock = {
+        ...perSqmBlock,
+        priceMode: 'fixed',
+        priceCents: 150000, // 1 500 €
+      };
+      const { surchargeCents } = svc.priceConfiguration([block], sel(true, full));
+      expect(surchargeCents).toBe(150000);
+    });
+
+    it('bills nothing and keeps no snapshot when the customer declines it', () => {
+      const { surchargeCents, snapshot } = svc.priceConfiguration([perSqmBlock], sel(false, full));
+      expect(surchargeCents).toBe(0);
+      expect(snapshot).toHaveLength(0);
+    });
+
+    it('clamps measurements to the field bounds before billing', () => {
+      // Longueur clamped 999 → 280 : 280 × 100 cm = 2.8 m² × 450 € = 1 260 €
+      const { surchargeCents, snapshot } = svc.priceConfiguration(
+        [perSqmBlock],
+        sel(true, [{ key: 'lo', label: 'x', value: 999 }, { key: 'la', label: 'x', value: 100 }]),
+      );
+      expect(surchargeCents).toBe(126000);
+      expect(snapshot[0].measurements?.[0].value).toBe(280);
+    });
+
+    it('bills nothing while a billed dimension is still missing', () => {
+      const { surchargeCents } = svc.priceConfiguration(
+        [perSqmBlock],
+        sel(true, [{ key: 'lo', label: 'Longueur îlot', value: 200 }]),
+      );
+      expect(surchargeCents).toBe(0);
+    });
+
+    it('ignores untagged measurements', () => {
+      // Hauteur îlot has no dimensionKey: recorded, never billed.
+      const { surchargeCents, snapshot } = svc.priceConfiguration(
+        [perSqmBlock],
+        sel(true, [...full, { key: 'ht', label: 'Hauteur îlot', value: 95 }]),
+      );
+      expect(surchargeCents).toBe(90000);
+      expect(snapshot[0].measurements).toHaveLength(3);
+    });
+
+    it('does not let the client dictate the island price', () => {
+      const tampered: ConfigSelectionEntry[] = [
+        {
+          blockId: 'blk_ilot',
+          type: 'ilot',
+          label: 'Îlot',
+          ilot: { included: true, surchargeCents: 1 },
+          measurements: full,
+        },
+      ];
+      const { surchargeCents, snapshot } = svc.priceConfiguration([perSqmBlock], tampered);
+      expect(surchargeCents).toBe(90000);
+      expect(snapshot[0].ilot?.surchargeCents).toBe(90000);
     });
   });
 });

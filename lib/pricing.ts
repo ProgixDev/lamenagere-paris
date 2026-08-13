@@ -51,19 +51,13 @@ function clamp(value: number, min?: number, max?: number): number {
   return value;
 }
 
-/** Surcharge (euros) for a chosen opening type on a product. */
-export function openingSurcharge(
-  product: Product,
-  openingType?: string,
-): number {
-  if (!openingType || !product.openingTypes?.length) return 0;
-  return product.openingTypes.find((o) => o.type === openingType)?.surcharge ?? 0;
-}
-
 /**
  * Display-only price (euros) for a configured product. Mirrors the server's
  * PricingService so the customer sees a live preview; the server re-resolves
  * the authoritative price at checkout.
+ *
+ * Option surcharges (openings included) come from the configuration blocks and
+ * are added by the caller via `configSurchargeEuros`, not here.
  *
  * Returns `undefined` when the inputs needed for the product's price mode are
  * missing (e.g. per_sqm without dimensions), so callers can show a prompt.
@@ -71,14 +65,11 @@ export function openingSurcharge(
 export function computeConfiguredPrice(
   product: Product,
   dims?: Dimensions | null,
-  openingType?: string,
   qualityTier?: string,
 ): number | undefined {
-  const surcharge = openingSurcharge(product, openingType);
-
   switch (product.priceMode) {
     case "fixed":
-      return product.price != null ? product.price + surcharge : undefined;
+      return product.price ?? undefined;
 
     case "per_sqm": {
       const rate = perSqmRate(product, qualityTier);
@@ -90,7 +81,7 @@ export function computeConfiguredPrice(
       // arrive already resolved, so they're used as-is.
       if (formula.fields.length === 0) {
         if (!((dims.width ?? 0) > 0) || !((dims.height ?? 0) > 0)) return undefined;
-        return Math.max(0, Math.round(formula.areaM2(dims) * rate)) + surcharge;
+        return Math.max(0, Math.round(formula.areaM2(dims) * rate));
       }
 
       // Every dimension the formula bills must be present, else there's no
@@ -108,13 +99,12 @@ export function computeConfiguredPrice(
       }
 
       // Round to whole euros (matches server PricingService).
-      const base = Math.max(0, Math.round(formula.areaM2(checked) * rate));
-      return base + surcharge;
+      return Math.max(0, Math.round(formula.areaM2(checked) * rate));
     }
 
     case "calculated":
-      // Coefficients aren't exposed to the client; fall back to base + surcharge.
-      return product.price != null ? product.price + surcharge : undefined;
+      // Coefficients aren't exposed to the client; fall back to the base price.
+      return product.price ?? undefined;
 
     case "quote":
     default:

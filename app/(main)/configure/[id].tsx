@@ -17,7 +17,6 @@ import {
   formatAreaDimensions,
   type AreaDimensions,
 } from "../../../lib/area-formulas";
-import { openingTypeLabel } from "../../../lib/opening-types";
 import {
   buildConfiguration,
   configSurchargeEuros,
@@ -31,6 +30,30 @@ import { useCartStore } from "../../../features/cart/store";
 
 type StepKind = "measures" | "options" | "summary";
 
+/**
+ * The order the customer is asked things in, fixed here on purpose.
+ *
+ * The back office decides *which* modules exist and what they contain, but not
+ * the sequence: a manager reordering blocks in the editor must never be able to
+ * ask for the gamme before the shape. Blocks of the same family keep the order
+ * they were given (Array#sort is stable), so two colour blocks stay in the
+ * admin's order relative to each other.
+ */
+const BLOCK_RANK: Record<string, number> = {
+  shape: 0,
+  ilot: 1,
+  measurements: 2,
+  colors: 3,
+  opening_details: 4,
+  accessories: 5,
+  options: 6,
+  photos: 7,
+};
+/** Families asked before the gamme, in the first step. */
+const FIRST_STEP_TYPES = new Set(["shape", "ilot", "measurements"]);
+const byRank = (a: { type: string }, b: { type: string }) =>
+  (BLOCK_RANK[a.type] ?? 99) - (BLOCK_RANK[b.type] ?? 99);
+
 export default function ConfigureScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -40,7 +63,6 @@ export default function ConfigureScreen() {
   const [stepIdx, setStepIdx] = useState(0);
   // Keyed by dimension: the product's area formula decides which are asked for.
   const [dimInputs, setDimInputs] = useState<Record<string, string>>({});
-  const [openingType, setOpeningType] = useState<string | null>(null);
   const [qualityTier, setQualityTier] = useState<string | null>(null);
   const [configState, setConfigState] = useState<ConfigState>({});
   const [quantity, setQuantity] = useState(1);
@@ -51,36 +73,28 @@ export default function ConfigureScreen() {
   // asked for alongside the measurements it scales — not after them.
   const byShape = isPerSqm && product?.areaFormula === "by_shape";
   const measurementBlocks = useMemo(
-    () =>
-      blocks.filter(
-        (b) => b.type === "measurements" || (byShape && b.type === "shape"),
-      ),
-    [blocks, byShape],
+    () => blocks.filter((b) => FIRST_STEP_TYPES.has(b.type)).sort(byRank),
+    [blocks],
   );
   const optionBlocks = useMemo(
-    () =>
-      blocks.filter(
-        (b) => b.type !== "measurements" && !(byShape && b.type === "shape"),
-      ),
-    [blocks, byShape],
+    () => blocks.filter((b) => !FIRST_STEP_TYPES.has(b.type)).sort(byRank),
+    [blocks],
   );
 
   // by_shape products take their dimensions from the blocks above, so they show
   // no separate largeur/hauteur inputs — that was the double entry.
   const needsDims =
     !byShape && (product?.productType === PRODUCT_TYPES.CONFIGURABLE || isPerSqm);
-  const openingTypes = product?.openingTypes ?? [];
-  const hasOpening = openingTypes.length > 0;
   const qualityTiers = product?.qualityTiers ?? [];
   const hasTiers = qualityTiers.length > 0;
 
   const steps = useMemo<StepKind[]>(() => {
     const s: StepKind[] = [];
     if (needsDims || measurementBlocks.length) s.push("measures");
-    if (hasOpening || optionBlocks.length) s.push("options");
+    if (optionBlocks.length) s.push("options");
     s.push("summary");
     return s;
-  }, [needsDims, hasOpening, measurementBlocks.length, optionBlocks.length]);
+  }, [needsDims, measurementBlocks.length, optionBlocks.length]);
 
   if (isLoading || !product) {
     return (
@@ -109,12 +123,7 @@ export default function ConfigureScreen() {
       : undefined;
   const configuration = buildConfiguration(blocks, configState);
   const surcharge = configSurchargeEuros(configuration);
-  const base = computeConfiguredPrice(
-    product,
-    dims,
-    openingType ?? undefined,
-    qualityTier ?? undefined,
-  );
+  const base = computeConfiguredPrice(product, dims, qualityTier ?? undefined);
   const total = base != null ? base + surcharge : undefined;
   const liveRate = isPerSqm ? perSqmRate(product, qualityTier ?? undefined) : undefined;
 
@@ -124,15 +133,14 @@ export default function ConfigureScreen() {
   // Per-step validation gate.
   function stepError(): string | null {
     if (step === "measures") {
-      if (hasTiers && !qualityTier) return "Choisissez une gamme";
+      const v = configValidation(measurementBlocks, configState);
+      if (!v.ok) return v.hint ?? "Complétez les mesures";
       if (byShape && !dims) return "Choisissez la forme et renseignez vos mesures";
       if (needsDims && !dims)
         return `Renseignez ${formula.fields.map((f) => f.label.toLowerCase()).join(", ")}`;
-      const v = configValidation(measurementBlocks, configState);
-      if (!v.ok) return v.hint ?? "Complétez les mesures";
+      if (hasTiers && !qualityTier) return "Choisissez une gamme";
     }
     if (step === "options") {
-      if (hasOpening && !openingType) return "Choisissez un type d'ouverture";
       const v = configValidation(optionBlocks, configState);
       if (!v.ok) return v.hint ?? "Complétez les options";
     }
@@ -154,7 +162,7 @@ export default function ConfigureScreen() {
   };
   const addToCart = async () => {
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    addItem(product, quantity, dims, openingType ?? undefined, qualityTier ?? undefined, {
+    addItem(product, quantity, dims, qualityTier ?? undefined, {
       configuration,
       configSurcharge: surcharge,
     });
@@ -198,9 +206,46 @@ export default function ConfigureScreen() {
         <Animated.View key={step} entering={FadeIn.duration(220)}>
           {step === "measures" && (
             <View style={{ paddingTop: 6 }}>
-              <StepTitle title="Vos mesures" subtitle="Indiquez les dimensions souhaitées." />
+              <StepTitle title="Votre configuration" subtitle="Forme, dimensions puis gamme." />
+              <ProductConfigBlocks blocks={measurementBlocks} value={configState} onChange={setConfigState} />
+              {needsDims && (
+                <View style={{ paddingHorizontal: 16 }}>
+                  <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, ...SHADOW.card }}>
+                    {/* One input per dimension the product's formula bills. */}
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+                      {formula.fields.map((field) => (
+                        <View key={field.key} style={{ flexGrow: 1, flexBasis: "45%" }}>
+                          <Input
+                            label={field.label.toUpperCase()}
+                            value={dimInputs[field.key] ?? ""}
+                            onChangeText={(t) =>
+                              setDimInputs((d) => ({ ...d, [field.key]: t }))
+                            }
+                            keyboardType="numeric"
+                            suffix="cm"
+                          />
+                        </View>
+                      ))}
+                    </View>
+                    {isPerSqm && liveRate != null && (
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.secondary, marginTop: 8 }}>
+                        {formatPrice(liveRate)}/m²
+                        {formula.key !== "width_height" ? ` · ${formula.expression}` : ""}
+                        {product.minDimensions && product.maxDimensions
+                          ? ` · de ${product.minDimensions.width} à ${product.maxDimensions.width} cm`
+                          : ""}
+                      </Text>
+                    )}
+                    {isPerSqm && dimsComplete && (
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.onSurfaceVariant, marginTop: 6 }}>
+                        Surface : {formula.areaM2(entered).toFixed(2)} m²
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              )}
               {hasTiers && (
-                <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+                <View style={{ paddingHorizontal: 16, marginTop: 16 }}>
                   <Text style={{ fontSize: 18, fontFamily: FONTS.serif, color: COLORS.onSurface, marginBottom: 12 }}>
                     Gamme
                   </Text>
@@ -239,43 +284,6 @@ export default function ConfigureScreen() {
                   </View>
                 </View>
               )}
-              {needsDims && (
-                <View style={{ paddingHorizontal: 16 }}>
-                  <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, ...SHADOW.card }}>
-                    {/* One input per dimension the product's formula bills. */}
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
-                      {formula.fields.map((field) => (
-                        <View key={field.key} style={{ flexGrow: 1, flexBasis: "45%" }}>
-                          <Input
-                            label={field.label.toUpperCase()}
-                            value={dimInputs[field.key] ?? ""}
-                            onChangeText={(t) =>
-                              setDimInputs((d) => ({ ...d, [field.key]: t }))
-                            }
-                            keyboardType="numeric"
-                            suffix="cm"
-                          />
-                        </View>
-                      ))}
-                    </View>
-                    {isPerSqm && liveRate != null && (
-                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.secondary, marginTop: 8 }}>
-                        {formatPrice(liveRate)}/m²
-                        {formula.key !== "width_height" ? ` · ${formula.expression}` : ""}
-                        {product.minDimensions && product.maxDimensions
-                          ? ` · de ${product.minDimensions.width} à ${product.maxDimensions.width} cm`
-                          : ""}
-                      </Text>
-                    )}
-                    {isPerSqm && dimsComplete && (
-                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.onSurfaceVariant, marginTop: 6 }}>
-                        Surface : {formula.areaM2(entered).toFixed(2)} m²
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              )}
-              <ProductConfigBlocks blocks={measurementBlocks} value={configState} onChange={setConfigState} />
             {byShape && liveRate != null && (
               <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
                 <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, ...SHADOW.card }}>
@@ -301,42 +309,6 @@ export default function ConfigureScreen() {
           {step === "options" && (
             <View style={{ paddingTop: 6 }}>
               <StepTitle title="Vos options" subtitle="Personnalisez votre produit." />
-              {hasOpening && (
-                <View style={{ paddingHorizontal: 16, marginTop: 4 }}>
-                  <Text style={{ fontSize: 18, fontFamily: FONTS.serif, color: COLORS.onSurface, marginBottom: 12 }}>
-                    Type d&apos;ouverture
-                  </Text>
-                  <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, ...SHADOW.card }}>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                      {openingTypes.map((opt) => {
-                        const active = openingType === opt.type;
-                        return (
-                          <TouchableOpacity
-                            key={opt.type}
-                            onPress={() => {
-                              Haptics.selectionAsync();
-                              setOpeningType(opt.type);
-                            }}
-                            style={{
-                              paddingHorizontal: 14,
-                              paddingVertical: 9,
-                              borderRadius: 9999,
-                              backgroundColor: active ? COLORS.primary : "transparent",
-                              borderWidth: 1,
-                              borderColor: active ? COLORS.primary : COLORS.outlineVariant,
-                            }}
-                          >
-                            <Text style={{ fontSize: 13, fontFamily: active ? "Inter_600SemiBold" : "Inter_500Medium", color: active ? COLORS.onPrimary : COLORS.onSurface }}>
-                              {openingTypeLabel(opt.type)}
-                              {opt.surcharge > 0 ? ` +${formatPrice(opt.surcharge)}` : ""}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  </View>
-                </View>
-              )}
               <ProductConfigBlocks blocks={optionBlocks} value={configState} onChange={setConfigState} />
             </View>
           )}
@@ -358,7 +330,6 @@ export default function ConfigureScreen() {
                   {dims && (
               <SummaryRow label="Dimensions" value={formatAreaDimensions(formula.key, dims)} />
             )}
-                  {openingType && <SummaryRow label="Ouverture" value={openingTypeLabel(openingType)} />}
                   {configuration.length > 0 && <SummaryRow label="Configuration" value={summarizeConfiguration(configuration)} />}
                   <SummaryRow label="Quantité" value={String(quantity)} />
                 </View>

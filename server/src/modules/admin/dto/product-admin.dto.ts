@@ -21,12 +21,6 @@ export type ProductType = 'standard' | 'quote_only' | 'configurable';
 export type PriceMode = 'fixed' | 'calculated' | 'per_sqm' | 'quote';
 export type ProductStatus = 'publie' | 'brouillon' | 'archive';
 
-/** One allowed opening type for a product, with its surcharge (in euros). */
-export class OpeningTypeDto {
-  @IsString() type!: string;
-  @IsNumber() surcharge!: number;
-}
-
 /** One quality tier for a per_sqm product, with its own €/m² rate (euros). */
 export class QualityTierDto {
   @IsString() key!: string;
@@ -63,13 +57,6 @@ export class UpsertProductDto {
   @IsOptional()
   @IsEnum(AREA_FORMULA_KEYS)
   areaFormula?: AreaFormulaKey;
-
-  // Allowed opening types + per-type surcharge (euros).
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => OpeningTypeDto)
-  openingTypes?: OpeningTypeDto[];
 
   // Quality tiers for per_sqm products, each with its own €/m² rate.
   @IsOptional()

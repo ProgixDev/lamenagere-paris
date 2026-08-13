@@ -20,7 +20,6 @@ interface CartStore {
     product: Product,
     quantity?: number,
     customDimensions?: AreaDimensions,
-    openingType?: string,
     qualityTier?: string,
     extra?: AddItemExtra,
   ) => void;
@@ -41,7 +40,6 @@ export const useCartStore = create<CartStore>()(
         product,
         quantity = 1,
         customDimensions,
-        openingType,
         qualityTier,
         extra,
       ) => {
@@ -61,21 +59,16 @@ export const useCartStore = create<CartStore>()(
         }
         const { items } = get();
         const configuration = extra?.configuration?.length ? extra.configuration : undefined;
-        // A made-to-measure line (custom dimensions, opening type, or any config
+        // A made-to-measure line (custom dimensions, quality tier, or any config
         // selection) is unique — never merge it. Plain products still merge.
         const isConfigured =
-          !!customDimensions || !!openingType || !!qualityTier || !!configuration;
+          !!customDimensions || !!qualityTier || !!configuration;
         const existingIndex = isConfigured
           ? -1
           : items.findIndex((item) => item.product.id === product.id);
 
         const base =
-          computeConfiguredPrice(
-            product,
-            customDimensions,
-            openingType,
-            qualityTier,
-          ) ??
+          computeConfiguredPrice(product, customDimensions, qualityTier) ??
           product.price ??
           0;
         const calculatedPrice = base + (extra?.configSurcharge ?? 0);
@@ -99,7 +92,6 @@ export const useCartStore = create<CartStore>()(
             product,
             quantity,
             customDimensions,
-            openingType,
             qualityTier,
             configuration,
             calculatedPrice,

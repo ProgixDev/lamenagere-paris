@@ -1,4 +1,7 @@
-import type { DimensionRole } from '../../common/pricing/area-formulas';
+import type {
+  AreaDimensionKey,
+  DimensionRole,
+} from '../../common/pricing/area-formulas';
 import {
   centsToEuros,
   formatEUR,
@@ -18,6 +21,7 @@ export type StockLabel = 'en_stock' | 'stock_faible' | 'rupture' | null;
 export type ConfigBlockType =
   | 'measurements'
   | 'shape'
+  | 'ilot'
   | 'colors'
   | 'accessories'
   | 'opening_details'
@@ -35,6 +39,11 @@ export interface ConfigBlockField {
    * the billed surface. Untagged fields are recorded but never billed.
    */
   priceRole?: DimensionRole | null;
+  /**
+   * `ilot` blocks only: which dimension of the block's own area formula this
+   * measurement feeds. Untagged fields are recorded but never billed.
+   */
+  dimensionKey?: AreaDimensionKey | null;
 }
 
 export interface ConfigBlockOption {
@@ -66,6 +75,18 @@ export interface ConfigBlock {
   fields?: ConfigBlockField[];
   options?: ConfigBlockOption[];
   items?: ConfigBlockItem[];
+  /**
+   * `ilot` blocks only — the island is priced on its own, from its own
+   * measurements, independently of the product's gamme.
+   *
+   * "fixed"   → `priceCents` is added as a flat supplement.
+   * "per_sqm" → the fields tagged with a `dimensionKey` feed `areaFormula`,
+   *             and the resulting surface is billed at `pricePerSqmCents`.
+   */
+  priceMode?: 'fixed' | 'per_sqm';
+  priceCents?: number;
+  pricePerSqmCents?: number;
+  areaFormula?: AreaFormulaKey;
 }
 
 // ── Captured selection snapshot (stored on order_items.configuration) ───────
@@ -80,6 +101,12 @@ export interface ConfigSelectionEntry {
   opening?: { key: string; label: string; surchargeCents?: number };
   options?: { key: string; label: string; surchargeCents?: number; image?: string }[];
   photos?: { url: string; type: 'image' | 'video' }[];
+  /**
+   * `ilot` blocks: whether the customer wants one, and what it costs. A
+   * non-required island block can be declined, in which case nothing is billed
+   * and its measurements are dropped from the snapshot.
+   */
+  ilot?: { included: boolean; surchargeCents?: number };
 }
 export type ItemConfiguration = ConfigSelectionEntry[];
 
@@ -140,7 +167,6 @@ export interface ProductRow {
   height_coef_cents: number | null;
   price_per_sqm_cents: number | null;
   area_formula: AreaFormulaKey | null;
-  opening_types: { type: string; surcharge_cents: number }[] | null;
   quality_tiers:
     | { key: string; label: string; price_per_sqm_cents: number }[]
     | null;
@@ -209,8 +235,6 @@ export interface ProductDto {
   customizable: boolean;
   minDimensions?: { width: number; height: number };
   maxDimensions?: { width: number; height: number };
-  /** Allowed opening types + per-type surcharge (in euros). */
-  openingTypes?: { type: string; surcharge: number }[];
   /** Quality tiers for per_sqm products + each tier's €/m² rate (euros). */
   qualityTiers?: { key: string; label: string; pricePerSqm: number }[];
   deliveryEstimates: { metropole: string; outreMer: string };
@@ -318,13 +342,6 @@ export function toProductDto(row: ProductRow): ProductDto {
     maxDimensions:
       row.max_width != null && row.max_height != null
         ? { width: Number(row.max_width), height: Number(row.max_height) }
-        : undefined,
-    openingTypes:
-      row.opening_types && row.opening_types.length
-        ? row.opening_types.map((o) => ({
-            type: o.type,
-            surcharge: centsToEuros(o.surcharge_cents ?? 0),
-          }))
         : undefined,
     qualityTiers:
       row.quality_tiers && row.quality_tiers.length
@@ -445,7 +462,7 @@ export function toAdminCategoryDto(
 }
 
 export const PRODUCT_SELECT =
-  'id, sku, name, slug, description, short_description, category_id, product_type, price_mode, status, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, area_formula, opening_types, quality_tiers, dim_width, dim_height, dim_depth, dim_unit, ref_width, ref_height, ref_unit, min_width, min_height, max_width, max_height, customizable, delivery_metropole, delivery_outremer, stock_qty, low_stock_threshold, max_per_order, config_blocks, colors, created_at, rating_avg, rating_count, category:categories(*), media:product_media(*)';
+  'id, sku, name, slug, description, short_description, category_id, product_type, price_mode, status, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, area_formula, quality_tiers, dim_width, dim_height, dim_depth, dim_unit, ref_width, ref_height, ref_unit, min_width, min_height, max_width, max_height, customizable, delivery_metropole, delivery_outremer, stock_qty, low_stock_threshold, max_per_order, config_blocks, colors, created_at, rating_avg, rating_count, category:categories(*), media:product_media(*)';
 
 export const CATEGORY_SELECT =
   'id, name, slug, icon, image_url, description, accent_color, parent_id, sort_order, is_visible, is_featured_home, b2b_only, delivery_override, config_blocks';

@@ -18,7 +18,6 @@ export const createOrderApi = async (payload: {
     productId: string;
     quantity: number;
     customDimensions?: AreaDimensions;
-    openingType?: string;
     qualityTier?: string;
     configuration?: ItemConfiguration;
     quoteId?: string;
