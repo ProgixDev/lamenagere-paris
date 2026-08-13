@@ -30,6 +30,9 @@ interface InputProps {
   multiline?: boolean;
   numberOfLines?: number;
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
+  /** Chained after the internal focus handling; the floating label still works. */
+  onFocus?: () => void;
+  onBlur?: () => void;
 }
 
 const AnimatedText = Animated.createAnimatedComponent(Text);
@@ -47,6 +50,8 @@ export default function Input({
   multiline = false,
   numberOfLines,
   autoCapitalize = "none",
+  onFocus,
+  onBlur,
 }: InputProps) {
   const [isFocused, setIsFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -145,8 +150,14 @@ export default function Input({
           multiline={multiline}
           numberOfLines={numberOfLines}
           autoCapitalize={autoCapitalize}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          onFocus={() => {
+            setIsFocused(true);
+            onFocus?.();
+          }}
+          onBlur={() => {
+            setIsFocused(false);
+            onBlur?.();
+          }}
           style={{
             flex: 1,
             paddingVertical: multiline ? 8 : 6,

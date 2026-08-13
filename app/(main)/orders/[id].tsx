@@ -25,7 +25,7 @@ import {
   useRequestRefund,
 } from "../../../features/orders/hooks";
 import { useCreateReview } from "../../../features/reviews/hooks";
-import { summarizeConfiguration } from "../../../lib/config-blocks";
+import ConfigRecap from "../../../components/product/ConfigRecap";
 import type { OrderItem, RefundStatus } from "../../../lib/types";
 import GuestGate from "../../../components/GuestGate";
 import { useIsGuestVisitor } from "../../../features/auth/guards";
@@ -216,9 +216,6 @@ function OrderDetailScreenContent() {
         <Card padding="lg">
           <Text className="mb-3" style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 20 }}>Articles</Text>
           {order.items.map((item) => {
-            const summary = item.configuration?.length
-              ? summarizeConfiguration(item.configuration)
-              : "";
             const rated = ratedItems.has(item.id);
             return (
               <View key={item.id} className="mb-2">
@@ -227,16 +224,13 @@ function OrderDetailScreenContent() {
                     <Text className="text-sm" style={{ color: COLORS.onSurface }} numberOfLines={1}>
                       {item.product.name} x{item.quantity}
                     </Text>
-                    {summary ? (
-                      <Text className="text-xs mt-0.5" style={{ color: COLORS.outline }} numberOfLines={2}>
-                        {summary}
-                      </Text>
-                    ) : null}
                   </View>
                   <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 16 }}>
                     {formatPrice(item.price * item.quantity)}
                   </Text>
                 </View>
+
+                <ConfigRecap configuration={item.configuration} />
 
                 {order.status === "livree" && (
                   rated ? (

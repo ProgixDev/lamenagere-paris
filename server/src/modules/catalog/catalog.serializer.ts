@@ -68,6 +68,14 @@ export interface ConfigBlock {
   type: ConfigBlockType;
   label: string;
   required?: boolean;
+  /**
+   * Which products of the category this block is for. A factory sells the same
+   * family both from catalogue and made to measure, so one template has to
+   * serve both: "sqm" blocks (the customer's own dimensions) are skipped on
+   * fixed-price products, "fixed" blocks on made-to-measure ones. Absent means
+   * every product.
+   */
+  appliesTo?: 'all' | 'sqm' | 'fixed';
   /** Allow selecting more than one option/item (colors, accessories). */
   multiple?: boolean;
   helpText?: string;
@@ -95,10 +103,15 @@ export interface ConfigSelectionEntry {
   type: ConfigBlockType;
   label: string;
   measurements?: { key: string; label: string; value: number; unit?: string }[];
-  shape?: { key: string; label: string };
-  colors?: { key: string; label: string; surchargeCents?: number }[];
-  accessories?: { id: string; title: string; priceCents?: number }[];
-  opening?: { key: string; label: string; surchargeCents?: number };
+  /**
+   * Images are copied into the snapshot rather than resolved later: a back
+   * office opening a two-year-old order must see what the customer actually
+   * bought, not whatever picture the product carries today.
+   */
+  shape?: { key: string; label: string; image?: string };
+  colors?: { key: string; label: string; surchargeCents?: number; image?: string; hex?: string }[];
+  accessories?: { id: string; title: string; priceCents?: number; image?: string }[];
+  opening?: { key: string; label: string; surchargeCents?: number; image?: string };
   options?: { key: string; label: string; surchargeCents?: number; image?: string }[];
   photos?: { url: string; type: 'image' | 'video' }[];
   /**
@@ -106,7 +119,7 @@ export interface ConfigSelectionEntry {
    * non-required island block can be declined, in which case nothing is billed
    * and its measurements are dropped from the snapshot.
    */
-  ilot?: { included: boolean; surchargeCents?: number };
+  ilot?: { included: boolean; surchargeCents?: number; image?: string };
 }
 export type ItemConfiguration = ConfigSelectionEntry[];
 
@@ -356,14 +369,14 @@ export function toProductDto(row: ProductRow): ProductDto {
       outreMer: row.delivery_outremer,
     },
     media: media.map((m) => ({ type: m.type, url: m.url })),
-    // Product override always wins. Inheritance from the category template is
-    // for made-to-measure products only: a fixed-price product is bought by
-    // the unit, so it must not pick up its category's configuration steps.
+    // Product override always wins, otherwise the category template applies —
+    // whatever the pricing mode. A fixed price does not mean "nothing to
+    // choose": a factory sells catalogue sofas that are still configured
+    // (shape, colour, fabric). Blocks that only make sense for one mode carry
+    // `appliesTo` and are filtered out by the app and by order pricing.
     configBlocks: row.config_blocks?.length
       ? row.config_blocks
-      : row.price_mode === 'fixed' && row.product_type === 'standard'
-        ? []
-        : row.category?.config_blocks ?? [],
+      : row.category?.config_blocks ?? [],
     colors:
       row.colors && row.colors.length
         ? row.colors.map((c) => ({

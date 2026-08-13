@@ -136,6 +136,13 @@ export interface ConfigBlock {
   type: ConfigBlockType;
   label: string;
   required?: boolean;
+  /**
+   * Which products of the category this block is for. One template serves both
+   * catalogue (fixed price) and made-to-measure (per m²) products, so a block
+   * asking for the customer's own dimensions is skipped on a fixed-price item.
+   * Absent means every product.
+   */
+  appliesTo?: "all" | "sqm" | "fixed";
   multiple?: boolean;
   helpText?: string;
   planImage?: string;
@@ -159,14 +166,14 @@ export interface ConfigSelectionEntry {
   type: ConfigBlockType;
   label: string;
   measurements?: { key: string; label: string; value: number; unit?: string }[];
-  shape?: { key: string; label: string };
-  colors?: { key: string; label: string; surchargeCents?: number }[];
-  accessories?: { id: string; title: string; priceCents?: number }[];
-  opening?: { key: string; label: string; surchargeCents?: number };
+  shape?: { key: string; label: string; image?: string };
+  colors?: { key: string; label: string; surchargeCents?: number; image?: string; hex?: string }[];
+  accessories?: { id: string; title: string; priceCents?: number; image?: string }[];
+  opening?: { key: string; label: string; surchargeCents?: number; image?: string };
   options?: { key: string; label: string; surchargeCents?: number; image?: string }[];
   photos?: { url: string; type: "image" | "video" }[];
   /** `ilot` blocks: whether the customer wants one, and what it costs. */
-  ilot?: { included: boolean; surchargeCents?: number };
+  ilot?: { included: boolean; surchargeCents?: number; image?: string };
 }
 export type ItemConfiguration = ConfigSelectionEntry[];
 

@@ -65,6 +65,20 @@ export type CustomDimensions = AreaDimensions;
  * Option surcharges (openings included) come from the product's configuration
  * blocks and are priced by `priceConfiguration`, not from this method.
  */
+/**
+ * Whether a block is meant for this product. Kept next to the pricing so the
+ * server never bills a block the app was right not to show.
+ */
+export function blockApplies(
+  block: { appliesTo?: 'all' | 'sqm' | 'fixed' },
+  isPerSqm: boolean,
+): boolean {
+  const a = block.appliesTo ?? 'all';
+  if (a === 'sqm') return isPerSqm;
+  if (a === 'fixed') return !isPerSqm;
+  return true;
+}
+
 @Injectable()
 export class PricingService {
   resolveUnitPriceCents(
@@ -116,13 +130,13 @@ export class PricingService {
         const ms = this.clampMeasurements(block, sel.measurements);
         const cents = this.ilotSurchargeCents(block, ms);
         if (ms.length) entry.measurements = ms;
-        entry.ilot = { included: true, surchargeCents: cents };
+        entry.ilot = { included: true, surchargeCents: cents, image: block.planImage };
         surchargeCents += cents;
         touched = true;
       } else if (block.type === 'shape' && sel.shape) {
         const opt = (block.options ?? []).find((o) => o.key === sel.shape!.key);
         if (opt) {
-          entry.shape = { key: opt.key, label: opt.label };
+          entry.shape = { key: opt.key, label: opt.label, image: opt.image };
           touched = true;
         }
       } else if (block.type === 'colors' && sel.colors?.length) {
@@ -130,7 +144,13 @@ export class PricingService {
         const colors = sel.colors
           .map((c) => opts.find((o) => o.key === c.key))
           .filter((o): o is ConfigBlockOption => !!o)
-          .map((o) => ({ key: o.key, label: o.label, surchargeCents: o.surchargeCents }));
+          .map((o) => ({
+            key: o.key,
+            label: o.label,
+            surchargeCents: o.surchargeCents,
+            image: o.image,
+            hex: o.hex,
+          }));
         colors.forEach((c) => (surchargeCents += c.surchargeCents ?? 0));
         if (colors.length) {
           entry.colors = colors;
@@ -141,7 +161,7 @@ export class PricingService {
         const accs = sel.accessories
           .map((a) => items.find((i) => i.id === a.id))
           .filter((i): i is ConfigBlockItem => !!i)
-          .map((i) => ({ id: i.id, title: i.title, priceCents: i.priceCents }));
+          .map((i) => ({ id: i.id, title: i.title, priceCents: i.priceCents, image: i.image }));
         accs.forEach((a) => (surchargeCents += a.priceCents ?? 0));
         if (accs.length) {
           entry.accessories = accs;
@@ -150,7 +170,12 @@ export class PricingService {
       } else if (block.type === 'opening_details' && sel.opening) {
         const opt = (block.options ?? []).find((o) => o.key === sel.opening!.key);
         if (opt) {
-          entry.opening = { key: opt.key, label: opt.label, surchargeCents: opt.surchargeCents };
+          entry.opening = {
+            key: opt.key,
+            label: opt.label,
+            surchargeCents: opt.surchargeCents,
+            image: opt.image,
+          };
           surchargeCents += opt.surchargeCents ?? 0;
           touched = true;
         }
@@ -217,7 +242,8 @@ export class PricingService {
     // Every dimension the formula bills must be present, else the island isn't
     // measurable yet and bills nothing rather than a partial surface.
     if (formula.fields.some((f) => !((dims[f.key] ?? 0) > 0))) return 0;
-    return Math.max(0, Math.round(formula.areaM2(dims) * rate));
+    // Rounded to whole euros, like every other per-m² price.
+  return Math.max(0, Math.round((formula.areaM2(dims) * rate) / 100) * 100);
   }
 
   /**

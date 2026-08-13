@@ -33,6 +33,7 @@ import {
   type AreaDimensions,
 } from "../../../lib/area-formulas";
 import { isOutOfStock, maxOrderableQty } from "../../../lib/stock";
+import { blockApplies } from "../../../lib/config-blocks";
 import Button from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
 import PressableScale from "../../../components/ui/PressableScale";
@@ -137,8 +138,11 @@ export default function ProductDetailScreen() {
   // Made-to-measure: needs width/height before it can be priced/ordered.
   const needsDimensions =
     product.productType === PRODUCT_TYPES.CONFIGURABLE || isPerSqm;
-  // Effective blocks: product override wins, else the category template.
-  const configBlocks = product.configBlocks ?? product.category.configBlocks ?? [];
+  // Effective blocks: product override wins, else the category template. Blocks
+  // reserved for the other pricing mode never count.
+  const configBlocks = (product.configBlocks ?? product.category.configBlocks ?? []).filter(
+    (b) => blockApplies(b, isPerSqm),
+  );
   // Colour variants: picking one swaps the gallery to that colour's images.
   const colors = (product.colors ?? []).filter((c) => c.images.length > 0);
   const hasColors = colors.length > 0;

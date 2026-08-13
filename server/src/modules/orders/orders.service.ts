@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
-import { PricingService } from '../../common/pricing/pricing.service';
+import { blockApplies, PricingService } from '../../common/pricing/pricing.service';
 import {
   isOverseas,
   orderStatusLabel,
@@ -21,6 +21,20 @@ import {
 } from './orders.serializer';
 import { CreateOrderDto } from './dto/create-order.dto';
 import type { ConfigBlock } from '../catalog/catalog.serializer';
+
+/**
+ * Id of the synthetic configuration entry that carries the product's own
+ * colourway. Mirrors `PRODUCT_COLOR_BLOCK_ID` in the app.
+ */
+const PRODUCT_COLOR_BLOCK_ID = 'product-color';
+
+/**
+ * The chosen gamme is stored on the line as a bare key, which reads as "haute"
+ * in the back office and would follow a later rename. Snapshotting its label
+ * alongside the rest of the configuration keeps the order readable and true to
+ * what was sold.
+ */
+const QUALITY_TIER_BLOCK_ID = 'quality-tier';
 import { TicketsService } from '../tickets/tickets.service';
 import { PromoService, PromoCodeRow } from '../promo/promo.service';
 
@@ -57,7 +71,7 @@ interface ProductForOrder {
   delivery_metropole: string;
   delivery_outremer: string;
   media: { url: string; type: string; is_primary: boolean }[];
-  colors: { images: string[] }[] | null;
+  colors: { key: string; name: string; images: string[] | null }[] | null;
   config_blocks: ConfigBlock[] | null;
   category: { config_blocks: ConfigBlock[] | null } | null;
 }
@@ -279,9 +293,13 @@ export class OrdersService {
       if (!product) {
         throw new BadRequestException(`Produit introuvable: ${item.productId}`);
       }
-      const effectiveBlocks = product.config_blocks?.length
-        ? product.config_blocks
-        : product.category?.config_blocks ?? [];
+      // Blocks reserved for the other pricing mode are dropped before anything
+      // is priced or snapshotted, so a stale client can't have one billed.
+      const effectiveBlocks = (
+        product.config_blocks?.length
+          ? product.config_blocks
+          : product.category?.config_blocks ?? []
+      ).filter((b) => blockApplies(b, product.price_mode === 'per_sqm'));
       // Shape-driven products (a kitchen billed on its developed run) take
       // their dimensions from what the customer already entered in the config
       // blocks, so nothing is asked for twice and nothing is client-supplied.
@@ -303,15 +321,45 @@ export class OrdersService {
         effectiveBlocks,
         item.configuration,
       );
+      // The product's own colourway has no block behind it, so it survives
+      // `priceConfiguration` only if re-attached here — validated against the
+      // product's real variants, never trusting the label the client sent.
+      const wanted = (item.configuration ?? []).find(
+        (e) => e.blockId === PRODUCT_COLOR_BLOCK_ID,
+      )?.colors?.[0]?.key;
+      const variant = wanted
+        ? product.colors?.find((c) => c.key === wanted)
+        : undefined;
+      if (variant) {
+        snapshot.push({
+          blockId: PRODUCT_COLOR_BLOCK_ID,
+          type: 'colors',
+          label: 'Coloris',
+          colors: [{ key: variant.key, label: variant.name }],
+        });
+      }
+      const tier = item.qualityTier
+        ? product.quality_tiers?.find((t) => t.key === item.qualityTier)
+        : undefined;
+      if (tier) {
+        snapshot.push({
+          blockId: QUALITY_TIER_BLOCK_ID,
+          type: 'options',
+          label: 'Gamme',
+          options: [{ key: tier.key, label: tier.label }],
+        });
+      }
       const unit = baseUnit + surchargeCents;
       subtotal += unit * item.quantity;
-      // Photos may live on the colour variants when the gallery holds a video
-      // only — fall back so the order line keeps a thumbnail.
+      // The line keeps the picture of the colourway the customer actually
+      // chose; failing that the primary media, then any colour that has one.
       const primaryUrl =
+        variant?.images?.[0] ??
         (
           product.media?.find((m) => m.is_primary && m.type === 'image') ??
           product.media?.find((m) => m.type === 'image')
-        )?.url ?? product.colors?.find((c) => c.images?.length)?.images[0];
+        )?.url ??
+        product.colors?.find((c) => c.images?.length)?.images?.[0];
       return {
         product_id: product.id,
         product_name: product.name,

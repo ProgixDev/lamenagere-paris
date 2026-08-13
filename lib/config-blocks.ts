@@ -252,5 +252,92 @@ export function ilotSurchargeCents(
   }
   const formula = areaFormula(block.areaFormula);
   if (formula.fields.some((f) => !((dims[f.key] ?? 0) > 0))) return 0;
-  return Math.max(0, Math.round(formula.areaM2(dims) * rate));
+  // Rounded to whole euros, like every other per-m² price.
+  return Math.max(0, Math.round((formula.areaM2(dims) * rate) / 100) * 100);
+}
+
+/** One printable line of an order's configuration recap. */
+export interface RecapRow {
+  label: string;
+  value: string;
+  /** Surcharge this line carries, in cents. */
+  priceCents?: number;
+  /** Indented detail under the block it belongs to (a single measurement). */
+  sub?: boolean;
+}
+
+/**
+ * Turns a stored configuration into readable label → value lines, one block at
+ * a time, with the surcharge each one carried.
+ *
+ * The old one-line summary joined everything with " · ", which for a kitchen
+ * meant ten blocks squashed into two truncated lines — the customer could not
+ * check what they had ordered, and the workshop could not read it back.
+ */
+export function configRecapRows(config?: ItemConfiguration | null): RecapRow[] {
+  const rows: RecapRow[] = [];
+  const sum = (xs: { surchargeCents?: number }[]) =>
+    xs.reduce((n, x) => n + (x.surchargeCents ?? 0), 0);
+
+  for (const e of config ?? []) {
+    const measurements = e.measurements ?? [];
+    const detail = () =>
+      measurements.forEach((m) =>
+        rows.push({ label: m.label, value: `${m.value} ${m.unit ?? "cm"}`, sub: true }),
+      );
+
+    if (e.type === "ilot") {
+      if (!e.ilot?.included) continue;
+      rows.push({ label: e.label, value: "Oui", priceCents: e.ilot.surchargeCents });
+      detail();
+    } else if (e.type === "measurements") {
+      if (!measurements.length) continue;
+      rows.push({ label: e.label, value: "" });
+      detail();
+    } else if (e.shape) {
+      rows.push({ label: e.label, value: e.shape.label });
+    } else if (e.colors?.length) {
+      rows.push({
+        label: e.label,
+        value: e.colors.map((c) => c.label).join(", "),
+        priceCents: sum(e.colors),
+      });
+    } else if (e.opening) {
+      rows.push({
+        label: e.label,
+        value: e.opening.label,
+        priceCents: e.opening.surchargeCents,
+      });
+    } else if (e.accessories?.length) {
+      rows.push({
+        label: e.label,
+        value: e.accessories.map((a) => a.title.trim()).join(", "),
+        priceCents: e.accessories.reduce((n, a) => n + (a.priceCents ?? 0), 0),
+      });
+    } else if (e.options?.length) {
+      rows.push({
+        label: e.label,
+        value: e.options.map((o) => o.label).join(", "),
+        priceCents: sum(e.options),
+      });
+    } else if (e.photos?.length) {
+      rows.push({
+        label: e.label,
+        value: `${e.photos.length} fichier${e.photos.length > 1 ? "s" : ""}`,
+      });
+    }
+  }
+  return rows;
+}
+
+/**
+ * Whether a block is meant for this product. Mirrors the server's
+ * `blockApplies` so the app never shows a step the server would refuse to
+ * price — and never hides one it would.
+ */
+export function blockApplies(block: ConfigBlock, isPerSqm: boolean): boolean {
+  const a = block.appliesTo ?? "all";
+  if (a === "sqm") return isPerSqm;
+  if (a === "fixed") return !isPerSqm;
+  return true;
 }
