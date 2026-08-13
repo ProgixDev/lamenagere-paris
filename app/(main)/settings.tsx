@@ -29,6 +29,7 @@ function SettingsScreenContent() {
   const notifications = useNotifPrefStore((s) => s.enabled);
   const setNotifEnabled = useNotifPrefStore((s) => s.setEnabled);
   const deleteAccount = useAuthStore((s) => s.deleteAccount);
+  const logout = useAuthStore((s) => s.logout);
 
   // Toggling actually (un)registers this device for push on the server.
   const handleNotifToggle = async (value: boolean) => {
@@ -47,6 +48,13 @@ function SettingsScreenContent() {
     } catch {
       // best-effort; preference is still saved locally
     }
+  };
+
+  const handleLogout = () => {
+    Alert.alert("Déconnexion", "Êtes-vous sûr de vouloir vous déconnecter ?", [
+      { text: "Annuler", style: "cancel" },
+      { text: "Se déconnecter", style: "destructive", onPress: () => logout() },
+    ]);
   };
 
   const handleDeleteAccount = () => {
@@ -102,6 +110,14 @@ function SettingsScreenContent() {
           <SettingsRow icon="currency-eur" label="Devise" value="EUR (€)" last />
         </SettingsSection>
 
+        {/* Assistance — moved off the profile screen, which is now identity
+            and activity only. */}
+        <SettingsSection title="Assistance">
+          <SettingsRow icon="lifebuoy" label="Signaler un problème" onPress={() => router.push("/(main)/support?mode=new")} />
+          <SettingsRow icon="help-circle-outline" label="Aide & Contact" onPress={() => router.push("/(main)/support")} />
+          <SettingsRow icon="information-outline" label="À propos" onPress={() => router.push("/(main)/about")} last />
+        </SettingsSection>
+
         {/* Legal */}
         <SettingsSection title="Légal">
           <SettingsRow icon="file-document-outline" label="Conditions générales" onPress={() => router.push("/(main)/legal/terms")} />
@@ -109,27 +125,35 @@ function SettingsScreenContent() {
           <SettingsRow icon="handshake-outline" label="CGV" onPress={() => router.push("/(main)/legal/cgv")} last />
         </SettingsSection>
 
-        {/* Danger */}
-        <View style={{ paddingHorizontal: 20, marginTop: SPACE.xl }}>
-          <TouchableOpacity
+        {/* Session, then the irreversible action — kept in separate cards so
+            "Supprimer" is never a mis-tap away from "Se déconnecter". The old
+            washed-out red fill is gone; the red now lives in the label. */}
+        <View style={{ paddingHorizontal: 20, marginTop: SPACE.sm, gap: 12 }}>
+          <ActionCard
+            icon="logout"
+            label="Se déconnecter"
+            color={COLORS.onSurface}
+            onPress={handleLogout}
+          />
+          <ActionCard
+            icon="account-remove-outline"
+            label="Supprimer mon compte"
+            color={COLORS.error}
             onPress={handleDeleteAccount}
-            accessibilityLabel="Supprimer mon compte"
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 10,
-              paddingVertical: 15,
-              paddingHorizontal: 16,
-              backgroundColor: COLORS.error + "0F",
-              borderRadius: 16,
-            }}
-          >
-            <Icon name="account-remove-outline" size={20} color={COLORS.error} />
-            <Text style={{ fontSize: 15, fontFamily: FONTS.bodyMedium, color: COLORS.error }}>
-              Supprimer mon compte
-            </Text>
-          </TouchableOpacity>
+          />
         </View>
+
+        <Text
+          style={{
+            fontSize: 11,
+            fontFamily: FONTS.body,
+            color: COLORS.surfaceDim,
+            textAlign: "center",
+            marginTop: SPACE.xl,
+          }}
+        >
+          La Ménagère Paris — v1.0.0
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -145,6 +169,35 @@ function SettingsSection({ title, children }: { title: string; children: React.R
         {children}
       </View>
     </View>
+  );
+}
+
+/** Standalone account action — its own card, so it reads apart from the lists. */
+function ActionCard({ icon, label, color, onPress }: {
+  icon: string; label: string; color: string; onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        paddingVertical: 15,
+        paddingHorizontal: 16,
+        backgroundColor: COLORS.surfaceContainerLowest,
+        borderRadius: 16,
+        ...SHADOW.soft,
+      }}
+    >
+      <Icon name={icon} size={20} color={color} />
+      <Text style={{ fontSize: 15, fontFamily: FONTS.bodyMedium, color }}>
+        {label}
+      </Text>
+    </TouchableOpacity>
   );
 }
 

@@ -8,9 +8,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { COLORS } from "../../lib/constants";
@@ -25,6 +26,7 @@ import {
   type Ticket,
 } from "../../features/tickets/api";
 import GuestGate from "../../components/GuestGate";
+import EmptyState from "../../components/ui/EmptyState";
 import { useIsGuestVisitor } from "../../features/auth/guards";
 
 const CATEGORIES = [
@@ -45,10 +47,26 @@ const STATUS_COLOR: Record<string, string> = {
 function SupportScreenContent() {
   const router = useRouter();
   const qc = useQueryClient();
-  const [mode, setMode] = useState<"list" | "new">("list");
+  // "Signaler un problème" opens straight on the form; "Aide & Contact" on the
+  // ticket list.
+  const params = useLocalSearchParams<{ mode?: string }>();
+  const [mode, setMode] = useState<"list" | "new">(params?.mode === "new" ? "new" : "list");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const ticketsQ = useQuery({ queryKey: ["tickets"], queryFn: listTicketsApi });
+
+  // The list used to render `ticketsQ.data?.map(...)` with an empty-check on
+  // the same optional chain, so a failed request — 401, timeout, server down —
+  // left `data` undefined and painted an entirely blank screen with no way to
+  // retry. Every state is now accounted for, and a non-array payload degrades
+  // to "empty" instead of throwing.
+  const tickets = Array.isArray(ticketsQ.data) ? ticketsQ.data : [];
+  const errorMessage =
+    (ticketsQ.error as { message?: string } | null)?.message ??
+    "Une erreur s’est produite.";
+  // Loading / error / empty all take the centred placeholder layout, and the
+  // floating CTA steps aside so it isn't duplicated by the empty state's own.
+  const isPlaceholder = ticketsQ.isLoading || ticketsQ.isError || tickets.length === 0;
 
   if (selectedId) {
     return <TicketThread id={selectedId} onBack={() => setSelectedId(null)} />;
@@ -70,14 +88,41 @@ function SupportScreenContent() {
         />
       ) : (
         <>
-          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
-            {ticketsQ.isLoading && <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />}
-            {ticketsQ.data?.length === 0 && (
-              <Text style={{ textAlign: "center", color: COLORS.outline, marginTop: 40, fontFamily: "Inter_400Regular" }}>
-                Aucun ticket. Signalez un problème et notre équipe vous répond.
-              </Text>
-            )}
-            {ticketsQ.data?.map((t) => (
+          <ScrollView
+            contentContainerStyle={{
+              padding: 20,
+              paddingBottom: 100,
+              flexGrow: isPlaceholder ? 1 : undefined,
+              justifyContent: isPlaceholder ? "center" : undefined,
+            }}
+            refreshControl={
+              <RefreshControl
+                refreshing={ticketsQ.isRefetching && !ticketsQ.isLoading}
+                onRefresh={() => ticketsQ.refetch()}
+                tintColor={COLORS.primary}
+              />
+            }
+          >
+            {ticketsQ.isLoading ? (
+              <ActivityIndicator color={COLORS.primary} />
+            ) : ticketsQ.isError ? (
+              <EmptyState
+                icon="alert-circle"
+                title="Chargement impossible"
+                message={`Vos tickets n’ont pas pu être récupérés. ${errorMessage}`}
+                action={{ label: "Réessayer", onPress: () => ticketsQ.refetch() }}
+                secondaryAction={{ label: "Signaler un problème", onPress: () => setMode("new") }}
+              />
+            ) : tickets.length === 0 ? (
+              <EmptyState
+                art="messages"
+                title="Aucun ticket"
+                message="Vous n’avez encore signalé aucun problème. Décrivez-nous votre souci et notre équipe vous répond."
+                action={{ label: "Signaler un problème", onPress: () => setMode("new") }}
+              />
+            ) : null}
+
+            {tickets.map((t) => (
               <TouchableOpacity
                 key={t.id}
                 onPress={() => setSelectedId(t.id)}
@@ -98,15 +143,19 @@ function SupportScreenContent() {
             ))}
           </ScrollView>
 
-          <View style={{ position: "absolute", bottom: 24, left: 20, right: 20 }}>
-            <TouchableOpacity
-              onPress={() => setMode("new")}
-              style={{ backgroundColor: COLORS.primary, borderRadius: 14, paddingVertical: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}
-            >
-              <MaterialCommunityIcons name="plus" size={18} color="#fff" />
-              <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 15 }}>Signaler un problème</Text>
-            </TouchableOpacity>
-          </View>
+          {!isPlaceholder && (
+            <View style={{ position: "absolute", bottom: 24, left: 20, right: 20 }}>
+              <TouchableOpacity
+                onPress={() => setMode("new")}
+                accessibilityRole="button"
+                accessibilityLabel="Signaler un problème"
+                style={{ backgroundColor: COLORS.primary, borderRadius: 14, paddingVertical: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, ...SHADOW.card }}
+              >
+                <MaterialCommunityIcons name="plus" size={18} color="#fff" />
+                <Text style={{ color: "#fff", fontFamily: FONTS.bodySemibold, fontSize: 15 }}>Signaler un problème</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </>
       )}
     </SafeAreaView>
@@ -116,10 +165,13 @@ function SupportScreenContent() {
 function Header({ title, onBack }: { title: string; onBack: () => void }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 }}>
-      <TouchableOpacity onPress={onBack} accessibilityLabel="Retour">
+      <TouchableOpacity onPress={onBack} accessibilityRole="button" accessibilityLabel="Retour" hitSlop={10}>
         <MaterialCommunityIcons name="chevron-left" size={26} color={COLORS.onSurface} />
       </TouchableOpacity>
-      <Text style={[TYPE.screenTitle, { flex: 1 }]} numberOfLines={1}>{title}</Text>
+      <Text style={[TYPE.screenTitle, { flex: 1, textAlign: "center" }]} numberOfLines={1}>{title}</Text>
+      {/* Balances the back chevron so the title is centred on the screen, not
+          on the space left over beside it. */}
+      <View style={{ width: 26 }} />
     </View>
   );
 }
@@ -244,7 +296,29 @@ function TicketThread({ id, onBack }: { id: string; onBack: () => void }) {
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
       <Header title={t ? t.subject : "Ticket"} onBack={onBack} />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 20 }}>
+        <ScrollView
+          contentContainerStyle={{
+            padding: 20,
+            paddingBottom: 20,
+            flexGrow: t ? undefined : 1,
+            justifyContent: t ? undefined : "center",
+          }}
+        >
+          {/* Same dead-end as the list had: without these, a failed fetch left
+              the thread as a bare header with no content and no way back in. */}
+          {!t && ticketQ.isLoading && <ActivityIndicator color={COLORS.primary} />}
+          {!t && ticketQ.isError && (
+            <EmptyState
+              icon="alert-circle"
+              title="Ticket indisponible"
+              message={
+                (ticketQ.error as { message?: string } | null)?.message ??
+                "Ce ticket n’a pas pu être chargé."
+              }
+              action={{ label: "Réessayer", onPress: () => ticketQ.refetch() }}
+              secondaryAction={{ label: "Retour", onPress: onBack }}
+            />
+          )}
           {t && (
             <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 16, marginBottom: 16, ...SHADOW.card }}>
               <Text style={{ fontSize: 12, color: COLORS.outline, fontFamily: FONTS.body }}>

@@ -1,12 +1,5 @@
 import React from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  Image,
-} from "react-native";
+import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "../../components/ui/Icon";
 import { useRouter } from "expo-router";
@@ -18,39 +11,40 @@ import { useGuestStore } from "../../features/auth/guest";
 import { getNameInitials } from "../../lib/utils";
 import LogoHeader from "../../components/layout/LogoHeader";
 import GuestGate from "../../components/GuestGate";
+import PressableScale from "../../components/ui/PressableScale";
+import { useOrders } from "../../features/orders/hooks";
+import { useQuoteRequests } from "../../features/quotes/hooks";
+import { useFavoritesStore } from "../../features/favorites/store";
+import Animated, { FadeInDown, useReducedMotion } from "react-native-reanimated";
 
-const MENU_SECTIONS = [
-  {
-    title: "Mes achats",
-    items: [
-      { icon: "shopping-outline", label: "Mes Commandes", route: "/(main)/orders", badge: null },
-      { icon: "file-document-outline", label: "Mes Devis", route: "/(main)/orders", badge: null },
-      { icon: "heart-outline", label: "Mes Favoris", route: "/(main)/favorites", badge: null },
-    ],
-  },
-  {
-    title: "Mon compte",
-    items: [
-      { icon: "map-marker-outline", label: "Mes Adresses", route: "/(main)/addresses", badge: null },
-      { icon: "cog-outline", label: "Paramètres", route: "/(main)/settings", badge: null },
-    ],
-  },
-  {
-    title: "Aide",
-    items: [
-      { icon: "lifebuoy", label: "Signaler un problème", route: "/(main)/support", badge: null },
-      { icon: "help-circle-outline", label: "Aide & Contact", route: "/(main)/about", badge: null },
-      { icon: "information-outline", label: "À propos", route: "/(main)/about", badge: null },
-    ],
-  },
-];
+/**
+ * The customer's own space — identity and activity, nothing else.
+ *
+ * This screen used to be three stacks of identical grey rows, half of which
+ * were settings ("Paramètres", "À propos", legal-adjacent help) and one of
+ * which was a red-tinted logout block. All of that now lives in
+ * app/(main)/settings.tsx, reachable from the gear in this screen's header.
+ *
+ * What's left is what a profile is for: who you are (navy masthead + monogram),
+ * what you've done (live counters), and where to go next (activity cards).
+ */
+
+/** "mars 2024" — the signup month, shown as a quiet loyalty cue. */
+function memberSince(createdAt?: string): string | null {
+  if (!createdAt) return null;
+  const d = new Date(createdAt);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+}
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, logout, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
+  const { data: orders = [], isPending: ordersPending } = useOrders();
+  const { data: quotes = [], isPending: quotesPending } = useQuoteRequests();
+  const favoriteCount = useFavoritesStore((s) => s.favorites.length);
   const isGuest = useGuestStore((s) => s.isGuest);
-
-  const initials = user ? getNameInitials(user.fullName) : "?";
+  const reduceMotion = useReducedMotion();
 
   if (isGuest && !isAuthenticated) {
     return (
@@ -62,198 +56,399 @@ export default function ProfileScreen() {
     );
   }
 
-  const handleLogout = () => {
-    Alert.alert(
-      "Déconnexion",
-      "Êtes-vous sûr de vouloir vous déconnecter ?",
-      [
-        { text: "Annuler", style: "cancel" },
-        { text: "Se déconnecter", style: "destructive", onPress: () => logout() },
-      ],
-    );
-  };
+  const initials = user ? getNameInitials(user.fullName) : "?";
+  const since = memberSince(user?.createdAt);
+  const addressCount = user?.addresses?.length ?? 0;
+
+  // Headline figures are lifetime totals; the captions on the activity cards
+  // carry the "needs your attention" numbers so a count always means one thing.
+  const openOrders = orders.filter((o) => o.status !== "livree").length;
+  const readyQuotes = quotes.filter((q) => q.status === "devis_envoye").length;
+
+  const stats: { label: string; value: string; route: string }[] = [
+    {
+      label: "Commandes",
+      value: ordersPending ? "—" : String(orders.length),
+      route: "/(main)/orders",
+    },
+    {
+      label: "Devis",
+      value: quotesPending ? "—" : String(quotes.length),
+      route: "/(main)/orders?tab=quotes",
+    },
+    { label: "Favoris", value: String(favoriteCount), route: "/(main)/favorites" },
+  ];
+
+  const activity: {
+    icon: string;
+    label: string;
+    caption: string;
+    live: boolean;
+    route: string;
+  }[] = [
+    {
+      icon: "shopping-outline",
+      label: "Mes commandes",
+      caption: openOrders > 0 ? `${openOrders} en cours` : "Tout est livré",
+      live: openOrders > 0,
+      route: "/(main)/orders",
+    },
+    {
+      icon: "file-document-outline",
+      label: "Mes devis",
+      caption: readyQuotes > 0 ? `${readyQuotes} à consulter` : "Aucun en attente",
+      live: readyQuotes > 0,
+      route: "/(main)/orders?tab=quotes",
+    },
+    {
+      icon: "heart-outline",
+      label: "Mes favoris",
+      caption:
+        favoriteCount > 0
+          ? `${favoriteCount} article${favoriteCount > 1 ? "s" : ""}`
+          : "Rien de sauvegardé",
+      live: favoriteCount > 0,
+      route: "/(main)/favorites",
+    },
+    {
+      icon: "map-marker-outline",
+      label: "Mes adresses",
+      caption:
+        addressCount > 0
+          ? `${addressCount} enregistrée${addressCount > 1 ? "s" : ""}`
+          : "Ajouter une adresse",
+      live: false,
+      route: "/(main)/addresses",
+    },
+  ];
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
-      <LogoHeader />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* Profile header card */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 16, marginBottom: SPACE.xxl }}>
-          <View
-            style={{
-              backgroundColor: COLORS.surfaceContainerLowest,
-              borderRadius: 16,
-              padding: SPACE.xl,
-              alignItems: "center",
-              ...SHADOW.card,
-            }}
+      {/* Masthead: shared logo, with settings pulled out of the row list and
+          parked here as the single gear affordance. */}
+      <View>
+        <LogoHeader />
+        <TouchableOpacity
+          onPress={() => router.push("/(main)/settings")}
+          hitSlop={14}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Paramètres"
+          style={{ position: "absolute", right: 16, top: 26 }}
+        >
+          <Icon name="cog-outline" size={24} color={COLORS.onSurface} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 110 }}
+      >
+        {/* ── Identity panel ─────────────────────────────────────────────
+            A full-bleed navy block, not a floating card on empty space:
+            the monogram plate is what makes this feel like a boutique
+            account rather than a settings list. */}
+        <LinearGradient
+          colors={[COLORS.primaryContainer, COLORS.primary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{
+            paddingTop: SPACE.xl,
+            paddingBottom: 60,
+            paddingHorizontal: 20,
+            alignItems: "center",
+            borderBottomLeftRadius: 32,
+            borderBottomRightRadius: 32,
+          }}
+        >
+          <PressableScale
+            onPress={() => router.push("/(main)/edit-profile")}
+            accessibilityLabel="Modifier le profil"
           >
-            {/* Avatar */}
-            <LinearGradient
-              colors={[BRAND.blue, BRAND.blueDeep]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={{
-                width: 72,
-                height: 72,
-                borderRadius: 36,
-                alignItems: "center",
-                justifyContent: "center",
-                marginBottom: 12,
-              }}
-            >
-              <Text style={{ fontSize: 26, fontFamily: "Manrope_700Bold", color: "#ffffff" }}>
-                {initials}
-              </Text>
-            </LinearGradient>
-
-            <Text style={[TYPE.sectionTitle, { marginBottom: 2 }]}>
-              {user?.fullName?.trim() ? user.fullName : "Utilisateur"}
-            </Text>
-            <Text style={{ fontSize: 13, fontFamily: FONTS.body, color: COLORS.outline, marginBottom: 8 }}>
-              {user?.email || ""}
-            </Text>
-
-            {user?.accountType === "professionnel" && (
-              <View
-                style={{
-                  backgroundColor: COLORS.surfaceContainer,
-                  borderRadius: 9999,
-                  paddingHorizontal: 12,
-                  paddingVertical: 4,
-                }}
-              >
-                <Text style={[TYPE.overline, { color: BRAND.blue }]}>
-                  Compte Professionnel
-                </Text>
-              </View>
-            )}
-
-            {/* Quick edit */}
-            <TouchableOpacity
-              onPress={() => router.push("/(main)/edit-profile")}
-              accessibilityLabel="Modifier le profil"
-              style={{
-                marginTop: 16,
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              <Icon name="pencil-outline" size={14} color={BRAND.blue} />
-              <Text style={{ fontSize: 12, fontFamily: FONTS.bodyMedium, color: BRAND.blue }}>
-                Modifier le profil
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Menu sections */}
-        {MENU_SECTIONS.map((section) => (
-          <View key={section.title} style={{ marginBottom: SPACE.xl }}>
-            <Text
-              style={[
-                TYPE.overline,
-                {
-                  paddingHorizontal: 20,
-                  marginBottom: SPACE.md,
-                },
-              ]}
-            >
-              {section.title}
-            </Text>
             <View
               style={{
-                marginHorizontal: 20,
-                backgroundColor: COLORS.surfaceContainerLowest,
-                borderRadius: 16,
-                overflow: "hidden",
-                ...SHADOW.card,
+                width: 88,
+                height: 88,
+                borderRadius: 44,
+                backgroundColor: "#ffffff",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              {section.items.map((item, idx) => (
-                <TouchableOpacity
-                  key={item.label}
-                  onPress={() => router.push(item.route as any)}
-                  activeOpacity={0.7}
+              <Text
+                style={{
+                  fontFamily: FONTS.serifBold,
+                  fontSize: 34,
+                  lineHeight: 40,
+                  color: COLORS.primary,
+                }}
+              >
+                {initials}
+              </Text>
+            </View>
+            <View
+              style={{
+                position: "absolute",
+                right: -2,
+                bottom: -2,
+                width: 30,
+                height: 30,
+                borderRadius: 15,
+                backgroundColor: COLORS.primary,
+                borderWidth: 2,
+                borderColor: "#ffffff",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Icon name="pencil-outline" size={14} color="#ffffff" />
+            </View>
+          </PressableScale>
+
+          <Text
+            numberOfLines={1}
+            style={{
+              fontFamily: FONTS.serif,
+              fontSize: 28,
+              lineHeight: 34,
+              color: "#ffffff",
+              marginTop: SPACE.lg,
+            }}
+          >
+            {user?.fullName?.trim() ? user.fullName : "Utilisateur"}
+          </Text>
+
+          {!!user?.email && (
+            <Text
+              numberOfLines={1}
+              style={{
+                fontFamily: FONTS.body,
+                fontSize: 13,
+                color: "rgba(255,255,255,0.72)",
+                marginTop: 3,
+              }}
+            >
+              {user.email}
+            </Text>
+          )}
+
+          {user?.accountType === "professionnel" && (
+            <View
+              style={{
+                marginTop: SPACE.md,
+                borderWidth: 1,
+                borderColor: "rgba(254,193,3,0.55)",
+                borderRadius: 9999,
+                paddingHorizontal: 12,
+                paddingVertical: 5,
+              }}
+            >
+              <Text style={[TYPE.overline, { color: BRAND.yellow, fontSize: 10 }]}>
+                Compte professionnel
+              </Text>
+            </View>
+          )}
+
+          {!!since && (
+            <Text
+              style={{
+                fontFamily: FONTS.body,
+                fontSize: 12,
+                color: "rgba(255,255,255,0.62)",
+                marginTop: SPACE.md,
+              }}
+            >
+              Client depuis {since}
+            </Text>
+          )}
+        </LinearGradient>
+
+        {/* ── Counters ───────────────────────────────────────────────────
+            Straddles the panel edge so the two halves read as one object. */}
+        <Animated.View
+          entering={reduceMotion ? undefined : FadeInDown.springify().damping(16)}
+          style={{
+            flexDirection: "row",
+            marginHorizontal: 20,
+            marginTop: -40,
+            backgroundColor: COLORS.surfaceContainerLowest,
+            borderRadius: 20,
+            paddingVertical: SPACE.lg,
+            ...SHADOW.card,
+          }}
+        >
+          {stats.map((s, i) => (
+            <React.Fragment key={s.label}>
+              {i > 0 && (
+                <View
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingHorizontal: 16,
-                    paddingVertical: 15,
-                    gap: 14,
-                    borderBottomWidth: idx < section.items.length - 1 ? 1 : 0,
-                    borderBottomColor: COLORS.outlineVariant,
+                    width: 1,
+                    alignSelf: "center",
+                    height: 34,
+                    backgroundColor: COLORS.outlineVariant,
                   }}
+                />
+              )}
+              {/* PressableScale puts `style` on its inner Animated.View, so
+                  the thirds have to be claimed by this wrapper — otherwise the
+                  columns size to their text and clump to the left. */}
+              <View style={{ flex: 1 }}>
+                <PressableScale
+                  onPress={() => router.push(s.route as never)}
+                  scaleTo={0.96}
+                  accessibilityLabel={`${s.label} : ${s.value}`}
+                  style={{ alignItems: "center", paddingVertical: 2 }}
                 >
-                  <View
-                    style={{
-                      width: 38,
-                      height: 38,
-                      borderRadius: 11,
-                      backgroundColor: COLORS.surfaceContainer,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Icon
-                      name={item.icon as any}
-                      size={20}
-                      color={BRAND.blue}
-                    />
-                  </View>
                   <Text
                     style={{
-                      flex: 1,
-                      fontSize: 15,
-                      fontFamily: FONTS.bodyMedium,
+                      fontFamily: FONTS.serifBold,
+                      fontSize: 26,
+                      lineHeight: 30,
                       color: COLORS.onSurface,
                     }}
                   >
-                    {item.label}
+                    {s.value}
                   </Text>
-                  <Icon name="chevron-right" size={18} color={COLORS.surfaceDim} />
-                </TouchableOpacity>
+                  <Text
+                    style={[
+                      TYPE.overline,
+                      { fontSize: 10, letterSpacing: 1.2, marginTop: 4, textAlign: "center" },
+                    ]}
+                  >
+                    {s.label}
+                  </Text>
+                </PressableScale>
+              </View>
+            </React.Fragment>
+          ))}
+        </Animated.View>
+
+        {/* ── Activity ───────────────────────────────────────────────────
+            Two-up cards instead of a row list: bigger targets, and each one
+            carries its own live caption so the screen is never blank. */}
+        <Text
+          style={[
+            TYPE.overline,
+            { paddingHorizontal: 20, marginTop: SPACE.xxl, marginBottom: SPACE.md },
+          ]}
+        >
+          Mon activité
+        </Text>
+
+        <View style={{ paddingHorizontal: 20, gap: 12 }}>
+          {[activity.slice(0, 2), activity.slice(2, 4)].map((row, ri) => (
+            <View key={ri} style={{ flexDirection: "row", gap: 12 }}>
+              {row.map((item, ci) => (
+                <Animated.View
+                  key={item.label}
+                  style={{ flex: 1 }}
+                  entering={
+                    reduceMotion
+                      ? undefined
+                      : FadeInDown.delay((ri * 2 + ci) * 50)
+                          .springify()
+                          .damping(16)
+                  }
+                >
+                  <PressableScale
+                    onPress={() => router.push(item.route as never)}
+                    scaleTo={0.97}
+                    accessibilityLabel={`${item.label}, ${item.caption}`}
+                    style={{
+                      backgroundColor: COLORS.surfaceContainerLowest,
+                      borderRadius: 18,
+                      padding: SPACE.lg,
+                      minHeight: 116,
+                      justifyContent: "space-between",
+                      ...SHADOW.soft,
+                    }}
+                  >
+                    <Icon name={item.icon} size={24} color={COLORS.primary} />
+                    <View>
+                      <Text
+                        style={{
+                          fontFamily: FONTS.bodyMedium,
+                          fontSize: 14.5,
+                          color: COLORS.onSurface,
+                        }}
+                      >
+                        {item.label}
+                      </Text>
+                      <Text
+                        style={{
+                          fontFamily: item.live ? FONTS.bodyMedium : FONTS.body,
+                          fontSize: 12,
+                          color: item.live ? BRAND.blue : COLORS.outline,
+                          marginTop: 3,
+                        }}
+                      >
+                        {item.caption}
+                      </Text>
+                    </View>
+                  </PressableScale>
+                </Animated.View>
               ))}
             </View>
-          </View>
-        ))}
+          ))}
+        </View>
 
-        {/* Logout */}
-        <View style={{ paddingHorizontal: 20, marginTop: SPACE.xs }}>
-          <TouchableOpacity
-            onPress={handleLogout}
-            activeOpacity={0.7}
-            accessibilityLabel="Se déconnecter"
+        {/* ── Assistance ─────────────────────────────────────────────────
+            The one help entry worth keeping on the profile; "Signaler un
+            problème" and "À propos" moved to Paramètres. */}
+        <Text
+          style={[
+            TYPE.overline,
+            { paddingHorizontal: 20, marginTop: SPACE.xxl, marginBottom: SPACE.md },
+          ]}
+        >
+          Assistance
+        </Text>
+
+        <Animated.View
+          entering={reduceMotion ? undefined : FadeInDown.delay(200).springify().damping(16)}
+          style={{ paddingHorizontal: 20 }}
+        >
+          <PressableScale
+            onPress={() => router.push("/(main)/support")}
+            scaleTo={0.985}
+            accessibilityLabel="Aide et contact"
             style={{
               flexDirection: "row",
               alignItems: "center",
-              gap: 12,
-              paddingVertical: 15,
-              paddingHorizontal: 16,
-              backgroundColor: COLORS.error + "0F",
-              borderRadius: 16,
+              gap: 14,
+              backgroundColor: COLORS.surfaceContainerLowest,
+              borderRadius: 18,
+              paddingHorizontal: SPACE.lg,
+              paddingVertical: SPACE.lg,
+              ...SHADOW.soft,
             }}
           >
-            <Icon name="logout" size={20} color={COLORS.error} />
-            <Text style={{ fontSize: 15, fontFamily: FONTS.bodyMedium, color: COLORS.error }}>
-              Se déconnecter
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Version */}
-        <Text
-          style={{
-            fontSize: 11,
-            fontFamily: FONTS.body,
-            color: COLORS.surfaceDim,
-            textAlign: "center",
-            marginTop: SPACE.xl,
-          }}
-        >
-          La Ménagère Paris — v1.0.0
-        </Text>
+            <Icon name="lifebuoy" size={24} color={COLORS.primary} />
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  fontFamily: FONTS.bodySemibold,
+                  fontSize: 15,
+                  color: COLORS.onSurface,
+                }}
+              >
+                Besoin d'aide ?
+              </Text>
+              <Text
+                style={{
+                  fontFamily: FONTS.body,
+                  fontSize: 12.5,
+                  lineHeight: 17,
+                  color: COLORS.outline,
+                  marginTop: 2,
+                }}
+              >
+                Une question sur une commande ou un devis
+              </Text>
+            </View>
+            <Icon name="chevron-right" size={18} color={COLORS.surfaceDim} />
+          </PressableScale>
+        </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );

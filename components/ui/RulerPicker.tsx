@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useRef, useState } from "react";
+import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import Animated, {
   useAnimatedScrollHandler,
   useSharedValue,
 } from "react-native-reanimated";
-import Svg, { Line, Text as SvgText } from "react-native-svg";
+import Svg, { Path, Text as SvgText } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import Icon from "./Icon";
@@ -279,42 +279,48 @@ function RulerPicker({
  * tick marks would be rebuilt on every render of the screen.
  */
 const Ruler = memo(function Ruler({ lo, hi }: { lo: number; hi: number }) {
-  const ticks: React.ReactNode[] = [];
-  for (let v = lo; v <= hi; v += 1) {
-    const x = (v - lo) * PX;
-    const major = v % 10 === 0;
-    const mid = v % 5 === 0;
-    ticks.push(
-      <Line
-        key={v}
-        x1={x}
-        y1={major ? 10 : mid ? 18 : 23}
-        x2={x}
-        y2={32}
-        stroke={major ? COLORS.onSurfaceVariant : COLORS.outlineVariant}
-        strokeWidth={major ? 1.5 : 1}
-        strokeLinecap="round"
-      />,
-    );
-    if (v % 50 === 0) {
-      ticks.push(
+  // One <Line> per centimetre meant ~2 845 native views for a U-shaped kitchen
+  // (three 800 cm runs plus two heights), all created in the frame that opens
+  // the step — that was the multi-second freeze. Each weight of graduation is
+  // now a single compound path, so the whole ruler is three nodes.
+  const { minor, mid, major, labels } = useMemo(() => {
+    let minorD = "";
+    let midD = "";
+    let majorD = "";
+    const marks: { x: number; v: number }[] = [];
+    for (let v = lo; v <= hi; v += 1) {
+      const x = (v - lo) * PX;
+      if (v % 10 === 0) {
+        majorD += `M${x} 10V32`;
+        // Numbering every 50 cm keeps the strip readable at 8 px per cm.
+        if (v % 50 === 0) marks.push({ x, v });
+      } else if (v % 5 === 0) {
+        midD += `M${x} 18V32`;
+      } else {
+        minorD += `M${x} 23V32`;
+      }
+    }
+    return { minor: minorD, mid: midD, major: majorD, labels: marks };
+  }, [lo, hi]);
+
+  return (
+    <Svg width={(hi - lo) * PX} height={BAND_H}>
+      <Path d={minor} stroke={COLORS.outlineVariant} strokeWidth={1} strokeLinecap="round" />
+      <Path d={mid} stroke={COLORS.outlineVariant} strokeWidth={1} strokeLinecap="round" />
+      <Path d={major} stroke={COLORS.onSurfaceVariant} strokeWidth={1.5} strokeLinecap="round" />
+      {labels.map((m) => (
         <SvgText
-          key={`l${v}`}
-          x={x}
+          key={m.v}
+          x={m.x}
           y={48}
           fontSize={10}
           fontWeight="500"
           fill={COLORS.outline}
           textAnchor="middle"
         >
-          {v}
-        </SvgText>,
-      );
-    }
-  }
-  return (
-    <Svg width={(hi - lo) * PX} height={BAND_H}>
-      {ticks}
+          {m.v}
+        </SvgText>
+      ))}
     </Svg>
   );
 });

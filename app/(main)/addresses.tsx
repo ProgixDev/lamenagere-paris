@@ -4,12 +4,13 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import EmptyState from "../../components/ui/EmptyState";
+import { ListRowSkeleton } from "../../components/ui/Skeleton";
 import { COLORS } from "../../lib/constants";
 import { FONTS, TYPE, SPACE, SHADOW } from "../../lib/typography";
 import {
@@ -155,8 +156,8 @@ function AddressesScreenContent() {
         </TouchableOpacity>
 
         {isLoading ? (
-          <View style={{ alignItems: "center", paddingTop: 40 }}>
-            <ActivityIndicator color={COLORS.primary} />
+          <View style={{ paddingTop: 24 }}>
+            <ListRowSkeleton count={3} />
           </View>
         ) : isError ? (
           <View style={{ alignItems: "center", paddingTop: 40 }}>
@@ -216,17 +217,12 @@ function AddressesScreenContent() {
             </View>
           ))
         ) : (
-          <View style={{ alignItems: "center", paddingTop: 40 }}>
-            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: COLORS.surfaceContainer, alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
-              <MaterialCommunityIcons name="map-marker-outline" size={28} color={COLORS.primary} />
-            </View>
-            <Text style={[TYPE.sectionTitle, { marginBottom: 4 }]}>
-              Aucune adresse
-            </Text>
-            <Text style={{ fontSize: 13, fontFamily: FONTS.body, color: COLORS.onSurfaceVariant, textAlign: "center" }}>
-              Ajoutez une adresse de livraison{"\n"}pour accélérer vos commandes
-            </Text>
-          </View>
+          <EmptyState
+            art="address"
+            title="Aucune adresse"
+            message="Ajoutez une adresse de livraison pour accélérer vos commandes."
+            action={{ label: "Ajouter une adresse", onPress: () => setModalVisible(true) }}
+          />
         )}
       </ScrollView>
 

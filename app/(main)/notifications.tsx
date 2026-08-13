@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import Icon from "../../components/ui/Icon";
+import EmptyState from "../../components/ui/EmptyState";
 import { COLORS } from "../../lib/constants";
 import { FONTS, TYPE, SHADOW } from "../../lib/typography";
 import { buildDeepLinkFromTarget } from "../../lib/notifications";
@@ -153,34 +154,13 @@ export default function NotificationsScreen() {
           ))}
         </ScrollView>
       ) : (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 40 }}>
-          <View
-            style={{
-              width: 72,
-              height: 72,
-              borderRadius: 36,
-              backgroundColor: COLORS.surfaceContainer,
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: 20,
-            }}
-          >
-            <Icon name="bell-outline" size={32} color={COLORS.outline} />
-          </View>
-          <Text style={{ fontFamily: FONTS.serif, fontSize: 22, color: COLORS.onSurface, marginBottom: 8, textAlign: "center" }}>
-            Aucune notification
-          </Text>
-          <Text
-            style={{
-              fontSize: 14,
-              lineHeight: 21,
-              fontFamily: FONTS.body,
-              color: COLORS.outline,
-              textAlign: "center",
-            }}
-          >
-            Vos offres, nouveautés et suivis de commande{"\n"}apparaîtront ici.
-          </Text>
+        <View style={{ flex: 1, justifyContent: "center" }}>
+          <EmptyState
+            art="messages"
+            title="Aucune notification"
+            message="Vos offres, nouveautés et suivis de commande apparaîtront ici."
+            action={{ label: "Explorer le catalogue", onPress: () => router.push("/(tabs)/categories") }}
+          />
         </View>
       )}
     </SafeAreaView>

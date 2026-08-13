@@ -29,6 +29,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "../../components/ui/Icon";
 import { ProductGridSkeleton } from "../../components/ui/Skeleton";
 import * as Haptics from "expo-haptics";
+import AppHeader from "../../components/layout/AppHeader";
 import { COLORS, BRAND } from "../../lib/constants";
 import { FONTS, TYPE, SPACE, SHADOW } from "../../lib/typography";
 import { getProductImage } from "../../lib/mock-data";
@@ -45,9 +46,6 @@ import {
   useProductsByCategory,
 } from "../../features/products/hooks";
 import HeroCarousel from "../../components/HeroCarousel";
-import SearchBar from "../../components/SearchBar";
-import LogoHeader from "../../components/layout/LogoHeader";
-import GreetingHeader from "../../components/home/GreetingHeader";
 import SortFilterSheet from "../../components/home/SortFilterSheet";
 import {
   DEFAULT_FILTERS,
@@ -555,9 +553,7 @@ const HomeHeader = React.memo(function HomeHeader({
 }) {
   return (
     <View>
-      <LogoHeader />
-      <GreetingHeader />
-      <SearchBar onFilterPress={onFilterPress} filterActive={filterActive} />
+      <AppHeader greeting onFilterPress={onFilterPress} filterActive={filterActive} />
 
       <View style={{ backgroundColor: COLORS.background }}>
         <TopCategoryTabs

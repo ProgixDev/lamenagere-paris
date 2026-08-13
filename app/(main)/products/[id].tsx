@@ -942,22 +942,23 @@ function FloatingContactButton({ onPress }: { onPress: () => void }) {
   }, [pulse]);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
   return (
+    // Two layers on purpose: an entering animation and an animated transform on
+    // the same node fight over `transform`, which Reanimated warns about. The
+    // outer view carries the layout animation, the inner one the pulse.
     <Animated.View
       entering={FadeInUp.springify().damping(14)}
-      style={[
-        {
-          position: "absolute",
-          right: 18,
-          bottom: 168,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.22,
-          shadowRadius: 8,
-          elevation: 8,
-        },
-        style,
-      ]}
+      style={{
+        position: "absolute",
+        right: 18,
+        bottom: 168,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.22,
+        shadowRadius: 8,
+        elevation: 8,
+      }}
     >
+    <Animated.View style={style}>
       <TouchableOpacity
         onPress={onPress}
         activeOpacity={0.85}
@@ -972,6 +973,7 @@ function FloatingContactButton({ onPress }: { onPress: () => void }) {
       >
         <Icon name="message-text" size={26} color={COLORS.onPrimary} />
       </TouchableOpacity>
+    </Animated.View>
     </Animated.View>
   );
 }

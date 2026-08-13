@@ -8,8 +8,9 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import EmptyState from "../../../components/ui/EmptyState";
 import { COLORS } from "../../../lib/constants";
 import { TYPE, SHADOW } from "../../../lib/typography";
 import { formatPrice, formatDate } from "../../../lib/utils";
@@ -48,7 +49,10 @@ type Tab = "orders" | "quotes";
 
 function OrdersScreenContent() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("orders");
+  // Opened from the profile, "Mes Devis" must land on the quotes tab rather
+  // than on the same screen as "Mes Commandes".
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const [tab, setTab] = useState<Tab>(params?.tab === "quotes" ? "quotes" : "orders");
   const { data: orders = [], isLoading: ordersLoading } = useOrders();
   const { data: quotes = [], isLoading: quotesLoading } = useQuoteRequests();
   const addQuoteItem = useCartStore((s) => s.addQuoteItem);
@@ -183,7 +187,12 @@ function OrdersScreenContent() {
               );
             })
           ) : (
-            <EmptyBlock icon="package-variant-closed" title="Aucune commande" message="Vos commandes apparaîtront ici" />
+            <EmptyBlock
+              art="orders"
+              title="Aucune commande"
+              message="Vos commandes apparaîtront ici, avec leur suivi de livraison."
+              action={{ label: "Explorer le catalogue", onPress: () => router.push("/(tabs)/categories") }}
+            />
           )
         ) : quotesLoading ? (
           <LoadingBlock />
@@ -253,7 +262,12 @@ function OrdersScreenContent() {
             );
           })
         ) : (
-          <EmptyBlock icon="file-document-outline" title="Aucun devis" message="Vos demandes de devis apparaîtront ici" />
+          <EmptyBlock
+            art="search"
+            title="Aucun devis"
+            message="Demandez un devis depuis la fiche d'un produit sur mesure."
+            action={{ label: "Voir les produits", onPress: () => router.push("/(tabs)/categories") }}
+          />
         )}
       </ScrollView>
     </SafeAreaView>
@@ -268,16 +282,18 @@ function LoadingBlock() {
   );
 }
 
-function EmptyBlock({ icon, title, message }: { icon: string; title: string; message: string }) {
-  return (
-    <View style={{ alignItems: "center", paddingTop: 60, paddingHorizontal: 20 }}>
-      <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: COLORS.surfaceContainer, alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
-        <MaterialCommunityIcons name={icon as any} size={28} color={COLORS.primary} />
-      </View>
-      <Text style={[TYPE.sectionTitle, { marginBottom: 4 }]}>{title}</Text>
-      <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.onSurfaceVariant, textAlign: "center" }}>{message}</Text>
-    </View>
-  );
+function EmptyBlock({
+  art,
+  title,
+  message,
+  action,
+}: {
+  art: "orders" | "search";
+  title: string;
+  message: string;
+  action?: { label: string; onPress: () => void };
+}) {
+  return <EmptyState art={art} title={title} message={message} action={action} />;
 }
 
 /**

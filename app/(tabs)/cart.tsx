@@ -8,8 +8,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Icon from "../../components/ui/Icon";
+import EmptyState from "../../components/ui/EmptyState";
 import { COLORS, BRAND } from "../../lib/constants";
 import { TYPE } from "../../lib/typography";
 import { useCart } from "../../features/cart/hooks";
@@ -61,45 +61,19 @@ export default function CartScreen() {
       <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
         <LogoHeader />
 
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 40 }}>
-          <View
-            style={{
-              width: 80,
-              height: 80,
-              borderRadius: 40,
-              backgroundColor: COLORS.surfaceContainer,
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: 20,
+        <View style={{ flex: 1, justifyContent: "center" }}>
+          <EmptyState
+            art="cart"
+            title="Votre panier est vide"
+            message="Explorez nos collections et ajoutez vos coups de cœur — ils vous attendront ici."
+            action={{
+              label: "Explorer le catalogue",
+              onPress: () => router.push("/(tabs)/categories"),
             }}
-          >
-            <MaterialCommunityIcons name="shopping-outline" size={36} color={BRAND.blue} />
-          </View>
-          <Text
-            style={[
-              TYPE.sectionTitle,
-              { marginBottom: 8 },
-            ]}
-          >
-            Votre panier est vide
-          </Text>
-          <Text
-            style={{
-              fontSize: 13,
-              fontFamily: "Inter_400Regular",
-              color: COLORS.onSurfaceVariant,
-              textAlign: "center",
-              marginBottom: 24,
+            secondaryAction={{
+              label: "Voir mes favoris",
+              onPress: () => router.push("/(main)/favorites"),
             }}
-          >
-            Explorez nos collections et ajoutez{"\n"}vos coups de cœur
-          </Text>
-          <Button
-            label="Explorer le catalogue"
-            onPress={() => router.push("/(tabs)/categories")}
-            size="md"
-            fullWidth={false}
-            tint={[BRAND.blue, BRAND.blueDeep]}
           />
         </View>
       </SafeAreaView>

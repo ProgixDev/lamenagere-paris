@@ -11,11 +11,13 @@ import {
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
+import AppHeader from "../../../components/layout/AppHeader";
+import { ProductGridSkeleton } from "../../../components/ui/Skeleton";
 import { COLORS, BRAND } from "../../../lib/constants";
 import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import { priceTagLabel } from "../../../lib/pricing";
@@ -229,7 +231,9 @@ export default function CategoryProductsScreen() {
   // The header keeps a fixed height either way, so the nav and the title
   // overlay always have something to sit on.
   const heroImage = getProductImage(category?.image) ?? CATEGORY_HEROES[id];
-  const heroHeight = 220 + insets.top;
+  // The app header now sits above the hero, so the photo is a banner rather
+  // than a full-bleed cover that had to make room for its own navigation.
+  const heroHeight = 150;
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -250,7 +254,7 @@ export default function CategoryProductsScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: COLORS.background }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
@@ -258,46 +262,32 @@ export default function CategoryProductsScreen() {
         onScroll={onScroll}
         scrollEventThrottle={64}
       >
-        {/* Hero header — fixed height whether or not a hero image exists. */}
-        <View style={{ height: heroHeight, backgroundColor: COLORS.primary }}>
+        {/* The app's own header — logo, notifications, favourites and search —
+            so a category screen is recognisably the same app as the home. */}
+        <AppHeader
+          title={category?.name || "Produits"}
+          subtitle={
+            isLoading
+              ? "Chargement…"
+              : `${products.length} article${products.length !== 1 ? "s" : ""}`
+          }
+          searchPlaceholder="Rechercher dans cette collection..."
+          onBack={() => router.back()}
+        />
+
+        {/* Category banner, below the header rather than behind it. */}
+        <View style={{ height: heroHeight, backgroundColor: COLORS.primary, marginBottom: 4 }}>
           {heroImage && (
             <Image source={heroImage} style={{ width: W, height: heroHeight }} resizeMode="cover" />
           )}
           <LinearGradient
-            colors={["rgba(0,0,0,0.35)", "transparent", "rgba(0,0,0,0.4)"]}
-            locations={[0, 0.4, 1]}
+            colors={["transparent", "rgba(0,0,0,0.45)"]}
+            locations={[0.35, 1]}
             style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
           />
-
-          {/* Nav — offset below the status bar. */}
-          <View style={{ position: "absolute", top: insets.top + 8, left: 0, right: 0 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16 }}>
-              <TouchableOpacity
-                onPress={() => router.back()}
-                accessibilityRole="button"
-                accessibilityLabel="Retour"
-                style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.3)", alignItems: "center", justifyContent: "center" }}
-              >
-                <MaterialCommunityIcons name="chevron-left" size={22} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => router.push("/(main)/search")}
-                accessibilityRole="button"
-                accessibilityLabel="Rechercher"
-                style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.3)", alignItems: "center", justifyContent: "center" }}
-              >
-                <MaterialCommunityIcons name="magnify" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Category title overlay */}
-          <View style={{ position: "absolute", bottom: 16, left: 20, right: 20 }}>
-            <Text style={{ fontSize: 30, lineHeight: 34, fontFamily: FONTS.serifBold, color: "#fff" }}>
+          <View style={{ position: "absolute", bottom: 14, left: 20, right: 20 }}>
+            <Text style={{ fontSize: 26, lineHeight: 30, fontFamily: FONTS.serifBold, color: "#fff" }}>
               {category?.name || "Produits"}
-            </Text>
-            <Text style={{ fontSize: 12, fontFamily: FONTS.body, color: "rgba(255,255,255,0.85)", marginTop: 4 }}>
-              {products.length} article{products.length !== 1 ? "s" : ""}
             </Text>
           </View>
         </View>
@@ -307,8 +297,8 @@ export default function CategoryProductsScreen() {
 
         {/* Product grid */}
         {isLoading ? (
-          <View style={{ paddingTop: 40, alignItems: "center" }}>
-            <ActivityIndicator size="small" color={COLORS.primary} />
+          <View style={{ paddingTop: 20 }}>
+            <ProductGridSkeleton count={6} />
           </View>
         ) : products.length > 0 ? (
           <>
@@ -340,6 +330,6 @@ export default function CategoryProductsScreen() {
           />
         )}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }

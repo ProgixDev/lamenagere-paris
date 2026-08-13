@@ -45,6 +45,7 @@ export default function CheckoutPaymentScreen() {
     territory,
     shippingMethod,
     setLastOrderNumber,
+    setLastOrderId,
     appliedPromo,
     setAppliedPromo,
   } = useCheckoutStore();
@@ -186,6 +187,7 @@ export default function CheckoutPaymentScreen() {
       setAppliedPromo(null);
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       setLastOrderNumber(order.orderNumber);
+      setLastOrderId(order.id);
       router.replace("/(main)/checkout/confirmation");
     } catch (e: any) {
       Alert.alert(

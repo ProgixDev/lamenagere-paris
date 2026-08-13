@@ -11,6 +11,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Icon from "../../components/ui/Icon";
+import EmptyState from "../../components/ui/EmptyState";
 import { COLORS, BRAND } from "../../lib/constants";
 import { FONTS, TYPE, SPACE } from "../../lib/typography";
 import ConversationItem from "../../components/messaging/ConversationItem";
@@ -166,51 +167,23 @@ export default function MessagesScreen() {
             </Animated.View>
           ))
         ) : (
-          <View style={{ alignItems: "center", paddingTop: 80, paddingHorizontal: 20 }}>
-            <View
-              style={{
-                width: 72,
-                height: 72,
-                borderRadius: 36,
-                backgroundColor: COLORS.surfaceContainer,
-                alignItems: "center",
-                justifyContent: "center",
-                marginBottom: SPACE.xl,
-              }}
-            >
-              <Icon name="chat-outline" size={30} color={BRAND.blue} />
-            </View>
-            <Text
-              style={[TYPE.sectionTitle, { marginBottom: SPACE.sm, textAlign: "center" }]}
-            >
-              {search ? "Aucun résultat" : "Aucun échange"}
-            </Text>
-            <Text
-              style={{
-                fontSize: 14,
-                lineHeight: 21,
-                fontFamily: FONTS.body,
-                color: COLORS.outline,
-                textAlign: "center",
-              }}
-            >
-              {search
+          <EmptyState
+            art="messages"
+            title={search ? "Aucun résultat" : "Aucun échange"}
+            message={
+              search
                 ? "Essayez un autre nom ou un autre sujet."
-                : "Une question sur une pièce ? Ouvrez sa fiche et écrivez-nous — l’échange se retrouvera ici."}
-            </Text>
-
-            {!search && (
-              <View style={{ marginTop: SPACE.xl }}>
-                <Button
-                  label="Parcourir le catalogue"
-                  onPress={() => router.push("/(tabs)/categories")}
-                  size="md"
-                  fullWidth={false}
-                  tint={[BRAND.blue, BRAND.blueDeep]}
-                />
-              </View>
-            )}
-          </View>
+                : "Une question sur une pièce ? Ouvrez sa fiche et écrivez-nous — l’échange se retrouvera ici."
+            }
+            action={
+              search
+                ? undefined
+                : {
+                    label: "Parcourir le catalogue",
+                    onPress: () => router.push("/(tabs)/categories"),
+                  }
+            }
+          />
         )}
       </ScrollView>
     </SafeAreaView>

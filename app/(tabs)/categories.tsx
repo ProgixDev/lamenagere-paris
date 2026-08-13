@@ -14,6 +14,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import Icon from "../../components/ui/Icon";
 import PressableScale from "../../components/ui/PressableScale";
+import AppHeader from "../../components/layout/AppHeader";
+import { CategoryGridSkeleton } from "../../components/ui/Skeleton";
 import { COLORS } from "../../lib/constants";
 import { FONTS, TYPE, SPACE, SHADOW } from "../../lib/typography";
 import { PRODUCT_IMAGES } from "../../lib/mock-data";
@@ -24,8 +26,6 @@ import {
 } from "../../features/products/hooks";
 import { priceTagLabel } from "../../lib/pricing";
 import type { Product, Category } from "../../lib/types";
-import SearchBar from "../../components/SearchBar";
-import LogoHeader from "../../components/layout/LogoHeader";
 import { productCoverSource } from "../../lib/product-media";
 
 const { width: W } = Dimensions.get("window");
@@ -54,7 +54,7 @@ const CATEGORY_TAGLINES: Record<string, string> = {
 export default function CategoriesScreen() {
   const router = useRouter();
   const featured = useFeaturedProducts();
-  const { data: categories = [] } = useCategories();
+  const { data: categories = [], isLoading } = useCategories();
   const { data: popular = [] } = usePopularProducts(6);
   // Hero = the first category in the admin-defined order (sort_order).
   const heroCat = categories[0];
@@ -67,8 +67,7 @@ export default function CategoriesScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
-      <LogoHeader />
-      <SearchBar placeholder="Rechercher une collection..." />
+      <AppHeader searchPlaceholder="Rechercher une collection..." />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -89,6 +88,14 @@ export default function CategoriesScreen() {
             L'art du sur-mesure, livré chez vous.
           </Text>
         </View>
+
+        {/* Nothing was shown while the collections loaded — the screen sat on
+            its title over a blank body. */}
+        {isLoading && categories.length === 0 && (
+          <View style={{ marginTop: 16 }}>
+            <CategoryGridSkeleton count={3} />
+          </View>
+        )}
 
         {/* ── Hero card (full-width) ───────────────── */}
         {heroCat && (

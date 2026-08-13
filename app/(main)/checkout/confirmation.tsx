@@ -1,21 +1,117 @@
-import React from "react";
-import { View, Text, ScrollView } from "react-native";
+import React, { useEffect } from "react";
+import { View, Text, ScrollView, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { COLORS } from "../../../lib/constants";
-import { FONTS, TYPE } from "../../../lib/typography";
-import { formatDate } from "../../../lib/utils";
+import Animated, {
+  FadeInDown,
+  useAnimatedProps,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withTiming,
+  Easing,
+} from "react-native-reanimated";
+import Svg, { Circle, Path } from "react-native-svg";
+import { COLORS, BRAND } from "../../../lib/constants";
+import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
+import { formatDate, formatPrice } from "../../../lib/utils";
 import Button from "../../../components/ui/Button";
-import Card from "../../../components/ui/Card";
+import Skeleton from "../../../components/ui/Skeleton";
 import { useCheckoutStore } from "../../../features/checkout/store";
+import { useOrder } from "../../../features/orders/hooks";
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+
+const RING = 2 * Math.PI * 34;
+const CHECK = 46;
+
+/**
+ * The ring and the tick draw themselves, in the brand blue.
+ *
+ * This screen is the single most emotional moment in the app and it used to be
+ * a flat green disc — a colour that appears nowhere else in the brand — with no
+ * motion at all.
+ */
+function SuccessMark() {
+  const reduceMotion = useReducedMotion();
+  const ring = useSharedValue(reduceMotion ? 0 : RING);
+  const tick = useSharedValue(reduceMotion ? 0 : CHECK);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    ring.value = withTiming(0, { duration: 520, easing: Easing.out(Easing.cubic) });
+    tick.value = withDelay(320, withTiming(0, { duration: 320, easing: Easing.out(Easing.cubic) }));
+  }, [ring, tick, reduceMotion]);
+
+  const ringProps = useAnimatedProps(() => ({ strokeDashoffset: ring.value }));
+  const tickProps = useAnimatedProps(() => ({ strokeDashoffset: tick.value }));
+
+  return (
+    <Svg width={96} height={96} viewBox="0 0 80 80">
+      <Circle cx={40} cy={40} r={38} fill={`${BRAND.blue}14`} />
+      <AnimatedCircle
+        cx={40}
+        cy={40}
+        r={34}
+        stroke={BRAND.blue}
+        strokeWidth={3}
+        fill="none"
+        strokeDasharray={RING}
+        animatedProps={ringProps}
+        // Start the ring at the top rather than at three o'clock.
+        transform="rotate(-90 40 40)"
+      />
+      <AnimatedPath
+        d="M26 41l10 10 19-21"
+        stroke={BRAND.blue}
+        strokeWidth={4}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        strokeDasharray={CHECK}
+        animatedProps={tickProps}
+      />
+    </Svg>
+  );
+}
+
+function Line({
+  label,
+  value,
+  strong,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+}) {
+  return (
+    <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 16, paddingVertical: 4 }}>
+      <Text style={{ fontSize: 13, fontFamily: FONTS.body, color: COLORS.outline }}>{label}</Text>
+      <Text
+        style={{
+          fontSize: strong ? 16 : 13,
+          fontFamily: strong ? FONTS.serif : FONTS.bodyMedium,
+          color: COLORS.onSurface,
+          flexShrink: 1,
+          textAlign: "right",
+        }}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
 
 export default function CheckoutConfirmationScreen() {
   const router = useRouter();
-  const today = new Date();
+  const reduceMotion = useReducedMotion();
   const lastOrderNumber = useCheckoutStore((s) => s.lastOrderNumber);
+  const lastOrderId = useCheckoutStore((s) => s.lastOrderId);
   const reset = useCheckoutStore((s) => s.reset);
-  const orderNumber = lastOrderNumber ? `#${lastOrderNumber}` : "Commande";
+
+  // The real order, so the customer sees a receipt rather than a bare number.
+  const { data: order, isLoading } = useOrder(lastOrderId ?? "");
 
   const goTo = (path: "/(main)/orders" | "/(tabs)", replace?: boolean) => {
     reset();
@@ -23,45 +119,139 @@ export default function CheckoutConfirmationScreen() {
     else router.push(path);
   };
 
+  const enter = (delay: number) =>
+    reduceMotion ? undefined : FadeInDown.delay(delay).springify().damping(16);
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 40, alignItems: "center" }}>
-        <View
-          className="w-16 h-16 rounded-full items-center justify-center mb-6"
-          style={{ backgroundColor: COLORS.success }}
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 32, paddingBottom: 48 }}>
+        <View style={{ alignItems: "center" }}>
+          <SuccessMark />
+          <Animated.View entering={enter(240)} style={{ alignItems: "center" }}>
+            <Text style={[TYPE.hero, { textAlign: "center", marginTop: 18 }]}>
+              Commande confirmée
+            </Text>
+            <Text
+              style={{
+                fontSize: 14,
+                lineHeight: 21,
+                fontFamily: FONTS.body,
+                color: COLORS.onSurfaceVariant,
+                textAlign: "center",
+                marginTop: 6,
+              }}
+            >
+              Merci pour votre confiance.{"\n"}
+              {lastOrderNumber ? `Commande ${lastOrderNumber}` : ""}
+            </Text>
+          </Animated.View>
+        </View>
+
+        {/* Receipt */}
+        <Animated.View
+          entering={enter(380)}
+          style={{
+            backgroundColor: COLORS.surfaceContainerLowest,
+            borderRadius: 20,
+            padding: 18,
+            marginTop: 26,
+            ...SHADOW.card,
+          }}
         >
-          <MaterialCommunityIcons name="check" size={32} color="#fff" />
-        </View>
-
-        <Text style={[TYPE.hero, { color: COLORS.primary, marginBottom: 8, textAlign: "center" }]}>
-          Commande confirmée !
-        </Text>
-        <Text className="text-sm mb-8" style={{ color: COLORS.onSurfaceVariant }}>
-          Merci pour votre confiance.
-        </Text>
-
-        <Card padding="lg">
-          <View className="gap-3 w-full">
-            <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 22 }}>
-              {orderNumber}
-            </Text>
-            <Text className="text-sm" style={{ color: COLORS.outline }}>
-              {formatDate(today)}
-            </Text>
-            <View className="mt-2 pt-2" style={{ borderTopWidth: 1, borderTopColor: COLORS.surfaceContainerLow }}>
-              <Text className="text-sm" style={{ color: COLORS.secondary }}>
-                Livraison estimée : {formatDate(new Date(today.getTime() + 21 * 24 * 60 * 60 * 1000))}
-              </Text>
+          {isLoading && !order ? (
+            <View style={{ gap: 12 }}>
+              <Skeleton height={16} width="55%" />
+              <Skeleton height={64} borderRadius={12} />
+              <Skeleton height={14} width="40%" />
             </View>
-          </View>
-        </Card>
+          ) : order ? (
+            <>
+              {order.items.map((item) => (
+                <View
+                  key={item.id}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 14 }}
+                >
+                  {item.product.images?.[0] ? (
+                    <Image
+                      source={{ uri: item.product.images[0] }}
+                      style={{ width: 52, height: 52, borderRadius: 10, backgroundColor: COLORS.surfaceContainer }}
+                    />
+                  ) : (
+                    <View
+                      style={{ width: 52, height: 52, borderRadius: 10, backgroundColor: COLORS.surfaceContainer }}
+                    />
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text numberOfLines={2} style={{ fontSize: 13.5, fontFamily: FONTS.bodyMedium, color: COLORS.onSurface }}>
+                      {item.product.name}
+                    </Text>
+                    <Text style={{ fontSize: 12, fontFamily: FONTS.body, color: COLORS.outline, marginTop: 2 }}>
+                      ×{item.quantity}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 14, fontFamily: FONTS.serif, color: COLORS.onSurface }}>
+                    {formatPrice(item.price * item.quantity)}
+                  </Text>
+                </View>
+              ))}
 
-        <View className="w-full mt-8 gap-4">
-          <Button label="Suivi de commande" onPress={() => goTo("/(main)/orders")} variant="secondary" size="lg" />
-          <Button label="Continuer le shopping" onPress={() => goTo("/(tabs)", true)} size="lg" />
-        </View>
+              <View style={{ height: 1, backgroundColor: COLORS.surfaceContainer, marginVertical: 8 }} />
 
-        <Text className="text-xs mt-6 text-center" style={{ color: COLORS.onSurfaceVariant }}>
+              <Line label="Sous-total" value={formatPrice(order.subtotal)} />
+              {order.discount ? (
+                <Line
+                  label={order.promoCode ? `Code ${order.promoCode}` : "Remise"}
+                  value={`− ${formatPrice(order.discount)}`}
+                />
+              ) : null}
+              <Line
+                label="Livraison"
+                value={order.shippingCost > 0 ? formatPrice(order.shippingCost) : "Offerte"}
+              />
+              <View style={{ height: 1, backgroundColor: COLORS.surfaceContainer, marginVertical: 8 }} />
+              <Line label="Total payé" value={formatPrice(order.total)} strong />
+
+              <View style={{ height: 1, backgroundColor: COLORS.surfaceContainer, marginVertical: 12 }} />
+
+              <Line
+                label="Livraison estimée"
+                value={order.estimatedDelivery ? formatDate(new Date(order.estimatedDelivery)) : "à confirmer"}
+              />
+              <Line
+                label="Adresse"
+                value={`${order.shippingAddress.street}, ${order.shippingAddress.postalCode} ${order.shippingAddress.city}`}
+              />
+            </>
+          ) : (
+            <Text style={{ fontSize: 13, fontFamily: FONTS.body, color: COLORS.outline }}>
+              {lastOrderNumber
+                ? `Votre commande ${lastOrderNumber} a bien été enregistrée. Retrouvez son détail dans « Mes commandes ».`
+                : "Votre commande a bien été enregistrée."}
+              {"\n"}
+              {formatDate(new Date())}
+            </Text>
+          )}
+        </Animated.View>
+
+        <Animated.View entering={enter(500)} style={{ marginTop: 24, gap: 12 }}>
+          <Button label="Suivre ma commande" onPress={() => goTo("/(main)/orders")} size="lg" />
+          <Button
+            label="Continuer mes achats"
+            onPress={() => goTo("/(tabs)", true)}
+            variant="secondary"
+            size="lg"
+          />
+        </Animated.View>
+
+        <Text
+          style={{
+            fontSize: 12,
+            fontFamily: FONTS.body,
+            color: COLORS.outline,
+            textAlign: "center",
+            marginTop: 20,
+          }}
+        >
           Un e-mail de confirmation a été envoyé à votre adresse.
         </Text>
       </ScrollView>

@@ -6,12 +6,13 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
-  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import EmptyState from "../../components/ui/EmptyState";
+import { ProductGridSkeleton } from "../../components/ui/Skeleton";
 import { COLORS } from "../../lib/constants";
 import { TYPE, FONTS, SHADOW } from "../../lib/typography";
 import { priceTagLabel } from "../../lib/pricing";
@@ -49,9 +50,7 @@ export default function FavoritesScreen() {
       </View>
 
       {isLoading && favorites.length > 0 ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator size="small" color={COLORS.primary} />
-        </View>
+        <ProductGridSkeleton count={4} />
       ) : products.length > 0 ? (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
@@ -88,20 +87,16 @@ export default function FavoritesScreen() {
           </View>
         </ScrollView>
       ) : (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 40 }}>
-          <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: COLORS.surfaceContainer, alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
-            <MaterialCommunityIcons name="heart-outline" size={32} color={COLORS.primary} />
-          </View>
-          <Text style={[TYPE.sectionTitle, { marginBottom: 6 }]}>Aucun favori</Text>
-          <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: COLORS.onSurfaceVariant, textAlign: "center", marginBottom: 20 }}>
-            Sauvegardez vos coups de cœur{"\n"}pour les retrouver facilement
-          </Text>
-          <TouchableOpacity
-            onPress={() => router.push("/(tabs)/categories")}
-            style={{ borderWidth: 1, borderColor: COLORS.outlineVariant, borderRadius: 9999, paddingHorizontal: 20, paddingVertical: 10 }}
-          >
-            <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.primary }}>Découvrir nos collections</Text>
-          </TouchableOpacity>
+        <View style={{ flex: 1, justifyContent: "center" }}>
+          <EmptyState
+            art="favorites"
+            title="Aucun favori"
+            message="Sauvegardez vos coups de cœur pour les retrouver ici, sur tous vos appareils."
+            action={{
+              label: "Découvrir nos collections",
+              onPress: () => router.push("/(tabs)/categories"),
+            }}
+          />
         </View>
       )}
     </SafeAreaView>

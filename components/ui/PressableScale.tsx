@@ -1,5 +1,10 @@
 import React from "react";
-import { Pressable, type ViewStyle, type StyleProp } from "react-native";
+import {
+  Pressable,
+  type AccessibilityRole,
+  type ViewStyle,
+  type StyleProp,
+} from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -13,6 +18,11 @@ interface PressableScaleProps {
   /** How far it shrinks while pressed. Default 0.97. */
   scaleTo?: number;
   disabled?: boolean;
+  /** Announced by VoiceOver/TalkBack — required when the content is not text. */
+  accessibilityLabel?: string;
+  /** Defaults to "button" so assistive tech announces it as tappable. */
+  accessibilityRole?: AccessibilityRole;
+  accessibilityHint?: string;
 }
 
 /**
@@ -25,6 +35,9 @@ export default function PressableScale({
   style,
   scaleTo = 0.97,
   disabled = false,
+  accessibilityLabel,
+  accessibilityRole = "button",
+  accessibilityHint,
 }: PressableScaleProps) {
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({
@@ -35,6 +48,10 @@ export default function PressableScale({
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole={onPress ? accessibilityRole : undefined}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled }}
       onPressIn={() => {
         if (disabled) return;
         scale.value = withTiming(scaleTo, { duration: 90 });
