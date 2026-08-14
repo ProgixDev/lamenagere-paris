@@ -1,4 +1,6 @@
 import { mm, moduleById } from "./catalog";
+import { rotatedWall } from "./scene";
+import { ilotFootprint } from "./types";
 import type { KitchenScene, PlacedModule, Run, Slot } from "./types";
 
 /**
@@ -75,25 +77,65 @@ export function moveModule(
   const width = mm(mod.widthMm);
   const others = spansOn(run, mod.slot, key);
 
-  // The gap the module is being dragged into: the last neighbour that ends
-  // before it and the first that starts after it.
-  const centre = desiredOffsetM + width / 2;
-  const before = others.filter((s) => s.end <= centre).pop();
-  const after = others.find((s) => s.start >= centre);
+  /**
+   * The stretch the module can slide through without passing anyone, measured
+   * from where it stands now.
+   *
+   * Deriving these from the *dragged-to* position instead is wrong in a way
+   * that is easy to miss: a neighbour the cursor has landed on top of counts as
+   * neither behind nor ahead, so it drops out of the bounds entirely and the
+   * cabinet is free to be parked straight through it.
+   */
+  const prev = others.filter((s) => s.end <= placed.offsetM + 1e-6).pop();
+  const next = others.find((s) => s.start >= placed.offsetM + width - 1e-6);
+  const min = prev ? prev.end : 0;
+  const max = (next ? next.start : run.lengthM) - width;
 
-  const min = before ? before.end : 0;
-  const max = (after ? after.start : run.lengthM) - width;
-  if (max < min) return scene; // No room in this gap at all.
+  /**
+   * Dragged decisively past a neighbour, the two trade places.
+   *
+   * Without this, dragging does nothing at all on most kitchens: the proposed
+   * run is packed solid, so almost every cabinet has neighbours on both sides
+   * and `min` equals `max`. Swapping keeps the pair inside the exact stretch
+   * they already occupied, so nothing outside them can be disturbed and any gap
+   * between them survives — it just ends up on the other side.
+   */
+  const past = (span: Span) => Math.min(mm(300), (span.end - span.start) / 2);
+  const target =
+    next && desiredOffsetM > max + past(next)
+      ? next
+      : prev && desiredOffsetM < min - past(prev)
+        ? prev
+        : null;
 
-  let next = Math.min(Math.max(desiredOffsetM, min), max);
+  if (target) {
+    const other = run.modules.find((p) => p.key === target.key)!;
+    const otherWidth = target.end - target.start;
+    const from = Math.min(placed.offsetM, target.start);
+    const to = Math.max(placed.offsetM + width, target.end);
+    const movingRight = target.start > placed.offsetM;
+    return withRun(
+      scene,
+      runIndex,
+      run.modules.map((p) => {
+        if (p.key === key) return { ...p, offsetM: round(movingRight ? to - width : from) };
+        if (p.key === other.key) return { ...p, offsetM: round(movingRight ? from : to - otherWidth) };
+        return p;
+      }),
+    );
+  }
+
+  if (max < min) return scene; // Boxed in, and not dragged far enough to swap.
+
+  let landing = Math.min(Math.max(desiredOffsetM, min), max);
   // Flush against a neighbour when close — the automatic alignment the brief asks for.
-  if (Math.abs(next - min) <= SNAP_M) next = min;
-  else if (Math.abs(next - max) <= SNAP_M) next = max;
+  if (Math.abs(landing - min) <= SNAP_M) landing = min;
+  else if (Math.abs(landing - max) <= SNAP_M) landing = max;
 
   return withRun(
     scene,
     runIndex,
-    run.modules.map((p) => (p.key === key ? { ...p, offsetM: round(next) } : p)),
+    run.modules.map((p) => (p.key === key ? { ...p, offsetM: round(landing) } : p)),
   );
 }
 
@@ -163,9 +205,12 @@ export const ILOT_KEY = "__ilot";
 export function moveIlot(scene: KitchenScene, x: number, z: number): KitchenScene {
   if (!scene.ilot) return scene;
   const runDepth = mm(600);
-  const has = (w: string) => scene.runs.some((r) => r.wall === w);
-  const halfW = scene.ilot.widthM / 2;
-  const halfD = scene.ilot.depthM / 2;
+  const has = (w: string) => scene.runs.some((r) => rotatedWall(r.wall, scene.rotationQuarters) === w);
+  // Measured against the turned footprint, not the raw dimensions — otherwise a
+  // island swung round parks half of itself inside a wall.
+  const foot = ilotFootprint(scene.ilot);
+  const halfW = foot.alongX / 2;
+  const halfD = foot.alongZ / 2;
 
   const xMin = -scene.room.widthM / 2 + (has("left") ? runDepth : 0) + halfW;
   const xMax = scene.room.widthM / 2 - (has("right") ? runDepth : 0) - halfW;

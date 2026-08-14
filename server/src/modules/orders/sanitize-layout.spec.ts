@@ -27,7 +27,7 @@ describe('sanitizeLayout', () => {
         ],
       },
     ],
-    ilot: { widthM: 1.8, depthM: 0.9, topM: 1.1, tight: true },
+    ilot: { widthM: 1.8, depthM: 0.9, topM: 1.1, rotationQuarters: 1, tight: true },
     worktopTopM: 0.95,
     credence: false,
     modulesTotalCents: 18000,
@@ -38,7 +38,7 @@ describe('sanitizeLayout', () => {
     expect(out).not.toBeNull();
     expect(out!.runs[0].modules).toHaveLength(1);
     expect(out!.modulesTotalCents).toBe(18000);
-    expect(out!.ilot).toEqual({ widthM: 1.8, depthM: 0.9, topM: 1.1, tight: true });
+    expect(out!.ilot).toEqual({ widthM: 1.8, depthM: 0.9, topM: 1.1, rotationQuarters: 1, tight: true });
     expect(out!.credence).toBe(false);
   });
 
@@ -111,6 +111,17 @@ describe('sanitizeLayout', () => {
       priceCents: 1,
     });
     expect(sanitizeLayout(l)!.runs[0].modules).toHaveLength(1);
+  });
+
+  it('only accepts a quarter turn of 0-3', () => {
+    for (const bad of [4, -1, 1.5, '1', null]) {
+      const l = valid();
+      (l as any).rotationQuarters = bad;
+      (l.ilot as any).rotationQuarters = bad;
+      expect(sanitizeLayout(l)!.rotationQuarters).toBe(0);
+      expect(sanitizeLayout(l)!.ilot!.rotationQuarters).toBe(0);
+    }
+    expect(sanitizeLayout({ ...valid(), rotationQuarters: 3 })!.rotationQuarters).toBe(3);
   });
 
   it('keeps the crédence drawn unless the client declined it', () => {

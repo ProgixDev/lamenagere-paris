@@ -91,6 +91,22 @@ export function kitchenConfigFrom(
    * such block, nothing picked — leaves the crédence drawn, which is what a
    * fitted kitchen has by default.
    */
+  // Everything the customer ticked in an accessories block, minus the ones that
+  // are really yes/no questions dressed as a picker (crédence, worktop material).
+  const picked: { id: string; title: string }[] = [];
+  for (const block of blocks) {
+    if (block.type !== "accessories" || isCredence(block.label)) continue;
+    const chosen = state[block.id]?.accessoryIds ?? [];
+    for (const item of block.items ?? []) {
+      if (!chosen.includes(item.id)) continue;
+      const title = item.title.trim();
+      // "Oui" / "Non" answers carry no object to stand on a worktop.
+      if (/^(oui|non)$/i.test(title)) continue;
+      picked.push({ id: item.id, title });
+    }
+  }
+  if (picked.length) config.accessories = picked;
+
   for (const block of blocks) {
     if (block.type !== "accessories" || !isCredence(block.label)) continue;
     const chosen = state[block.id]?.accessoryIds ?? [];

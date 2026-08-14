@@ -8,7 +8,8 @@
     "ios": "expo run:ios",
     "ios:sim": "bash scripts/run-ios-simulator.sh",
     "web": "expo start --web",
-    "build:three": "node scripts/build-three-bundle.mjs"
+    "build:three": "node scripts/build-three-bundle.mjs",
+    "check:renderer": "node scripts/check-renderer-literal.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/cormorant": "^0.4.2",

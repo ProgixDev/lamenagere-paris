@@ -7,14 +7,18 @@
  * image for the recap PDF) without touching the layout rules.
  */
 
-/** Which wall a run sits against. Matches the runs drawn by `ShapePlan`. */
-export type Wall = "back" | "left" | "right";
-
 /**
- * Openings also happen on the fourth wall — the one the camera looks in
- * through — which never carries a run.
+ * Which wall something sits against.
+ *
+ * A run is only ever *described* against back, left or right — the canonical
+ * frame the layout is built in — but once the kitchen is turned into another
+ * corner it can physically stand against the front wall, so all four are
+ * spellable.
  */
-export type OpeningWall = Wall | "front";
+export type Wall = "back" | "left" | "right" | "front";
+
+/** Openings use the same four walls. */
+export type OpeningWall = Wall;
 
 /** Where in the elevation a module lives. Decides its height off the floor. */
 export type Slot = "bas" | "haut" | "colonne";
@@ -31,6 +35,14 @@ export type Fixture =
   | "fridge"
   | "dishwasher"
   | "hood"
+  /** Freestanding range: burners and grates on top, oven behind the door. */
+  | "range"
+  /** A narrow domino warming plate, half the width of a hob. */
+  | "warming"
+  /** Glazed door — the carcass shows through, shelves and all. */
+  | "glass"
+  /** Glazed, with an LED strip lighting the inside. */
+  | "glass-led"
   | null;
 
 /** One entry of the LA MÉNAGÈRE library, in millimetres as the workshop quotes them. */
@@ -72,8 +84,26 @@ export interface Ilot {
   /** Centre of the island, metres, in room coordinates. */
   x: number;
   z: number;
+  /**
+   * Quarter turns clockwise, 0–3. Beyond swinging the footprint round, this
+   * decides which side the drawers face — so all four are meaningful even on a
+   * square island.
+   */
+  rotationQuarters: number;
   /** True when the measured island does not leave a walkway all round. */
   tight?: boolean;
+}
+
+/**
+ * The island's footprint as the room sees it, which is the pair its clearances
+ * have to be measured against — turned a quarter, its length runs the other way.
+ */
+export function ilotFootprint(ilot: { widthM: number; depthM: number; rotationQuarters: number }) {
+  const turned = (((ilot.rotationQuarters % 4) + 4) % 4) % 2 === 1;
+  return {
+    alongX: turned ? ilot.depthM : ilot.widthM,
+    alongZ: turned ? ilot.widthM : ilot.depthM,
+  };
 }
 
 /** An opening cut into a wall — a door, a window or a baie vitrée. */
@@ -98,14 +128,51 @@ export interface SceneMaterials {
   metal: string;
 }
 
+/**
+ * A chosen accessory, standing on the worktop as a plain named block.
+ *
+ * A range-couverts really lives inside a drawer, where nobody would see it.
+ * Standing them on the counter is not what the kitchen looks like — it is a
+ * checklist the customer can read at a glance, which is what they are for.
+ */
+export interface AccessoryBlock {
+  id: string;
+  title: string;
+  /** Centre of the block, metres, in room coordinates. */
+  x: number;
+  z: number;
+  /** Floor to the underside of the block. */
+  baseM: number;
+  widthM: number;
+  depthM: number;
+  heightM: number;
+}
+
 export interface KitchenScene {
   room: { widthM: number; depthM: number; heightM: number };
+  /**
+   * Quarter turns clockwise the whole implantation is rotated by, 0–3.
+   *
+   * The runs stay described against the canonical back/left/right walls and the
+   * renderer turns them as one — which is what lets the same kitchen sit in any
+   * corner without every wall rule being written four times.
+   */
+  rotationQuarters: number;
   runs: Run[];
+  accessories: AccessoryBlock[];
   ilot?: Ilot;
   openings: Opening[];
   materials: SceneMaterials;
   /** What the customer decides that the renderer has to build to. */
-  geometry: { worktopTopM: number; credence: boolean };
+  geometry: {
+    worktopTopM: number;
+    credence: boolean;
+    /**
+     * The smallest room this kitchen fits in, so the in-scene resize handles
+     * can stop there instead of letting the walls close through the cabinets.
+     */
+    minRoom: { widthM: number; depthM: number };
+  };
 }
 
 /** What the customer has decided by the time the 3D step opens. */
@@ -137,6 +204,12 @@ export interface KitchenConfig {
   ilotHeightCm?: number;
   /** "Crédence sur le mur" — the customer can decline it. */
   credence?: boolean;
+  /** Which corner the kitchen occupies: quarter turns clockwise, 0–3. */
+  rotationQuarters?: number;
+  /** Which way the island faces: quarter turns clockwise, 0–3. */
+  ilotRotationQuarters?: number;
+  /** Accessories picked in "Vos options", shown as named blocks. */
+  accessories?: { id: string; title: string }[];
   facadeHex?: string;
   worktopHex?: string;
 }

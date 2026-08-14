@@ -154,7 +154,9 @@ export interface ConfiguredLayout {
       priceCents: number;
     }[];
   }[];
-  ilot?: { widthM: number; depthM: number; topM: number; tight?: boolean };
+  ilot?: { widthM: number; depthM: number; topM: number; rotationQuarters?: number; tight?: boolean };
+  /** Quarter turns clockwise the implantation is rotated by, 0-3. */
+  rotationQuarters: number;
   /** Floor to the top of the worktop, as the customer asked for it. */
   worktopTopM: number;
   /** Whether the customer kept the crédence. */

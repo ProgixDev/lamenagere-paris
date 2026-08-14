@@ -32,6 +32,28 @@ export function runsOfShape(block: ConfigBlock | undefined, shapeKey?: string): 
 const RUN_ROLES = ["run1", "run2", "run3"] as const;
 
 /**
+ * Heights the customer is never asked for, and the value each takes.
+ *
+ * A kitchen is built to a standard height and a standard worktop, and asking a
+ * customer for either invites a wrong answer to a question they cannot check —
+ * most people do not know their ceiling height, and the worktop is a decision
+ * the workshop makes. They are still recorded, because the wall height is what
+ * the per-m² price is multiplied by; they are simply not asked.
+ */
+export const FIXED_HEIGHTS_CM = { wall: 210, worktop: 90 } as const;
+
+/** Accent- and case-insensitive, matching the loose labels the back office uses. */
+const norm = (v: string) =>
+  v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+/** Whether a measurement is one of the two the customer never sees. */
+export function hiddenHeight(field: ConfigBlockField): "wall" | "worktop" | null {
+  if (field.priceRole === "height") return "wall";
+  if (norm(field.label).includes("plan de travail")) return "worktop";
+  return null;
+}
+
+/**
  * The measurements actually worth asking for, given the shape.
  *
  * A straight kitchen has one wall, so asking for the second and third run is
@@ -43,7 +65,9 @@ export function visibleFields(
   block: ConfigBlock,
   opts: { byShape: boolean; runs: number },
 ): ConfigBlockField[] {
-  const fields = block.fields ?? [];
+  // The fixed heights are filtered first, so they vanish from the mesures step,
+  // the studio panel and the "have you filled this in" check alike.
+  const fields = (block.fields ?? []).filter((f) => !hiddenHeight(f));
   if (!opts.byShape) return fields;
   return fields.filter((f) => {
     const idx = RUN_ROLES.indexOf(f.priceRole as (typeof RUN_ROLES)[number]);

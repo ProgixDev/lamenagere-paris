@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, Image, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { View, Text, Image, Modal, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Animated, {
   FadeInDown,
@@ -35,6 +35,8 @@ import {
 } from "../../../lib/config-blocks";
 import {
   buildSteps,
+  FIXED_HEIGHTS_CM,
+  hiddenHeight,
   PRODUCT_COLOR_BLOCK_ID,
   runsOfShape,
   stepCopy,
@@ -77,6 +79,15 @@ export default function ConfigureScreen() {
   /** The measurement being typed, lit up on the plan. */
   const [focus, setFocus] = useState<PlanHighlight>(null);
   const sceneRef = useRef<Kitchen3DHandle>(null);
+  /**
+   * Read here and applied by hand inside the studio.
+   *
+   * A Modal renders into its own native root, so the SafeAreaProvider wrapping
+   * the app does not reach inside it — a SafeAreaView in there resolves every
+   * inset to zero and the header sits under the notch. Taking the values from
+   * the screen, which is inside the provider, sidesteps that entirely.
+   */
+  const insets = useSafeAreaInsets();
   /** Whether a drag moves a cabinet or orbits the camera. */
   const [moveMode, setMoveMode] = useState(false);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -103,6 +114,12 @@ export default function ConfigureScreen() {
     length: null,
     width: null,
   });
+  /** The full-screen 3D studio, which has room for controls the step does not. */
+  const [studioOpen, setStudioOpen] = useState(false);
+  /** Which corner the kitchen sits in: quarter turns clockwise, 0-3. */
+  const [rotation, setRotation] = useState(0);
+  /** Which way the island faces, independently of the kitchen. */
+  const [ilotRotation, setIlotRotation] = useState(0);
 
   const isPerSqm = product?.priceMode === PRICE_MODES.PER_SQM;
   const blocks = (product?.configBlocks ?? product?.category.configBlocks ?? []).filter(
@@ -117,6 +134,44 @@ export default function ConfigureScreen() {
     () => (product ? buildSteps(product, blocks, { byShape, needsDims }) : []),
     [product, blocks, byShape, needsDims],
   );
+
+  /**
+   * Fills in the heights the customer is never shown.
+   *
+   * They are hidden from every screen, but the wall height is what a per-m²
+   * kitchen is billed on and both belong in the recap — so they are written
+   * into the same state an answer would have gone to, not special-cased
+   * downstream. Existing values are left alone, so an order placed before this
+   * keeps whatever it was quoted on.
+   */
+  useEffect(() => {
+    const seed: ConfigState = {};
+    for (const block of blocks) {
+      if (block.type !== "measurements") continue;
+      for (const field of block.fields ?? []) {
+        const kind = hiddenHeight(field);
+        if (!kind) continue;
+        const current = configState[block.id]?.measurements?.[field.key];
+        if (current != null && current !== "") continue;
+        seed[block.id] = {
+          ...seed[block.id],
+          measurements: {
+            ...configState[block.id]?.measurements,
+            ...seed[block.id]?.measurements,
+            [field.key]: String(FIXED_HEIGHTS_CM[kind]),
+          },
+        };
+      }
+    }
+    if (!Object.keys(seed).length) return;
+    setConfigState((s) => {
+      const next = { ...s };
+      for (const [id, sel] of Object.entries(seed)) {
+        next[id] = { ...next[id], measurements: { ...next[id]?.measurements, ...sel.measurements } };
+      }
+      return next;
+    });
+  }, [blocks, configState]);
 
   const reduceMotion = useReducedMotion();
   const progress = useSharedValue(0);
@@ -210,6 +265,8 @@ export default function ConfigureScreen() {
     }),
     roomLengthCm: roomCm.length ?? undefined,
     roomWidthCm: roomCm.width ?? undefined,
+    rotationQuarters: rotation,
+    ilotRotationQuarters: ilotRotation,
   };
   const proposed = buildScene(sceneConfig);
   // Only what changes the room invalidates an arrangement; a colour change
@@ -226,6 +283,9 @@ export default function ConfigureScreen() {
     // island the customer positioned by hand has to be re-proposed.
     sceneConfig.roomLengthCm,
     sceneConfig.roomWidthCm,
+    // Turning the island changes the footprint its clearances are measured
+    // against, so a hand-placed one has to be re-proposed.
+    sceneConfig.ilotRotationQuarters,
   ]);
   const edits = sceneEdits?.signature === sceneSignature ? sceneEdits : null;
   const scene: KitchenScene = edits
@@ -302,20 +362,21 @@ export default function ConfigureScreen() {
     ]
   ).map((f) => {
     const override = roomCm[f.axis];
-    // Rebuilding without the override is what the minimum actually is.
-    const bare = buildScene({
-      ...sceneConfig,
-      roomLengthCm: undefined,
-      roomWidthCm: undefined,
-    }).room;
-    const min = Math.round((f.axis === "length" ? bare.widthM : bare.depthM) * 100);
-    return {
-      ...f,
-      current: Math.round(f.current * 100),
-      min,
-      auto: override == null,
-    };
+    const min = Math.round(
+      (f.axis === "length" ? scene.geometry.minRoom.widthM : scene.geometry.minRoom.depthM) * 100,
+    );
+    return { ...f, current: Math.round(f.current * 100), min, auto: override == null };
   });
+
+  const turnKitchen = () => {
+    void Haptics.selectionAsync();
+    setSelectedKey(null);
+    // The runs are described in the kitchen's own frame, so rearranged cabinets
+    // survive a turn untouched. The island is placed in the room's frame and
+    // the free floor has just moved under it, so that one is re-proposed.
+    setSceneEdits((e) => (e ? { ...e, ilot: null } : e));
+    setRotation((q) => (q + 1) % 4);
+  };
 
   const nudgeRoom = (axis: "length" | "width", direction: 1 | -1) => {
     const field = roomFields.find((f) => f.axis === axis)!;
@@ -811,390 +872,60 @@ export default function ConfigureScreen() {
             <View style={{ paddingHorizontal: 16, gap: 12 }}>
               <View
                 style={{
-                  height: 380,
+                  height: 240,
                   borderRadius: 18,
                   overflow: "hidden",
                   borderWidth: 1,
-                  borderColor: moveMode ? COLORS.primary : COLORS.outlineVariant,
+                  borderColor: COLORS.outlineVariant,
                   ...SHADOW.card,
                 }}
               >
-                <Kitchen3D
-                  ref={sceneRef}
-                  scene={scene}
-                  editable={moveMode}
-                  selectedKey={selectedKey}
-                  onSelect={setSelectedKey}
-                  onMove={(runIndex, key, offsetM) =>
-                    commitScene(moveModule(scene, runIndex, key, offsetM))
-                  }
-                  onMoveIlot={(x, z) => commitScene(moveIlot(scene, x, z))}
-                />
-
-                {/* Pinch already zooms; these are for one-handed use and for
-                    anyone who does not think to try a gesture on a render. */}
-                <View
-                  style={{
-                    position: "absolute",
-                    right: 12,
-                    bottom: 12,
-                    borderRadius: 999,
-                    overflow: "hidden",
-                    backgroundColor: "rgba(255,255,255,0.92)",
-                    borderWidth: 1,
-                    borderColor: COLORS.outlineVariant,
-                  }}
-                >
-                  {([
-                    { key: "in", icon: "plus", factor: ZOOM_STEP.in, label: "Zoom avant" },
-                    { key: "out", icon: "minus", factor: ZOOM_STEP.out, label: "Zoom arrière" },
-                  ] as const).map((z, i) => (
-                    <TouchableOpacity
-                      key={z.key}
-                      onPress={() => {
-                        Haptics.selectionAsync();
-                        sceneRef.current?.zoom(z.factor);
-                      }}
-                      accessibilityLabel={z.label}
-                      accessibilityRole="button"
-                      style={{
-                        width: 42,
-                        height: 42,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        borderTopWidth: i === 1 ? 1 : 0,
-                        borderTopColor: COLORS.outlineVariant,
-                      }}
-                    >
-                      <Icon name={z.icon} size={20} color={COLORS.onSurface} />
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                {/* Unmounted while the studio is open. Two WebViews each
+                    carrying their own three.js is a lot to keep alive on a
+                    phone, and this one is behind a full-screen sheet anyway. */}
+                {!studioOpen && <Kitchen3D scene={scene} />}
               </View>
 
-              {/* Moving is a mode rather than always-on: the same drag has to
-                  orbit the camera the rest of the time. */}
-              <PressableScale
+              <Button
+                label="Personnaliser en 3D"
                 onPress={() => {
-                  Haptics.selectionAsync();
-                  setMoveMode((v) => !v);
-                  setSelectedKey(null);
+                  void Haptics.selectionAsync();
+                  setStudioOpen(true);
                 }}
+                size="lg"
+              />
+
+              <View
                 style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  paddingVertical: 12,
-                  borderRadius: 999,
-                  backgroundColor: moveMode ? COLORS.primary : COLORS.surfaceContainer,
+                  backgroundColor: COLORS.surfaceContainerLowest,
+                  borderRadius: 18,
+                  padding: 16,
+                  ...SHADOW.card,
                 }}
               >
-                <Icon
-                  name={moveMode ? "check" : "cursor-move"}
-                  size={18}
-                  color={moveMode ? COLORS.onPrimary : COLORS.onSurfaceVariant}
-                />
+                <Text style={{ fontSize: 15, fontFamily: FONTS.serif, color: COLORS.onSurface }}>
+                  {scene.runs.reduce((n, r) => n + r.modules.length, 0)} éléments implantés
+                </Text>
                 <Text
                   style={{
-                    fontSize: 13.5,
-                    fontFamily: "Inter_600SemiBold",
-                    color: moveMode ? COLORS.onPrimary : COLORS.onSurfaceVariant,
+                    fontSize: 12.5,
+                    fontFamily: "Inter_400Regular",
+                    color: COLORS.outline,
+                    marginTop: 4,
+                    lineHeight: 18,
                   }}
                 >
-                  {moveMode ? "Terminer le déplacement" : "Déplacer les éléments"}
+                  Pièce {scene.room.widthM.toFixed(2).replace(".", ",")} ×{" "}
+                  {scene.room.depthM.toFixed(2).replace(".", ",")} m
+                  {scene.accessories.length
+                    ? ` · ${scene.accessories.length} accessoire${scene.accessories.length > 1 ? "s" : ""}`
+                    : ""}
+                  . Ouvrez le studio pour changer la taille de la pièce et déplacer les meubles.
                 </Text>
-              </PressableScale>
-
-              {moveMode ? (
-                <>
-                  <View
-                    style={{
-                      backgroundColor: COLORS.surfaceContainerLowest,
-                      borderRadius: 18,
-                      padding: 16,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 12,
-                      ...SHADOW.card,
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 15, fontFamily: FONTS.serif, color: COLORS.onSurface }}>
-                        {selectedIsIlot
-                          ? "Îlot central"
-                          : selectedModule
-                            ? selectedModule.label
-                            : "Touchez un élément"}
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          fontFamily: "Inter_400Regular",
-                          color: COLORS.outline,
-                          marginTop: 2,
-                          lineHeight: 17,
-                        }}
-                      >
-                        {selectedIsIlot
-                          ? "Glissez-le sur le sol pour le repositionner."
-                          : selectedModule
-                            ? `Mur ${targetRun + 1} · ${selectedModule.widthMm} × ${selectedModule.depthMm} × ${selectedModule.heightMm} mm`
-                            : "Puis glissez-le le long de son mur. L'îlot se déplace librement."}
-                      </Text>
-                    </View>
-                    {selectedModule && !selectedIsIlot ? (
-                      <TouchableOpacity
-                        onPress={() => {
-                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                          commitScene(removeModule(scene, targetRun, selectedKey!));
-                          setSelectedKey(null);
-                        }}
-                        hitSlop={8}
-                        style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-                      >
-                        <Icon name="trash-can-outline" size={20} color={COLORS.error} />
-                        <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.error }}>
-                          Retirer
-                        </Text>
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
-
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      fontFamily: "Inter_700Bold",
-                      letterSpacing: 0.8,
-                      color: COLORS.outline,
-                    }}
-                  >
-                    AJOUTER SUR LE MUR {targetRun + 1}
-                  </Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ gap: 8, paddingRight: 16 }}
-                  >
-                    {MODULES.map((m) => {
-                      const fits = fitsOnRun(scene, targetRun, m.id);
-                      return (
-                        <PressableScale
-                          key={m.id}
-                          disabled={!fits}
-                          onPress={() => {
-                            const next = addModule(scene, targetRun, m.id);
-                            if (!next.key) return;
-                            Haptics.selectionAsync();
-                            commitScene(next.scene);
-                            setSelectedKey(next.key);
-                          }}
-                          style={{
-                            paddingHorizontal: 14,
-                            paddingVertical: 10,
-                            borderRadius: 14,
-                            backgroundColor: COLORS.surfaceContainerLowest,
-                            borderWidth: 1,
-                            borderColor: COLORS.outlineVariant,
-                            opacity: fits ? 1 : 0.38,
-                            minWidth: 132,
-                          }}
-                        >
-                          <Text style={{ fontSize: 12.5, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>
-                            {m.label}
-                          </Text>
-                          <Text
-                            style={{
-                              fontSize: 11.5,
-                              fontFamily: "Inter_400Regular",
-                              color: COLORS.outline,
-                              marginTop: 2,
-                            }}
-                          >
-                            {fits ? `${m.widthMm} mm` : "Ne rentre pas"}
-                          </Text>
-                        </PressableScale>
-                      );
-                    })}
-                  </ScrollView>
-                </>
-              ) : (
-                <>
-                  {/* Resizing writes back into the very fields the mesures step
-                      collected, so the plan, the recap and the m² price cannot
-                      drift apart from what is on screen. */}
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      fontFamily: "Inter_700Bold",
-                      letterSpacing: 0.8,
-                      color: COLORS.outline,
-                    }}
-                  >
-                    VOTRE ESPACE
-                  </Text>
-                  <View
-                    style={{
-                      backgroundColor: COLORS.surfaceContainerLowest,
-                      borderRadius: 18,
-                      padding: 4,
-                      ...SHADOW.card,
-                    }}
-                  >
-                    {/* The room first: it is the thing the rest sits inside,
-                        and the one measurement no config block collects. */}
-                    {roomFields.map((f, i) => (
-                      <View
-                        key={f.axis}
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          paddingVertical: 10,
-                          paddingHorizontal: 12,
-                          borderTopWidth: i === 0 ? 0 : 1,
-                          borderTopColor: COLORS.outlineVariant,
-                        }}
-                      >
-                        <View style={{ flex: 1 }}>
-                          <Text
-                            style={{
-                              fontSize: 13.5,
-                              fontFamily: "Inter_500Medium",
-                              color: COLORS.onSurface,
-                            }}
-                          >
-                            {f.label}
-                          </Text>
-                          {f.auto ? (
-                            <Text
-                              style={{
-                                fontSize: 11,
-                                fontFamily: "Inter_400Regular",
-                                color: COLORS.outline,
-                                marginTop: 1,
-                              }}
-                            >
-                              au plus juste — agrandissez si votre pièce est plus grande
-                            </Text>
-                          ) : null}
-                        </View>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-                          <TouchableOpacity onPress={() => nudgeRoom(f.axis, -1)} hitSlop={10}>
-                            <Icon
-                              name="minus-circle-outline"
-                              size={24}
-                              color={f.current > f.min ? COLORS.primary : COLORS.outlineVariant}
-                            />
-                          </TouchableOpacity>
-                          <Text
-                            style={{
-                              minWidth: 62,
-                              textAlign: "center",
-                              fontSize: 15,
-                              fontFamily: "Manrope_700Bold",
-                              color: f.auto ? COLORS.outline : COLORS.onSurface,
-                            }}
-                          >
-                            {f.current} cm
-                          </Text>
-                          <TouchableOpacity onPress={() => nudgeRoom(f.axis, 1)} hitSlop={10}>
-                            <Icon name="plus-circle-outline" size={24} color={COLORS.primary} />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ))}
-
-                    {sceneDimFields.map((f) => (
-                      <View
-                        key={f.blockId + f.key}
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          paddingVertical: 10,
-                          paddingHorizontal: 12,
-                          borderTopWidth: 1,
-                          borderTopColor: COLORS.outlineVariant,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            flex: 1,
-                            fontSize: 13.5,
-                            fontFamily: "Inter_500Medium",
-                            color: COLORS.onSurface,
-                          }}
-                        >
-                          {f.label.trim()}
-                        </Text>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-                          <TouchableOpacity onPress={() => nudgeDim(f, -1)} hitSlop={10}>
-                            <Icon name="minus-circle-outline" size={24} color={COLORS.primary} />
-                          </TouchableOpacity>
-                          <Text
-                            style={{
-                              minWidth: 62,
-                              textAlign: "center",
-                              fontSize: 15,
-                              fontFamily: "Manrope_700Bold",
-                              color: COLORS.onSurface,
-                            }}
-                          >
-                            {f.value ?? "—"} cm
-                          </Text>
-                          <TouchableOpacity onPress={() => nudgeDim(f, 1)} hitSlop={10}>
-                            <Icon name="plus-circle-outline" size={24} color={COLORS.primary} />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ))}
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        justifyContent: "space-between",
-                        paddingVertical: 10,
-                        paddingHorizontal: 12,
-                        borderTopWidth: 1,
-                        borderTopColor: COLORS.outlineVariant,
-                      }}
-                    >
-                      <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: COLORS.outline }}>
-                        Surface au sol
-                      </Text>
-                      <Text style={{ fontSize: 13.5, fontFamily: "Manrope_700Bold", color: COLORS.primary }}>
-                        {(scene.room.widthM * scene.room.depthM).toFixed(2).replace(".", ",")} m²
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View
-                    style={{
-                      backgroundColor: COLORS.surfaceContainerLowest,
-                      borderRadius: 18,
-                      padding: 16,
-                      ...SHADOW.card,
-                    }}
-                  >
-                    <Text style={{ fontSize: 15, fontFamily: FONTS.serif, color: COLORS.onSurface }}>
-                      {scene.runs.reduce((n, r) => n + r.modules.length, 0)} éléments implantés
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 12.5,
-                        fontFamily: "Inter_400Regular",
-                        color: COLORS.outline,
-                        marginTop: 4,
-                        lineHeight: 18,
-                      }}
-                    >
-                      Implantation d'après votre forme, vos mesures
-                      {ilotOn ? " et votre îlot" : ""}. Elle est jointe à votre commande pour que
-                      nos ateliers voient exactement la cuisine à réaliser.
-                    </Text>
-                  </View>
-                </>
-              )}
+              </View>
             </View>
           )}
+
 
           {/* ── Récapitulatif ─────────────────────────────────────────── */}
           {step?.kind === "summary" && (
@@ -1259,6 +990,361 @@ export default function ConfigureScreen() {
           <Button label="Continuer" onPress={() => void go(1)} size="lg" disabled={!!error} />
         )}
       </View>
+
+      {/* ── Studio 3D ─────────────────────────────────────────────────────
+          A sheet rather than a route: every bit of state the studio needs —
+          the scene, the edits, the room size — already lives in this screen,
+          and pushing a route would mean marshalling all of it through a store
+          for no gain the customer can see. */}
+      <Modal
+        visible={studioOpen}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setStudioOpen(false)}
+        statusBarTranslucent={false}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: COLORS.background,
+            paddingTop: insets.top,
+            paddingBottom: insets.bottom,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+              gap: 12,
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 17, fontFamily: FONTS.serif, color: COLORS.onSurface }}>
+                Studio 3D
+              </Text>
+              <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: COLORS.outline }}>
+                {scene.runs.reduce((n, r) => n + r.modules.length, 0)} éléments ·{" "}
+                {(scene.room.widthM * scene.room.depthM).toFixed(1).replace(".", ",")} m²
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                setStudioOpen(false);
+                setMoveMode(false);
+                setSelectedKey(null);
+              }}
+              hitSlop={10}
+              style={{
+                paddingHorizontal: 16,
+                paddingVertical: 9,
+                borderRadius: 999,
+                backgroundColor: COLORS.primary,
+              }}
+            >
+              <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onPrimary }}>
+                Terminé
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ flex: 1, borderWidth: moveMode ? 2 : 0, borderColor: COLORS.primary }}>
+            {studioOpen && (
+              <Kitchen3D
+                ref={sceneRef}
+                scene={scene}
+                editable={moveMode}
+                selectedKey={selectedKey}
+                onSelect={setSelectedKey}
+                onMove={(runIndex, key, offsetM) =>
+                  commitScene(moveModule(scene, runIndex, key, offsetM))
+                }
+                onMoveIlot={(x, z) => commitScene(moveIlot(scene, x, z))}
+              />
+            )}
+
+            <TouchableOpacity
+              onPress={turnKitchen}
+              accessibilityLabel="Pivoter la cuisine d'un quart de tour"
+              style={{
+                position: "absolute",
+                left: 12,
+                top: 12,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 7,
+                paddingLeft: 11,
+                paddingRight: 14,
+                height: 40,
+                borderRadius: 999,
+                backgroundColor: "rgba(255,255,255,0.92)",
+                borderWidth: 1,
+                borderColor: COLORS.outlineVariant,
+              }}
+            >
+              <Icon name="rotate-right" size={18} color={COLORS.onSurface} />
+              <Text style={{ fontSize: 12.5, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>
+                Pivoter
+              </Text>
+            </TouchableOpacity>
+
+            {/* Room size, opposite the zoom pill. */}
+            <View
+              style={{
+                position: "absolute",
+                left: 12,
+                bottom: 12,
+                borderRadius: 16,
+                overflow: "hidden",
+                backgroundColor: "rgba(255,255,255,0.92)",
+                borderWidth: 1,
+                borderColor: COLORS.outlineVariant,
+              }}
+            >
+              {roomFields.map((f, i) => (
+                <View
+                  key={f.axis}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingLeft: 10,
+                    paddingRight: 4,
+                    height: 42,
+                    borderTopWidth: i === 0 ? 0 : 1,
+                    borderTopColor: COLORS.outlineVariant,
+                  }}
+                >
+                  <Text style={{ width: 26, fontSize: 11, fontFamily: "Inter_700Bold", color: COLORS.outline }}>
+                    {f.axis === "length" ? "LON" : "LAR"}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => nudgeRoom(f.axis, -1)}
+                    disabled={f.current <= f.min}
+                    accessibilityLabel={`Réduire la ${f.label.toLowerCase()}`}
+                    hitSlop={6}
+                    style={{ paddingHorizontal: 7 }}
+                  >
+                    <Icon name="minus" size={17} color={f.current > f.min ? COLORS.onSurface : COLORS.outlineVariant} />
+                  </TouchableOpacity>
+                  <Text
+                    style={{
+                      minWidth: 48,
+                      textAlign: "center",
+                      fontSize: 13,
+                      fontFamily: "Manrope_700Bold",
+                      color: f.auto ? COLORS.outline : COLORS.onSurface,
+                    }}
+                  >
+                    {f.current}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => nudgeRoom(f.axis, 1)}
+                    accessibilityLabel={`Agrandir la ${f.label.toLowerCase()}`}
+                    hitSlop={6}
+                    style={{ paddingHorizontal: 7 }}
+                  >
+                    <Icon name="plus" size={17} color={COLORS.onSurface} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+
+            <View
+              style={{
+                position: "absolute",
+                right: 12,
+                bottom: 12,
+                borderRadius: 999,
+                overflow: "hidden",
+                backgroundColor: "rgba(255,255,255,0.92)",
+                borderWidth: 1,
+                borderColor: COLORS.outlineVariant,
+              }}
+            >
+              {([
+                { key: "in", icon: "plus", factor: ZOOM_STEP.in, label: "Zoom avant" },
+                { key: "out", icon: "minus", factor: ZOOM_STEP.out, label: "Zoom arrière" },
+              ] as const).map((z, i) => (
+                <TouchableOpacity
+                  key={z.key}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    sceneRef.current?.zoom(z.factor);
+                  }}
+                  accessibilityLabel={z.label}
+                  hitSlop={4}
+                  style={{
+                    width: 42,
+                    height: 42,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderTopWidth: i === 1 ? 1 : 0,
+                    borderTopColor: COLORS.outlineVariant,
+                  }}
+                >
+                  <Icon name={z.icon} size={20} color={COLORS.onSurface} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Controls live under the canvas so nothing covers the kitchen. */}
+          <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16, gap: 10 }}>
+            <PressableScale
+              onPress={() => {
+                Haptics.selectionAsync();
+                setMoveMode((v) => !v);
+                setSelectedKey(null);
+              }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                paddingVertical: 12,
+                borderRadius: 999,
+                backgroundColor: moveMode ? COLORS.primary : COLORS.surfaceContainer,
+              }}
+            >
+              <Icon
+                name={moveMode ? "check" : "cursor-move"}
+                size={18}
+                color={moveMode ? COLORS.onPrimary : COLORS.onSurfaceVariant}
+              />
+              <Text
+                style={{
+                  fontSize: 13.5,
+                  fontFamily: "Inter_600SemiBold",
+                  color: moveMode ? COLORS.onPrimary : COLORS.onSurfaceVariant,
+                }}
+              >
+                {moveMode ? "Terminer le déplacement" : "Déplacer les éléments"}
+              </Text>
+            </PressableScale>
+
+            {moveMode ? (
+              <>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, minHeight: 44 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontFamily: FONTS.serif, color: COLORS.onSurface }}>
+                      {selectedIsIlot
+                        ? "Îlot central"
+                        : selectedModule
+                          ? selectedModule.label
+                          : "Touchez un élément"}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 11.5,
+                        fontFamily: "Inter_400Regular",
+                        color: COLORS.outline,
+                        marginTop: 1,
+                      }}
+                    >
+                      {selectedIsIlot
+                        ? "Glissez-le sur le sol, ou pivotez-le d'un quart de tour."
+                        : selectedModule
+                          ? `Mur ${targetRun + 1} · ${selectedModule.widthMm} mm — glissez-le, il échange sa place avec son voisin`
+                          : "Puis glissez-le le long de son mur."}
+                    </Text>
+                  </View>
+                  {selectedIsIlot ? (
+                    <TouchableOpacity
+                      onPress={() => {
+                        void Haptics.selectionAsync();
+                        setIlotRotation((q) => (q + 1) % 4);
+                      }}
+                      hitSlop={8}
+                      style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+                    >
+                      <Icon name="rotate-right" size={20} color={COLORS.primary} />
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.primary }}>
+                        Pivoter
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  {selectedModule && !selectedIsIlot ? (
+                    <TouchableOpacity
+                      onPress={() => {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                        commitScene(removeModule(scene, targetRun, selectedKey!));
+                        setSelectedKey(null);
+                      }}
+                      hitSlop={8}
+                      style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+                    >
+                      <Icon name="trash-can-outline" size={20} color={COLORS.error} />
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.error }}>
+                        Retirer
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 8, paddingRight: 16 }}
+                >
+                  {MODULES.map((m) => {
+                    const fits = fitsOnRun(scene, targetRun, m.id);
+                    return (
+                      <PressableScale
+                        key={m.id}
+                        disabled={!fits}
+                        onPress={() => {
+                          const next = addModule(scene, targetRun, m.id);
+                          if (!next.key) return;
+                          Haptics.selectionAsync();
+                          commitScene(next.scene);
+                          setSelectedKey(next.key);
+                        }}
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          borderRadius: 12,
+                          backgroundColor: COLORS.surfaceContainerLowest,
+                          borderWidth: 1,
+                          borderColor: COLORS.outlineVariant,
+                          opacity: fits ? 1 : 0.38,
+                          minWidth: 124,
+                        }}
+                      >
+                        <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>
+                          {m.label}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontFamily: "Inter_400Regular",
+                            color: COLORS.outline,
+                            marginTop: 1,
+                          }}
+                        >
+                          {fits ? `${m.widthMm} mm · mur ${targetRun + 1}` : "Ne rentre pas"}
+                        </Text>
+                      </PressableScale>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            ) : (
+              <Text
+                style={{
+                  fontSize: 12.5,
+                  fontFamily: "Inter_400Regular",
+                  color: COLORS.outline,
+                  lineHeight: 18,
+                }}
+              >
+                Tournez avec un doigt, pincez pour zoomer. LON / LAR règlent la taille de la
+                pièce{scene.accessories.length ? ", vos accessoires sont posés sur le plan" : ""}.
+              </Text>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

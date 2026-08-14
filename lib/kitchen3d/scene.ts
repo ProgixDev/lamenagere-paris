@@ -1,4 +1,5 @@
 import { mm, moduleById, MODULES, WORKTOP_TOP_MM } from "./catalog";
+import { ilotFootprint } from "./types";
 import type {
   KitchenConfig,
   KitchenScene,
@@ -19,7 +20,18 @@ import type {
  */
 
 /** Room defaults when a measurement has not been filled in, metres. */
-const FALLBACK = { run1: 3.6, run2: 2.4, run3: 2.4, height: 2.5 };
+const FALLBACK = { run1: 3.6, run2: 2.4, run3: 2.4, height: 2.1 };
+
+/**
+ * The room the customer starts from, before they say otherwise.
+ *
+ * Sizing it to the runs instead made every unedited kitchen look cramped —
+ * every square metre was cabinet. A typical room gives the island somewhere to
+ * stand and the customer something to shrink rather than something to grow.
+ * Still only a starting point: it can never come out smaller than the kitchen
+ * standing in it.
+ */
+const DEFAULT_ROOM = { widthM: 5.0, depthM: 4.0 };
 
 /** Clearance kept between the corner and the start of a return run. */
 const CORNER_CLEARANCE_M = mm(600);
@@ -41,6 +53,19 @@ const cm = (v: number | undefined, fallback: number) =>
 /** Metres, or null when the customer left the field empty. */
 const cmOrNull = (v: number | undefined) =>
   v != null && Number.isFinite(v) && v > 0 ? v / 100 : null;
+
+/**
+ * The wall a canonical run actually stands against once the kitchen is turned.
+ *
+ * Clockwise seen from above, which is the direction the renderer turns the
+ * group in. Used for the island's free floor, which is measured in the room's
+ * own frame rather than the kitchen's.
+ */
+const WALL_ORDER: Wall[] = ["back", "right", "front", "left"];
+export function rotatedWall(wall: Wall, quarters: number): Wall {
+  const i = WALL_ORDER.indexOf(wall);
+  return i < 0 ? wall : WALL_ORDER[(i + ((quarters % 4) + 4)) % 4];
+}
 
 export function runsOfShapeKey(shapeKey?: string | null): number {
   return shapeKey === "u" ? 3 : shapeKey === "l" ? 2 : 1;
@@ -126,7 +151,8 @@ function wallUnitsOver(baseModules: PlacedModule[], lengthM: number): PlacedModu
 
     // Columns run floor to ceiling — there is no "above" to fill.
     const width = mm(base.widthMm);
-    const id = base.fixture === "hob" ? "haut-hotte-60" : null;
+    // A range cooks just like a hob does, so it wants extraction too.
+    const id = base.fixture === "hob" || base.fixture === "range" ? "haut-hotte-60" : null;
 
     if (id) {
       const hood = moduleById(id)!;
@@ -164,6 +190,52 @@ const WANTED: Record<number, string[]> = {
 };
 const FILLER = ["bas-simple-60", "bas-tiroirs-60"];
 
+/** Footprint of an accessory block, metres. Uniform on purpose — see the type. */
+const ACC = { widthM: 0.34, depthM: 0.28, heightM: 0.16, gapM: 0.08 };
+
+/**
+ * Lines the chosen accessories up along the back worktop, left to right.
+ *
+ * They are placed rather than modelled: the point is that the customer can see
+ * and read what they picked, not that a range-couverts is drawn accurately
+ * inside a drawer where it would be invisible. Anything that overruns the run
+ * wraps onto a second row rather than marching off the end of the counter.
+ */
+function placeAccessories(
+  chosen: { id: string; title: string }[],
+  runs: Run[],
+  room: { widthM: number; depthM: number },
+  worktopTopM: number,
+) {
+  const back = runs.find((r) => r.wall === "back");
+  if (!back || !chosen.length) return [];
+
+  const pitch = ACC.widthM + ACC.gapM;
+  // Start clear of the corner when a return run turns out of it, so the first
+  // block does not straddle the join between two worktops.
+  const startM = runs.some((r) => r.wall === "left") ? CORNER_CLEARANCE_M : ACC.gapM;
+  const perRow = Math.max(1, Math.floor((back.lengthM - startM) / pitch));
+  // The back worktop spans z from the wall to one cabinet depth into the room.
+  const frontOfWorktop = -room.depthM / 2 + mm(600);
+
+  return chosen.map((a, i) => {
+    const col = i % perRow;
+    const row = Math.floor(i / perRow);
+    return {
+      id: a.id,
+      title: a.title.trim(),
+      // The back run starts at the left wall and travels +x.
+      x: -room.widthM / 2 + startM + pitch * col + ACC.widthM / 2,
+      // Rows stack towards the wall so the first one is nearest the viewer.
+      z: frontOfWorktop - ACC.depthM / 2 - row * (ACC.depthM + ACC.gapM),
+      baseM: worktopTopM,
+      widthM: ACC.widthM,
+      depthM: ACC.depthM,
+      heightM: ACC.heightM,
+    };
+  });
+}
+
 export function buildScene(config: KitchenConfig): KitchenScene {
   const runCount = runsOfShapeKey(config.shapeKey);
 
@@ -181,16 +253,29 @@ export function buildScene(config: KitchenConfig): KitchenScene {
    * customer gives the real room it is used as given, never rounded, and never
    * allowed below what the runs physically need.
    */
-  const minWidth = run1;
-  const minDepth = Math.max(
+  const quarters = ((config.rotationQuarters ?? 0) % 4 + 4) % 4;
+  const turned = quarters % 2 === 1;
+
+  // What the kitchen needs along its own two axes.
+  const alongRuns = run1;
+  const acrossRuns = Math.max(
     runCount >= 2 ? run2 : 0,
     runCount >= 3 ? run3 : 0,
     // A straight run has no second wall to measure, so it needs its own floor:
     // one cabinet depth plus room to stand in front of it.
     mm(600) + 0.9,
   );
-  const widthM = Math.max(cmOrNull(config.roomLengthCm) ?? minWidth, minWidth);
-  const depthM = Math.max(cmOrNull(config.roomWidthCm) ?? minDepth, minDepth);
+  // Turned a quarter, the long run lies along the room's depth instead, so the
+  // minimums swap with it — otherwise rotating into a narrow room would push
+  // the kitchen through a wall.
+  const minWidth = turned ? acrossRuns : alongRuns;
+  const minDepth = turned ? alongRuns : acrossRuns;
+  const widthM = Math.max(cmOrNull(config.roomLengthCm) ?? DEFAULT_ROOM.widthM, minWidth);
+  const depthM = Math.max(cmOrNull(config.roomWidthCm) ?? DEFAULT_ROOM.depthM, minDepth);
+
+  // The kitchen lays itself out in its own frame; the renderer turns it.
+  const canonWidth = turned ? depthM : widthM;
+  const canonDepth = turned ? widthM : depthM;
 
   /**
    * Worktop height as entered, which moves the carcasses under it: a customer
@@ -205,7 +290,7 @@ export function buildScene(config: KitchenConfig): KitchenScene {
   for (let i = 0; i < runCount; i++) {
     // A return run cannot start in the corner — the back run's carcass is
     // already there — so it loses one cabinet depth off the top.
-    const raw = i === 0 ? run1 : Math.min(i === 1 ? run2 : run3, depthM);
+    const raw = i === 0 ? run1 : Math.min(i === 1 ? run2 : run3, canonDepth);
     const lengthM = i === 0 ? raw : Math.max(0, raw - CORNER_CLEARANCE_M);
 
     const base = packRun(lengthM, WANTED[i] ?? [], FILLER);
@@ -223,7 +308,19 @@ export function buildScene(config: KitchenConfig): KitchenScene {
   const scene: KitchenScene = {
     room: { widthM, depthM, heightM },
     runs,
-    geometry: { worktopTopM, credence: config.credence !== false },
+    rotationQuarters: quarters,
+    // Accessories ride with the kitchen, so they are placed in its frame too.
+    accessories: placeAccessories(
+      config.accessories ?? [],
+      runs,
+      { widthM: canonWidth, depthM: canonDepth },
+      worktopTopM,
+    ),
+    geometry: {
+      worktopTopM,
+      credence: config.credence !== false,
+      minRoom: { widthM: minWidth, depthM: minDepth },
+    },
     openings: [],
     materials: {
       facade: config.facadeHex || "#E8E4DC",
@@ -237,11 +334,20 @@ export function buildScene(config: KitchenConfig): KitchenScene {
   if (config.ilot) {
     // The floor left over once the runs have taken their depth.
     const runDepth = mm(600);
-    const has = (w: Wall) => runs.some((r) => r.wall === w);
-    const xMin = -widthM / 2 + (has("left") ? runDepth : 0);
-    const xMax = widthM / 2 - (has("right") ? runDepth : 0);
-    const zMin = -depthM / 2 + (has("back") ? runDepth : 0);
-    const zMax = depthM / 2;
+    const hasCanon = (w: Wall) => runs.some((r) => r.wall === w);
+    const backLen = runs.find((r) => r.wall === "back")?.lengthM ?? canonWidth;
+    // Measured in the kitchen's own frame, where the third arm stands at the
+    // end of the back run rather than against the far wall.
+    const cxMin = -canonWidth / 2 + (hasCanon("left") ? runDepth : 0);
+    const cxMax = hasCanon("right") ? -canonWidth / 2 + backLen - runDepth : canonWidth / 2;
+    const czMin = -canonDepth / 2 + (hasCanon("back") ? runDepth : 0);
+    const czMax = canonDepth / 2;
+    // Back to the room's frame, which is where the island is positioned.
+    const turnedRoom = quarters % 2 === 1;
+    const xMin = turnedRoom ? czMin : cxMin;
+    const xMax = turnedRoom ? czMax : cxMax;
+    const zMin = turnedRoom ? cxMin : czMin;
+    const zMax = turnedRoom ? cxMax : czMax;
 
     /**
      * A measured island is drawn at its measured size, full stop.
@@ -251,20 +357,30 @@ export function buildScene(config: KitchenConfig): KitchenScene {
      * resizing an island the customer measured would put a number in the recap
      * that the picture disagrees with — so it is flagged instead.
      */
+    const ilotQuarters = ((config.ilotRotationQuarters ?? 0) % 4 + 4) % 4;
+    const turnedIlot = ilotQuarters % 2 === 1;
+    // An invented island is sized to the space it will actually occupy, which
+    // is the space the long side ends up facing once it is turned.
+    const spanX = xMax - xMin, spanZ = zMax - zMin;
+    const roomForLength = turnedIlot ? spanZ : spanX;
+    const roomForDepth = turnedIlot ? spanX : spanZ;
+
     const measuredW = cmOrNull(config.ilotLengthCm);
     const measuredD = cmOrNull(config.ilotWidthCm);
-    const ilotW = measuredW ?? clamp(xMax - xMin - WALKWAY_M * 2, 1.2, 2.4);
-    const ilotD = measuredD ?? clamp(zMax - zMin - WALKWAY_M * 2, 0.7, 1.1);
+    const ilotW = measuredW ?? clamp(roomForLength - WALKWAY_M * 2, 1.2, 2.4);
+    const ilotD = measuredD ?? clamp(roomForDepth - WALKWAY_M * 2, 0.7, 1.1);
 
+    const foot = ilotFootprint({ widthM: ilotW, depthM: ilotD, rotationQuarters: ilotQuarters });
     scene.ilot = {
       widthM: ilotW,
       depthM: ilotD,
+      rotationQuarters: ilotQuarters,
       topM: cm(config.ilotHeightCm, worktopTopM),
       x: (xMin + xMax) / 2,
       z: (zMin + zMax) / 2,
       tight:
-        (xMax - xMin - ilotW) / 2 < MIN_WALKWAY_M ||
-        (zMax - zMin - ilotD) / 2 < MIN_WALKWAY_M,
+        (spanX - foot.alongX) / 2 < MIN_WALKWAY_M ||
+        (spanZ - foot.alongZ) / 2 < MIN_WALKWAY_M,
     };
   }
 

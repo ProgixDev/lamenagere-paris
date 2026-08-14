@@ -22,8 +22,13 @@ const OUT = join(ROOT, "lib", "kitchen3d", "three-bundle.ts");
 const ENTRY = `
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+// A procedurally built room, used through PMREM as the environment map. Without
+// one, every metal and glossy surface renders dead flat — and it is generated,
+// so it costs no asset and works offline.
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 globalThis.THREE = THREE;
 globalThis.OrbitControls = OrbitControls;
+globalThis.RoomEnvironment = RoomEnvironment;
 `;
 
 const result = await build({

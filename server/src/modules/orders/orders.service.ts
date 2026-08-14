@@ -109,9 +109,13 @@ export function sanitizeLayout(raw: unknown): ConfiguredLayout | null {
             widthM: ilotW,
             depthM: ilotD,
             topM: num(l.ilot?.topM, 3) ?? 0.9,
+            rotationQuarters: [0, 1, 2, 3].includes(l.ilot?.rotationQuarters)
+              ? l.ilot.rotationQuarters
+              : 0,
             tight: l.ilot?.tight === true,
           }
         : undefined,
+    rotationQuarters: [0, 1, 2, 3].includes(l.rotationQuarters) ? l.rotationQuarters : 0,
     worktopTopM: num(l.worktopTopM, 3) ?? 0.9,
     credence: l.credence !== false,
     modulesTotalCents: cents(l.modulesTotalCents),

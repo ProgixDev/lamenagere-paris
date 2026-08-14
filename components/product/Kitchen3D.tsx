@@ -43,6 +43,14 @@ const Kitchen3D = forwardRef<
     onMove?: (runIndex: number, key: string, offsetM: number) => void;
     /** The island moves in two axes, so it reports a point rather than an offset. */
     onMoveIlot?: (x: number, z: number) => void;
+    /**
+     * Live while a room grip is dragged. The renderer has already resized
+     * itself, so this is for showing the figure — committing it here would
+     * re-inject the scene mid-drag and fight the preview.
+     */
+    onRoomPreview?: (lengthCm: number, widthCm: number) => void;
+    /** Fired once, on release, with the size to keep. */
+    onRoomResized?: (lengthCm: number, widthCm: number) => void;
     style?: any;
     onError?: (message: string) => void;
   }
@@ -54,6 +62,8 @@ const Kitchen3D = forwardRef<
     onSelect,
     onMove,
     onMoveIlot,
+    onRoomPreview,
+    onRoomResized,
     style,
     onError,
   },
@@ -113,12 +123,14 @@ const Kitchen3D = forwardRef<
       if (msg.type === "movedIlot" && typeof msg.x === "number" && typeof msg.z === "number") {
         onMoveIlot?.(msg.x, msg.z);
       }
+      if (msg.type === "roomPreview") onRoomPreview?.(msg.lengthCm, msg.widthCm);
+      if (msg.type === "roomResized") onRoomResized?.(msg.lengthCm, msg.widthCm);
       if (msg.type === "error") {
         setFailure(msg.message);
         onError?.(msg.message);
       }
     },
-    [onError, onSelect, onMove, onMoveIlot],
+    [onError, onSelect, onMove, onMoveIlot, onRoomPreview, onRoomResized],
   );
 
   return (

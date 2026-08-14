@@ -68,12 +68,118 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 1.02;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#EFEDE9');
+
+/**
+ * Reflections, from a room generated in code.
+ *
+ * A MeshStandardMaterial with any metalness and no environment to reflect is
+ * lit only by the lamps, so chrome renders as flat grey and a polished worktop
+ * looks like matte paper. RoomEnvironment builds a plausible interior out of
+ * boxes and PMREM turns it into the blurred probe the shader samples — the
+ * single biggest gain available here, and it downloads nothing.
+ */
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+// Dialled well down. At full strength the probe is bright enough to lay a
+// vertical gradient across every door, which reads as wet lacquer rather than
+// painted wood — the reflection is wanted for the stone and the metal, not for
+// the cabinetry.
+// Enough to light faces the key never reaches. A strong directional lamp with
+// little ambient blasts the cabinet ends while the doors face away from it —
+// invisible on white, but on a saturated mid-tone the two read as different
+// materials. The probe lights every orientation, so it carries more of the load.
+scene.environmentIntensity = 0.55;
+
+// ── Procedural surfaces ────────────────────────────────────────────────────
+/**
+ * Textures drawn at run time rather than downloaded.
+ *
+ * The point is not to save a download — it is that a photographed oak plank is
+ * stuck being oak, whereas a drawn one takes the customer's own colour and
+ * keeps its grain. Everything here is tinted from the hex they picked.
+ */
+function canvasTexture(w, h, draw, repeat) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  draw(c.getContext('2d'));
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  if (repeat) t.repeat.set(repeat[0], repeat[1]);
+  t.anisotropy = 8;
+  return t;
+}
+
+const shade = (hex, k) => new THREE.Color(hex).multiplyScalar(k).getStyle();
+
+/** Boards with a grain, for the floor. */
+function woodTexture(hex) {
+  return canvasTexture(512, 512, (g) => {
+    g.fillStyle = hex; g.fillRect(0, 0, 512, 512);
+    const boards = 4, bh = 512 / boards;
+    for (let b = 0; b < boards; b++) {
+      // Each board sits a shade off its neighbours, as real ones do.
+      g.fillStyle = shade(hex, 0.93 + ((b * 37) % 11) / 70);
+      g.fillRect(0, b * bh, 512, bh - 2);
+      g.strokeStyle = shade(hex, 0.62); g.lineWidth = 2;
+      g.beginPath(); g.moveTo(0, b * bh + bh - 1); g.lineTo(512, b * bh + bh - 1); g.stroke();
+      // Grain: long, shallow arcs along the board.
+      for (let i = 0; i < 26; i++) {
+        const y = b * bh + 4 + Math.random() * (bh - 8);
+        g.strokeStyle = shade(hex, 0.82 + Math.random() * 0.22);
+        g.lineWidth = 0.6 + Math.random() * 1.4;
+        g.beginPath();
+        g.moveTo(0, y);
+        g.bezierCurveTo(170, y + (Math.random() - 0.5) * 7, 340, y + (Math.random() - 0.5) * 7, 512, y);
+        g.stroke();
+      }
+    }
+  }, [3, 3]);
+}
+
+/** Veining, for a stone worktop. */
+function stoneTexture(hex) {
+  return canvasTexture(512, 512, (g) => {
+    g.fillStyle = hex; g.fillRect(0, 0, 512, 512);
+    // Fine speckle first, then a few larger veins over it.
+    for (let i = 0; i < 5000; i++) {
+      g.fillStyle = shade(hex, 0.75 + Math.random() * 0.6);
+      g.fillRect(Math.random() * 512, Math.random() * 512, 1.4, 1.4);
+    }
+    for (let v = 0; v < 7; v++) {
+      g.strokeStyle = shade(hex, 1.35 + Math.random() * 0.5);
+      g.lineWidth = 0.8 + Math.random() * 2.2;
+      g.globalAlpha = 0.5;
+      let x = Math.random() * 512, y = Math.random() * 512;
+      g.beginPath(); g.moveTo(x, y);
+      for (let k = 0; k < 7; k++) {
+        x += (Math.random() - 0.5) * 180; y += (Math.random() - 0.5) * 180;
+        g.lineTo(x, y);
+      }
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+  }, [2, 2]);
+}
+
+/** A fine vertical grain, so a painted door is not a flat fill. */
+function facadeTexture(hex) {
+  return canvasTexture(256, 256, (g) => {
+    g.fillStyle = hex; g.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 260; i++) {
+      g.strokeStyle = shade(hex, 0.97 + Math.random() * 0.06);
+      g.lineWidth = 0.7;
+      const x = Math.random() * 256;
+      g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 256); g.stroke();
+    }
+  }, [1, 1]);
+}
 
 const camera = new THREE.PerspectiveCamera(46, window.innerWidth/window.innerHeight, 0.05, 100);
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -101,14 +207,24 @@ let userMoved = false; // true once the customer has moved the camera themselves
 // ── Materials ──────────────────────────────────────────────────────────────
 function makeMaterials(m) {
   const std = (color, opts) => new THREE.MeshStandardMaterial(Object.assign({ color: new THREE.Color(color) }, opts||{}));
+  /**
+   * A textured surface takes its colour from the map, and only from the map.
+   *
+   * three multiplies the colour by the map, so passing both applies the hex
+   * twice — squared in linear space. #9B6B43 comes out at about a third of
+   * its brightness, which reads as a different, darker material than the
+   * untextured carcass beside it.
+   */
+  const painted = (map, opts) =>
+    new THREE.MeshStandardMaterial(Object.assign({ color: 0xffffff, map }, opts || {}));
   return {
-    facade:   std(m.facade,  { roughness:0.55, metalness:0.02 }),
+    facade:   painted(facadeTexture(m.facade), { roughness:0.62, metalness:0 }),
     // The carcass reads slightly darker than the front so edges stay legible.
-    carcass:  std(new THREE.Color(m.facade).multiplyScalar(0.86), { roughness:0.8 }),
-    worktop:  std(m.worktop, { roughness:0.35, metalness:0.05 }),
-    credence: std(new THREE.Color(m.worktop).lerp(new THREE.Color('#ffffff'), 0.12), { roughness:0.3 }),
+    carcass:  std(new THREE.Color(m.facade).multiplyScalar(0.94), { roughness:0.78, metalness:0 }),
+    worktop:  painted(stoneTexture(m.worktop), { roughness:0.3, metalness:0.06 }),
+    credence: std(new THREE.Color(m.worktop).lerp(new THREE.Color('#ffffff'), 0.12), { roughness:0.34, metalness:0 }),
     wall:     std(m.wall,    { roughness:0.95 }),
-    floor:    std(m.floor,   { roughness:0.75 }),
+    floor:    painted(woodTexture(m.floor), { roughness:0.62 }),
     metal:    std(m.metal,   { roughness:0.32, metalness:0.85 }),
     dark:     std('#1C1D1F', { roughness:0.25, metalness:0.3 }),
     glass:    new THREE.MeshPhysicalMaterial({ color:'#BFD4DC', roughness:0.06, metalness:0, transmission:0.85, transparent:true, opacity:0.35, thickness:0.01 }),
@@ -210,7 +326,7 @@ function hood(mats, w, x, z, depth, ceilingH) {
   const g = new THREE.Group();
   // Hoods are fitted a set distance above the hob, so this follows the worktop
   // rather than sitting at a fixed height off the floor.
-  const bottom = WORKTOP_TOP + MM(650);
+  const bottom = Math.min(WORKTOP_TOP + MM(650), ceilingH - MM(300));
   // Canopy, then a chimney running up to the ceiling.
   g.add(box(w*0.92, MM(120), depth*0.95, mats.steel, x, bottom + MM(60), z - depth*0.02));
   g.add(box(w*0.34, ceilingH - bottom - MM(120), depth*0.5, mats.steel, x, bottom + MM(120) + (ceilingH - bottom - MM(120))/2, z - depth*0.24));
@@ -245,11 +361,19 @@ function baseUnit(mats, mod, ox, ceilingH) {
   const w = MM(mod.widthMm), d = MM(mod.depthMm);
   const x = ox + w/2, carcassD = d - PANEL_T;
 
+  // A range is one appliance from floor to worktop, so it stands in place of
+  // the cabinet rather than on top of one — no plinth, no carcass, no front.
+  if (mod.fixture === 'range') {
+    g.add(gasRange(mats, w, d, x));
+    return g;
+  }
+
   g.add(box(w, PLINTH_H, carcassD - PLINTH_INSET, mats.dark, x, PLINTH_H/2, (carcassD - PLINTH_INSET)/2));
   g.add(box(w, CARCASS_H, carcassD, mats.carcass, x, PLINTH_H + CARCASS_H/2, carcassD/2));
 
   const fy = PLINTH_H + CARCASS_H/2, fz = carcassD + PANEL_T/2;
   if (mod.fixture === 'dishwasher') g.add(appliancePanel(mats, w, CARCASS_H, x, fy, fz, 'dishwasher'));
+  else if (mod.fixture === 'oven') g.add(appliancePanel(mats, w, CARCASS_H, x, fy, fz, 'oven'));
   else if (mod.drawers) g.add(drawerFronts(mats, w, CARCASS_H, mod.drawers, x, fy, fz));
   else if (mod.widthMm > 700) {
     // Wide cabinets take a pair of doors rather than one unliftable slab.
@@ -259,18 +383,69 @@ function baseUnit(mats, mod, ox, ceilingH) {
 
   if (mod.fixture === 'sink') g.add(sink(mats, w, x, d/2, d));
   if (mod.fixture === 'hob') g.add(hob(mats, w, x, d/2, d));
+  if (mod.fixture === 'warming') g.add(warmingPlate(mats, w, x, d/2, d));
   return g;
+}
+
+/**
+ * Where a wall unit can hang, given the ceiling above it.
+ *
+ * The standard 550 mm upstand puts the top of a 700 mm cupboard at 2.15 m, so
+ * any ceiling below that has cabinets growing through it. Real fitters close
+ * the gap above the worktop first and only then use a shorter cupboard, which
+ * is the order this follows.
+ */
+function wallUnitFit(h, ceilingH) {
+  const maxTop = ceilingH - MM(20);
+  let bottom = WALL_BOTTOM;
+  let height = h;
+  if (bottom + height > maxTop) {
+    bottom = Math.max(WORKTOP_TOP + MM(350), maxTop - height);
+    if (bottom + height > maxTop) height = Math.max(MM(280), maxTop - bottom);
+  }
+  return { bottom, height };
 }
 
 function wallUnit(mats, mod, ox, ceilingH) {
   const g = new THREE.Group();
-  const w = MM(mod.widthMm), d = MM(mod.depthMm), h = MM(mod.heightMm);
+  const w = MM(mod.widthMm), d = MM(mod.depthMm);
+  const fit = wallUnitFit(MM(mod.heightMm), ceilingH);
+  const WALL_BOTTOM = fit.bottom, h = fit.height;
   const x = ox + w/2;
   if (mod.fixture === 'hood') { g.add(hood(mats, w, x, d/2, d, ceilingH)); return g; }
 
   const carcassD = d - PANEL_T;
-  g.add(box(w, h, carcassD, mats.carcass, x, WALL_BOTTOM + h/2, carcassD/2));
   const fz = carcassD + PANEL_T/2;
+
+  if (mod.fixture === 'glass' || mod.fixture === 'glass-led') {
+    const lit = mod.fixture === 'glass-led';
+    // Hollow, not the solid block an opaque unit gets: there is no point
+    // glazing a door if what lies behind it is a filled box.
+    const t = MM(18);
+    const interior = new THREE.MeshStandardMaterial({
+      color: new THREE.Color('#F2F1ED'), roughness: 0.85,
+      ...(lit ? { emissive: new THREE.Color('#FFE9BE'), emissiveIntensity: 0.28 } : {}),
+    });
+    g.add(box(w, h, t, interior, x, WALL_BOTTOM + h/2, t/2));                       // back
+    g.add(box(w, t, carcassD, interior, x, WALL_BOTTOM + t/2, carcassD/2));         // bottom
+    g.add(box(w, t, carcassD, interior, x, WALL_BOTTOM + h - t/2, carcassD/2));     // top
+    for (const sx of [-1, 1]) {
+      g.add(box(t, h, carcassD, interior, x + sx*(w/2 - t/2), WALL_BOTTOM + h/2, carcassD/2));
+    }
+    g.add(glazedInterior(mats, w, h, carcassD, x, WALL_BOTTOM, carcassD/2, lit));
+    g.add(glazedFront(mats, w, h, x, WALL_BOTTOM + h/2, fz, lit));
+    return g;
+  }
+
+  g.add(box(w, h, carcassD, mats.carcass, x, WALL_BOTTOM + h/2, carcassD/2));
+  if (mod.fixture === 'microwave') {
+    // Sunk into the lower two-thirds, with a cupboard door above it.
+    const moH = h * 0.62;
+    g.add(appliancePanel(mats, w, moH, x, WALL_BOTTOM + moH/2, fz, 'oven'));
+    g.add(doorFront(mats, w, h - moH, x, WALL_BOTTOM + moH + (h - moH)/2, fz));
+    return g;
+  }
+
   if (mod.widthMm > 700) {
     g.add(doorFront(mats, w/2, h, x - w/4, WALL_BOTTOM + h/2, fz));
     g.add(doorFront(mats, w/2, h, x + w/4, WALL_BOTTOM + h/2, fz));
@@ -278,9 +453,11 @@ function wallUnit(mats, mod, ox, ceilingH) {
   return g;
 }
 
-function column(mats, mod, ox) {
+function column(mats, mod, ox, ceilingH) {
   const g = new THREE.Group();
-  const w = MM(mod.widthMm), d = MM(mod.depthMm), h = MM(mod.heightMm);
+  const w = MM(mod.widthMm), d = MM(mod.depthMm);
+  // A 2.10 m column under a 2.00 m ceiling has to lose the difference.
+  const h = Math.min(MM(mod.heightMm), ceilingH - MM(20));
   const x = ox + w/2, carcassD = d - PANEL_T, fz = carcassD + PANEL_T/2;
 
   g.add(box(w, PLINTH_H, carcassD - PLINTH_INSET, mats.dark, x, PLINTH_H/2, (carcassD - PLINTH_INSET)/2));
@@ -378,29 +555,50 @@ function buildWall(mats, width, height, openings, thickness) {
   return g;
 }
 
-// ── Scene assembly ─────────────────────────────────────────────────────────
-function build(data, catalog) {
-  if (root) { scene.remove(root); root.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); } }); }
-  root = new THREE.Group();
-  walls = [];
-  pickables = [];
-  ilotGroup = null;
-  selectionBox = null;
+/**
+ * Where a run starts, given the room it is in.
+ *
+ * A return run is anchored at the corner it turns out of, not stretched to
+ * fill its wall — the room can be deeper than the run is long, and a kitchen
+ * that floated away from its own corner when the room grew would be wrong.
+ * The left one is laid front-to-back so its cabinets face into the room, so
+ * its *start* is the far end and the corner is where it finishes.
+ */
+function placementFor(run, W, D, backLenM) {
+  if (run.wall === 'back') return { pos: [-W/2, 0, -D/2], rotY: 0 };
+  if (run.wall === 'left') {
+    return { pos: [-W/2, 0, -D/2 + CORNER_CLEARANCE + run.lengthM], rotY: Math.PI/2 };
+  }
+  if (run.wall === 'right') {
+    // Attached to the far end of the back run, not to the room's right wall.
+    // Once the room can be wider than the kitchen those are different places,
+    // and pinning it to the wall leaves the third arm stranded metres away —
+    // the U stops reading as a U and looks like a lone column.
+    return { pos: [-W/2 + backLenM, 0, -D/2 + CORNER_CLEARANCE], rotY: -Math.PI/2 };
+  }
+  return null;
+}
 
-  applyHeights((data.geometry && data.geometry.worktopTopM) || MM(900));
-  const mats = makeMaterials(data.materials);
-  const W = data.room.widthM, D = data.room.depthM, H = data.room.heightM;
+/**
+ * Floor, ceiling and the four walls, as one replaceable group.
+ *
+ * Kept separate from the cabinets so dragging a room handle can rebuild the
+ * shell — a dozen boxes — and merely reposition everything else, instead of
+ * regenerating a few hundred cabinet meshes on every pointer move.
+ */
+function buildShell(mats, W, D, H, openings) {
+  const shell = new THREE.Group();
   const T = MM(100);
+  walls = [];
 
-  // Floor and ceiling.
   const floor = box(W, MM(20), D, mats.floor, 0, -MM(10), 0);
-  floor.castShadow = false; root.add(floor);
+  floor.castShadow = false; shell.add(floor);
   ceiling = box(W, MM(20), D, mats.wall, 0, H + MM(10), 0);
-  ceiling.castShadow = false; ceilingY = H; root.add(ceiling);
+  ceiling.castShadow = false; ceilingY = H; shell.add(ceiling);
 
-  // Four walls, each with its own openings. Kept in the walls list so the
-  // render loop can drop whichever stands between the camera and the kitchen.
-  const opsOn = (w) => (data.openings || []).filter((o) => o.wall === w);
+  // Each wall carries its own openings. Kept in the walls list so the render
+  // loop can drop whichever stands between the camera and the kitchen.
+  const opsOn = (w) => openings.filter((o) => o.wall === w);
   const defs = [
     { wall:'back',  width:W, pos:[0, 0, -D/2 - T/2], rotY:0,            normal:[0,0,1],  map:(o)=>o.offsetM },
     { wall:'front', width:W, pos:[0, 0,  D/2 + T/2], rotY:Math.PI,      normal:[0,0,-1], map:(o)=>W - o.offsetM - o.widthM },
@@ -416,34 +614,240 @@ function build(data, catalog) {
     holder.add(g);
     holder.position.set(d.pos[0], d.pos[1], d.pos[2]);
     holder.rotation.y = d.rotY;
-    root.add(holder);
+    shell.add(holder);
     walls.push({ obj: holder, normal: new THREE.Vector3(d.normal[0], d.normal[1], d.normal[2]), centre: new THREE.Vector3(d.pos[0], H/2, d.pos[2]) });
   }
+  return shell;
+}
 
-  // Runs. A return run has to face into the room, which fixes its direction:
-  // the left one is laid front-to-back, the right one back-to-front.
+/**
+ * A name that hangs in the air above an accessory and always faces the camera.
+ *
+ * Drawn into a 2D canvas and used as a sprite texture, because three.js has no
+ * text of its own and pulling in a font loader for a handful of captions would
+ * cost more than the whole renderer. Scaled from the pixel size so the wording
+ * keeps its proportions whatever its length.
+ */
+function nameTag(text, height) {
+  const pad = 22, fontPx = 44;
+  const c = document.createElement('canvas');
+  const ctx = c.getContext('2d');
+  ctx.font = '600 ' + fontPx + 'px -apple-system, system-ui, sans-serif';
+  const w = Math.ceil(ctx.measureText(text).width) + pad * 2;
+  const h = fontPx + pad * 2;
+  c.width = w; c.height = h;
+
+  const g = c.getContext('2d');
+  g.font = '600 ' + fontPx + 'px -apple-system, system-ui, sans-serif';
+  g.textBaseline = 'middle';
+  const r = 16;
+  g.fillStyle = 'rgba(255,255,255,0.94)';
+  g.beginPath();
+  g.moveTo(r, 0); g.lineTo(w - r, 0); g.quadraticCurveTo(w, 0, w, r);
+  g.lineTo(w, h - r); g.quadraticCurveTo(w, h, w - r, h);
+  g.lineTo(r, h); g.quadraticCurveTo(0, h, 0, h - r);
+  g.lineTo(0, r); g.quadraticCurveTo(0, 0, r, 0);
+  g.fill();
+  g.strokeStyle = 'rgba(0,36,68,0.22)'; g.lineWidth = 2; g.stroke();
+  g.fillStyle = '#00243F';
+  g.fillText(text, pad, h / 2 + 2);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex, transparent: true, depthTest: false, depthWrite: false,
+  }));
+  // A fixed on-screen height; the width follows the wording.
+  sprite.scale.set(height * (w / h), height, 1);
+  sprite.renderOrder = 10;
+  return sprite;
+}
+
+/**
+ * A glazed door: a frame with a pane in it, and the shelves showing through.
+ *
+ * The shelves are what sell it — a plain translucent panel reads as a dirty
+ * window rather than a vitrine, because there is nothing behind it to see.
+ */
+function glazedFront(mats, w, h, x, y, z, lit) {
+  const g = new THREE.Group();
+  const rail = MM(58);
+  const fw = w - GAP*2, fh = h - GAP*2;
+
+  // Frame: two stiles and two rails, in the façade colour.
+  g.add(box(fw, rail, PANEL_T, mats.facade, x, y + fh/2 - rail/2, z));
+  g.add(box(fw, rail, PANEL_T, mats.facade, x, y - fh/2 + rail/2, z));
+  for (const s of [-1, 1]) {
+    g.add(box(rail, fh - rail*2, PANEL_T, mats.facade, x + s*(fw/2 - rail/2), y, z));
+  }
+
+  const pane = new THREE.Mesh(
+    new THREE.BoxGeometry(fw - rail*2, fh - rail*2, MM(5)),
+    new THREE.MeshStandardMaterial({
+      color: new THREE.Color(lit ? '#DCEBFF' : '#C6DCE8'),
+      roughness: 0.06, metalness: 0.1,
+      transparent: true, opacity: lit ? 0.16 : 0.22,
+    }),
+  );
+  pane.position.set(x, y, z);
+  g.add(pane);
+
+  g.add(handle(mats, Math.min(w*0.5, MM(220)), x, y + fh/2 - MM(78), z + PANEL_T/2 + MM(14), false));
+  return g;
+}
+
+/** Shelves and, on the LED version, the strip that lights them. */
+function glazedInterior(mats, w, h, d, x, yBottom, z, lit) {
+  const g = new THREE.Group();
+  const shelf = new THREE.MeshStandardMaterial({
+    color: new THREE.Color('#EFEFEC'), roughness: 0.7,
+    ...(lit ? { emissive: new THREE.Color('#FFF4D6'), emissiveIntensity: 0.35 } : {}),
+  });
+  for (const f of [0.36, 0.68]) {
+    g.add(box(w - MM(40), MM(16), d - MM(30), shelf, x, yBottom + h*f, z));
+  }
+  if (lit) {
+    // A warm strip tucked under the top, and the glow it throws.
+    const stripMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color('#FFF6DE'),
+      emissive: new THREE.Color('#FFD98A'), emissiveIntensity: 4,
+    });
+    // One under the top and one under each shelf, which is how these are fitted.
+    for (const f of [0.98, 0.68, 0.36]) {
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(w - MM(80), MM(9), MM(16)), stripMat);
+      strip.position.set(x, yBottom + h*f - MM(24), z + d/2 - MM(34));
+      g.add(strip);
+    }
+    const glow = new THREE.PointLight('#FFDCA0', 1.1, 1.4, 2);
+    glow.position.set(x, yBottom + h*0.6, z);
+    g.add(glow);
+  }
+  return g;
+}
+
+/**
+ * A freestanding gas range: burners and grates on top, oven behind the door.
+ *
+ * Unlike a built-in hob this is one appliance from floor to worktop, so it
+ * replaces the cabinet rather than sitting on it — no plinth, no façade.
+ */
+function gasRange(mats, w, d, x) {
+  const g = new THREE.Group();
+  const bodyD = d - PANEL_T;
+  const top = WORKTOP_TOP;
+  g.add(box(w - GAP*2, top - MM(20), bodyD, mats.steel, x, (top - MM(20))/2 + MM(10), bodyD/2));
+
+  // Oven door: dark glass, a bar handle, and a row of knobs above it.
+  const doorH = top * 0.62;
+  g.add(box(w - GAP*4, doorH, MM(10), mats.dark, x, doorH/2 + MM(60), bodyD + MM(6)));
+  g.add(handle(mats, w*0.7, x, doorH + MM(105), bodyD + MM(22), false));
+  for (let i = 0; i < 4; i++) {
+    const knob = new THREE.Mesh(new THREE.CylinderGeometry(MM(19), MM(19), MM(22), 14), mats.metal);
+    knob.rotation.x = Math.PI/2;
+    knob.position.set(x - w/2 + w*(i + 0.5)/4, doorH + MM(160), bodyD + MM(14));
+    g.add(knob);
+  }
+
+  // Cast-iron grates over four burners.
+  const grate = new THREE.MeshStandardMaterial({ color: new THREE.Color('#26282B'), roughness: 0.75 });
+  g.add(box(w - GAP*2, MM(10), bodyD*0.94, mats.dark, x, top + MM(5), bodyD/2));
+  for (const dx of [-1, 1]) for (const dz of [-1, 1]) {
+    const cx = x + dx*w*0.2, cz = bodyD/2 + dz*bodyD*0.22;
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(MM(42), MM(52), MM(26), 14), grate);
+    cap.position.set(cx, top + MM(24), cz);
+    g.add(cap);
+    for (let k = 0; k < 4; k++) {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(MM(150), MM(9), MM(16)), grate);
+      bar.rotation.y = (k * Math.PI) / 4;
+      bar.position.set(cx, top + MM(36), cz);
+      g.add(bar);
+    }
+  }
+  return g;
+}
+
+/** A narrow domino warming plate, sunk into the worktop. */
+function warmingPlate(mats, w, x, z, depth) {
+  const g = new THREE.Group();
+  const pw = Math.min(w - MM(50), MM(280)), pd = depth * 0.66, top = WORKTOP_TOP;
+  g.add(box(pw, MM(8), pd, mats.dark, x, top + MM(4), z));
+  for (const dz of [-1, 1]) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(MM(52), MM(4), 8, 22), mats.metal);
+    ring.rotation.x = Math.PI/2;
+    ring.position.set(x, top + MM(10), z + dz*pd*0.24);
+    g.add(ring);
+  }
+  return g;
+}
+
+/** A chosen accessory: a plain block, with its name floating over it. */
+function accessoryBlock(mats, acc, index) {
+  const g = new THREE.Group();
+  const body = new THREE.MeshStandardMaterial({
+    color: new THREE.Color('#D8DEE5'), roughness: 0.55, metalness: 0.05,
+  });
+  g.add(box(acc.widthM, acc.heightM, acc.depthM, body, 0, acc.heightM / 2, 0));
+
+  // Names are far wider than the blocks they label, so a straight row of them
+  // overlaps into mush. Stepping every other one up buys the width back
+  // without spreading the blocks across the whole worktop.
+  const tag = nameTag(acc.title, 0.085);
+  const lift = 0.12 + (index % 3) * 0.11;
+  g.add(tag);
+  tag.position.set(0, acc.heightM + lift, 0);
+
+  // A hairline from the block up to its name, so a raised label still reads as
+  // belonging to the box underneath it.
+  const stem = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.004, 0.004, lift, 6),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color('#8A939C') }),
+  );
+  stem.position.set(0, acc.heightM + lift / 2, 0);
+  g.add(stem);
+
+  g.position.set(acc.x, acc.baseM, acc.z);
+  return g;
+}
+
+// ── Scene assembly ─────────────────────────────────────────────────────────
+function build(data, catalog) {
+  if (root) { scene.remove(root); root.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); } }); }
+  root = new THREE.Group();
+  walls = [];
+  pickables = [];
+  ilotGroup = null;
+  selectionBox = null;
+
+  applyHeights((data.geometry && data.geometry.worktopTopM) || MM(900));
+  const mats = makeMaterials(data.materials);
+  const W = data.room.widthM, D = data.room.depthM, H = data.room.heightM;
+  // Texel density has to follow the room, or a 5 m floor stretches four planks
+  // across it and a long worktop smears its veining.
+  if (mats.floor.map) mats.floor.map.repeat.set(Math.max(1, W / 1.5), Math.max(1, D / 1.5));
+  if (mats.worktop.map) mats.worktop.map.repeat.set(Math.max(1, W / 1.4), 1);
+
+  root.add(buildShell(mats, W, D, H, data.openings || []));
+
   /**
-   * Where a run starts, given the room it is in.
+   * The kitchen is laid out in its own frame and turned as one piece.
    *
-   * A return run is anchored at the corner it turns out of, not stretched to
-   * fill its wall — the room can be deeper than the run is long, and a kitchen
-   * that floated away from its own corner when the room grew would be wrong.
-   * The left one is laid front-to-back so its cabinets face into the room, so
-   * its *start* is the far end and the corner is where it finishes.
+   * Rotating here rather than teaching every wall rule about four orientations
+   * is what keeps placementFor to three cases. On an odd quarter the room's
+   * width and depth swap roles as far as the layout is concerned, which is why
+   * the canonical pair is computed rather than reused.
    */
-  const placementFor = (run) => {
-    if (run.wall === 'back') return { pos: [-W/2, 0, -D/2], rotY: 0 };
-    if (run.wall === 'left') {
-      return { pos: [-W/2, 0, -D/2 + CORNER_CLEARANCE + run.lengthM], rotY: Math.PI/2 };
-    }
-    if (run.wall === 'right') {
-      return { pos: [W/2, 0, -D/2 + CORNER_CLEARANCE], rotY: -Math.PI/2 };
-    }
-    return null;
-  };
+  const quarters = ((data.rotationQuarters || 0) % 4 + 4) % 4;
+  const turned = quarters % 2 === 1;
+  const Wc = turned ? D : W;
+  const Dc = turned ? W : D;
+  const kitchen = new THREE.Group();
+  kitchen.rotation.y = -quarters * Math.PI / 2;
+  root.add(kitchen);
 
+  const backLen = (data.runs.find((r) => r.wall === 'back') || {}).lengthM || Wc;
   data.runs.forEach((run, runIndex) => {
-    const p = placementFor(run);
+    const p = placementFor(run, Wc, Dc, backLen);
     if (!p) return;
     const g = new THREE.Group();
     g.position.set(p.pos[0], p.pos[1], p.pos[2]);
@@ -455,7 +859,7 @@ function build(data, catalog) {
       let mg;
       if (mod.slot === 'bas') mg = baseUnit(mats, mod, item.offsetM, H);
       else if (mod.slot === 'haut') mg = wallUnit(mats, mod, item.offsetM, H);
-      else mg = column(mats, mod, item.offsetM);
+      else mg = column(mats, mod, item.offsetM, H);
       // The meshes inside sit at their authored offset, so the group itself
       // stays at the origin and its position.x is used purely as a live drag
       // delta. That keeps the builders free of any drag concern.
@@ -467,7 +871,7 @@ function build(data, catalog) {
       pickables.push(mg);
     }
     worktopSpans(mats, run.modules, catalog, g, run.lengthM, data.geometry.credence !== false);
-    root.add(g);
+    kitchen.add(g);
   });
 
   // Island: a run of cabinets back to back under one slab.
@@ -478,16 +882,21 @@ function build(data, catalog) {
     // ordered higher than the runs — so its carcass is sized separately.
     const iTop = data.ilot.topM > 0 ? data.ilot.topM : WORKTOP_TOP;
     const iCarcass = Math.max(MM(200), iTop - PLINTH_H - WORKTOP_T);
-    g.position.set(data.ilot.x - iw/2, 0, data.ilot.z - idp/2);
+
+    // Built about its own centre so it can be turned in place; a corner-anchored
+    // island would swing round the corner instead of pivoting where it stands.
+    g.position.set(data.ilot.x, 0, data.ilot.z);
+    g.rotation.y = -(((data.ilot.rotationQuarters || 0) % 4 + 4) % 4) * Math.PI / 2;
+
     const carcassD = idp - PANEL_T*2;
-    g.add(box(iw, PLINTH_H, carcassD - PLINTH_INSET, mats.dark, iw/2, PLINTH_H/2, idp/2));
-    g.add(box(iw, iCarcass, carcassD, mats.carcass, iw/2, PLINTH_H + iCarcass/2, idp/2));
+    g.add(box(iw, PLINTH_H, carcassD - PLINTH_INSET, mats.dark, 0, PLINTH_H/2, 0));
+    g.add(box(iw, iCarcass, carcassD, mats.carcass, 0, PLINTH_H + iCarcass/2, 0));
     const n = Math.max(2, Math.round(iw / 0.6));
     for (let i = 0; i < n; i++) {
       const dw = iw/n;
-      g.add(drawerFronts(mats, dw, iCarcass, 3, dw*i + dw/2, PLINTH_H + iCarcass/2, idp/2 + carcassD/2 + PANEL_T/2));
+      g.add(drawerFronts(mats, dw, iCarcass, 3, dw*i + dw/2 - iw/2, PLINTH_H + iCarcass/2, carcassD/2 + PANEL_T/2));
     }
-    g.add(box(iw + MM(60), WORKTOP_T, idp + MM(60), mats.worktop, iw/2, iTop - WORKTOP_T/2, idp/2));
+    g.add(box(iw + MM(60), WORKTOP_T, idp + MM(60), mats.worktop, 0, iTop - WORKTOP_T/2, 0));
     // The island belongs to no run, so it moves across the floor rather than
     // along a line — tagged here so the drag handler can tell the two apart.
     g.userData = { key: '__ilot', isIlot: true, x: data.ilot.x, z: data.ilot.z };
@@ -495,6 +904,8 @@ function build(data, catalog) {
     pickables.push(g);
     root.add(g);
   }
+
+  (data.accessories || []).forEach((acc, i) => kitchen.add(accessoryBlock(mats, acc, i)));
 
   // What the shot is framed on: the corners of every cabinet, not the room.
   // Falls back to the room when nothing was placed, so an empty kitchen still
@@ -524,17 +935,22 @@ function build(data, catalog) {
   highlight();
   // Only reframe when the kitchen itself changed. Re-injecting after an edit
   // must not throw the camera back to its opening shot.
-  const shape = W + 'x' + D + 'x' + H + 'x' + pickables.length;
+  // Keyed on the kitchen, not the room: resizing the space leaves the same
+  // cabinets on screen, and reframing on every tap of the room buttons would
+  // yank the camera out from under the customer.
+  const shape = H + 'x' + pickables.length + 'x' + data.runs.map((r) => r.lengthM).join(',');
   if (shape !== framedFor) { framedFor = shape; userMoved = false; fitTo(FACE_DIR); }
   post({ type:'ready' });
 }
 
 // ── Lighting ───────────────────────────────────────────────────────────────
 function setupLights(W, D, H) {
-  scene.add(new THREE.HemisphereLight('#FFFFFF', '#C9BCA8', 1.8));
+  // Much of the fill now comes from the environment probe, so the lamps are
+  // pulled right back — left as they were, the room washes out to white.
+  scene.add(new THREE.HemisphereLight('#FFFFFF', '#C9BCA8', 0.72));
   // Kept deliberately soft: one hard key makes a generated kitchen look like a
   // render, and the shadow terminator lands right where the door gaps are.
-  const key = new THREE.DirectionalLight('#FFF6E8', 1.5);
+  const key = new THREE.DirectionalLight('#FFF6E8', 0.85);
   key.position.set(W*0.7, H*2.1, D*1.4);
   key.castShadow = true;
   key.shadow.mapSize.set(2048, 2048);
@@ -546,10 +962,10 @@ function setupLights(W, D, H) {
   key.shadow.radius = 3;
   scene.add(key);
   // Bounce off the missing fourth wall, so fronts never go flat black.
-  const fill = new THREE.DirectionalLight('#DCE6F0', 0.8);
+  const fill = new THREE.DirectionalLight('#DCE6F0', 0.4);
   fill.position.set(-W, H, D*2);
   scene.add(fill);
-  scene.add(new THREE.AmbientLight('#FFFFFF', 0.55));
+  scene.add(new THREE.AmbientLight('#FFFFFF', 0.22));
 }
 
 /**
@@ -730,8 +1146,11 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   // customer's from now on — a resize must not snatch it back.
   zoomTo = null;
   userMoved = true;
-  if (!currentScene || !currentScene.editable) return;
+  if (!currentScene) return;
   const hit = pickAt(e);
+
+
+  if (!currentScene.editable) return;
   select(hit ? hit.group.userData.key : null);
   if (!hit) return;
 
@@ -773,8 +1192,8 @@ renderer.domElement.addEventListener('pointermove', (e) => {
     const dx = hitPoint.x - drag.startPoint.x;
     const dz = hitPoint.z - drag.startPoint.z;
     if (Math.abs(dx) > 0.002 || Math.abs(dz) > 0.002) drag.moved = true;
-    drag.group.position.x = drag.group.userData.x - currentScene.ilot.widthM/2 + dx;
-    drag.group.position.z = drag.group.userData.z - currentScene.ilot.depthM/2 + dz;
+    drag.group.position.x = drag.group.userData.x + dx;
+    drag.group.position.z = drag.group.userData.z + dz;
     drag.lastX = drag.startX + dx;
     drag.lastZ = drag.startZ + dz;
     if (selectionBox) selectionBox.update();

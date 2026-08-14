@@ -41,9 +41,11 @@ export function layoutOfScene(scene: KitchenScene): ConfiguredLayout {
           widthM: round(scene.ilot.widthM),
           depthM: round(scene.ilot.depthM),
           topM: round(scene.ilot.topM),
+          rotationQuarters: scene.ilot.rotationQuarters,
           tight: scene.ilot.tight,
         }
       : undefined,
+    rotationQuarters: scene.rotationQuarters,
     worktopTopM: round(scene.geometry.worktopTopM),
     credence: scene.geometry.credence,
     modulesTotalCents: sceneTotalCents(scene),
