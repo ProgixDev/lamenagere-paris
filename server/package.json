@@ -10,6 +10,7 @@
     "start:prod": "node dist/main.js",
     "seed": "ts-node -r tsconfig-paths/register scripts/seed.ts",
     "seed:demo": "ts-node -r tsconfig-paths/register scripts/seed-demo.ts",
+    "backfill:media": "ts-node -r tsconfig-paths/register scripts/backfill-media-assets.ts",
     "test": "jest",
     "lint": "eslint \"{src,test,scripts}/**/*.ts\""
   },
@@ -26,6 +27,7 @@
     "firebase-admin": "^13.10.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
+    "sharp": "^0.35.3",
     "stripe": "^22.2.1",
     "zod": "^4.3.6"
   },

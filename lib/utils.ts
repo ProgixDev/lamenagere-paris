@@ -33,11 +33,15 @@ export const formatPrice2 = (amount: number, currency = "EUR"): string => {
 };
 
 export const formatDate = (date: Date | string): string => {
+  // Intl throws a RangeError on an unparseable value, which in a release build
+  // takes the whole screen down. A date we can't read is never worth a crash.
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "";
   return new Intl.DateTimeFormat("fr-FR", {
     year: "numeric",
     month: "long",
     day: "numeric",
-  }).format(new Date(date));
+  }).format(d);
 };
 
 export const relativeTime = (date: Date | string): string => {

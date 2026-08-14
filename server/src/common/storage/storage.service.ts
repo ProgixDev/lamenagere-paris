@@ -3,6 +3,10 @@ import { SupabaseService } from '../supabase/supabase.service';
 
 export type MediaFolder =
   | 'products'
+  // Config-block art (accessories, options, openings). Kept apart from
+  // products/ because these are meant to be reused across many products, and
+  // the picker surfaces them differently.
+  | 'accessories'
   | 'quotes'
   | 'messages'
   | 'categories'
@@ -53,6 +57,13 @@ export class StorageService {
   /** The folder a stored path belongs to (e.g. "categories/x.jpg" -> "categories"). */
   private folderOf(path: string): MediaFolder {
     return path.split('/')[0] as MediaFolder;
+  }
+
+  /** Bucket a stored path lives in, for callers that record where a file went. */
+  bucketForPath(path: string): string {
+    return (
+      BUCKET_BY_FOLDER[this.folderOf(path)] ?? this.supabase.defaultBucketName
+    );
   }
 
   /** Uploads a buffer and returns its storage path + public URL. */

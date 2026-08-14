@@ -15,6 +15,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { useStripe } from "@stripe/stripe-react-native";
 import * as Haptics from "expo-haptics";
+import * as Linking from "expo-linking";
 import { COLORS } from "../../../lib/constants";
 import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import { formatPrice } from "../../../lib/utils";
@@ -150,6 +151,10 @@ export default function CheckoutPaymentScreen() {
       const { error: initError } = await initPaymentSheet({
         merchantDisplayName: "La Ménagère Paris",
         paymentIntentClientSecret: clientSecret,
+        // Without this, iOS hides every payment method that redirects out of
+        // the app (3DS challenges, Klarna, Bancontact…). The redirect lands on
+        // the /stripe-redirect route, which hands the URL back to the SDK.
+        returnURL: Linking.createURL("stripe-redirect"),
       });
       if (initError) {
         Alert.alert(

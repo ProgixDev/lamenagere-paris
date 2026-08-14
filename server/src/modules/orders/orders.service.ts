@@ -20,7 +20,10 @@ import {
   TrackingInfo,
 } from './orders.serializer';
 import { CreateOrderDto } from './dto/create-order.dto';
-import type { ConfigBlock } from '../catalog/catalog.serializer';
+import type {
+  ConfigBlock,
+  ConfiguredLayout,
+} from '../catalog/catalog.serializer';
 
 /**
  * Id of the synthetic configuration entry that carries the product's own
@@ -35,6 +38,85 @@ const PRODUCT_COLOR_BLOCK_ID = 'product-color';
  * what was sold.
  */
 const QUALITY_TIER_BLOCK_ID = 'quality-tier';
+
+/**
+ * Id of the synthetic entry carrying the 3D implantation. Mirrors
+ * `LAYOUT_BLOCK_ID` in the app.
+ */
+const LAYOUT_BLOCK_ID = 'kitchen-layout';
+
+/**
+ * Re-shapes a client-sent implantation into something safe to store.
+ *
+ * The layout is the one part of a line the server cannot recompute — it is the
+ * customer's own arrangement — so it is copied rather than derived. That makes
+ * it the only client-controlled blob on an order, hence the hard caps: it never
+ * touches the price, but it does land in the back office and in jsonb, and
+ * neither should be at the mercy of what an app sends.
+ */
+export function sanitizeLayout(raw: unknown): ConfiguredLayout | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const l = raw as Record<string, any>;
+
+  const num = (v: unknown, max: number): number | null => {
+    const n = typeof v === 'number' ? v : Number.NaN;
+    return Number.isFinite(n) && n >= 0 && n <= max ? Math.round(n * 1000) / 1000 : null;
+  };
+  const text = (v: unknown, max = 80): string =>
+    typeof v === 'string' ? v.slice(0, max) : '';
+  const cents = (v: unknown): number => {
+    const n = typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : 0;
+    return Math.min(Math.max(n, 0), 100_000_000);
+  };
+
+  const widthM = num(l.room?.widthM, 40);
+  const depthM = num(l.room?.depthM, 40);
+  const heightM = num(l.room?.heightM, 10);
+  if (widthM == null || depthM == null || heightM == null) return null;
+
+  const runs = (Array.isArray(l.runs) ? l.runs : []).slice(0, 4).map((r: any) => ({
+    wall: text(r?.wall, 12),
+    lengthM: num(r?.lengthM, 40) ?? 0,
+    modules: (Array.isArray(r?.modules) ? r.modules : [])
+      .slice(0, 60)
+      .map((m: any) => ({
+        moduleId: text(m?.moduleId, 64),
+        label: text(m?.label),
+        // Anything unrecognised falls back to a base unit rather than being
+        // stored as free text a recap would then group under a bogus heading.
+        slot: ['bas', 'haut', 'colonne'].includes(m?.slot) ? m.slot : 'bas',
+        offsetM: num(m?.offsetM, 40) ?? 0,
+        // Millimetres, and a cabinet wider than the room it sits in is a lie
+        // the back office plan would then have to draw.
+        widthMm: Math.round((num(m?.widthMm, 40_000) ?? 0) as number),
+        depthMm: Math.round((num(m?.depthMm, 40_000) ?? 0) as number),
+        priceCents: cents(m?.priceCents),
+      }))
+      .filter((m: { moduleId: string }) => m.moduleId.length > 0),
+  }));
+  if (!runs.length) return null;
+
+  const ilotW = num(l.ilot?.widthM, 20);
+  const ilotD = num(l.ilot?.depthM, 20);
+
+  return {
+    shape: text(l.shape, 4),
+    room: { widthM, depthM, heightM },
+    runs,
+    ilot:
+      ilotW != null && ilotD != null
+        ? {
+            widthM: ilotW,
+            depthM: ilotD,
+            topM: num(l.ilot?.topM, 3) ?? 0.9,
+            tight: l.ilot?.tight === true,
+          }
+        : undefined,
+    worktopTopM: num(l.worktopTopM, 3) ?? 0.9,
+    credence: l.credence !== false,
+    modulesTotalCents: cents(l.modulesTotalCents),
+  };
+}
 import { TicketsService } from '../tickets/tickets.service';
 import { PromoService, PromoCodeRow } from '../promo/promo.service';
 
@@ -356,6 +438,19 @@ export class OrdersService {
           type: 'options',
           label: 'Gamme',
           options: [{ key: tier.key, label: tier.label }],
+        });
+      }
+      // The implantation has no block behind it either, so like the colourway
+      // it survives `priceConfiguration` only if re-attached here.
+      const layout = sanitizeLayout(
+        (item.configuration ?? []).find((e) => e.blockId === LAYOUT_BLOCK_ID)?.layout,
+      );
+      if (layout) {
+        snapshot.push({
+          blockId: LAYOUT_BLOCK_ID,
+          type: 'layout',
+          label: 'Implantation',
+          layout,
         });
       }
       const unit = baseUnit + surchargeCents;

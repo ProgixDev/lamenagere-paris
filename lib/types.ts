@@ -97,7 +97,13 @@ export type ConfigBlockType =
   | "accessories"
   | "opening_details"
   | "photos"
-  | "options";
+  | "options"
+  /**
+   * Synthetic: carries the 3D implantation the customer arranged. No back
+   * office block produces one — the configurator derives it from the shape,
+   * the measurements and the îlot, and it is priced by nothing.
+   */
+  | "layout";
 
 export interface ConfigBlockField {
   key: string;
@@ -174,6 +180,44 @@ export interface ConfigSelectionEntry {
   photos?: { url: string; type: "image" | "video" }[];
   /** `ilot` blocks: whether the customer wants one, and what it costs. */
   ilot?: { included: boolean; surchargeCents?: number; image?: string };
+  /**
+   * `layout` entries: the implantation, so the workshop receives the exact
+   * project the customer arranged rather than a description of it. Indicative
+   * only — the line is still priced by the product's gamme and surface.
+   */
+  layout?: ConfiguredLayout;
+}
+
+/** The arranged kitchen, flattened for storage on a cart line and an order. */
+export interface ConfiguredLayout {
+  shape: string;
+  room: { widthM: number; depthM: number; heightM: number };
+  runs: {
+    wall: string;
+    lengthM: number;
+    modules: {
+      moduleId: string;
+      label: string;
+      /** "bas" | "haut" | "colonne" — snapshotted so the recap can group without the catalogue. */
+      slot: string;
+      offsetM: number;
+      /**
+       * Snapshotted alongside the offset because a plan cannot be drawn from
+       * positions alone, and because a catalogue caisson resized next year must
+       * not silently redraw an order placed this year.
+       */
+      widthMm: number;
+      depthMm: number;
+      priceCents: number;
+    }[];
+  }[];
+  ilot?: { widthM: number; depthM: number; topM: number; tight?: boolean };
+  /** Floor to the top of the worktop, as the customer asked for it. */
+  worktopTopM: number;
+  /** Whether the customer kept the crédence. */
+  credence: boolean;
+  /** What the placed modules would come to, for the workshop's reference. */
+  modulesTotalCents: number;
 }
 export type ItemConfiguration = ConfigSelectionEntry[];
 
@@ -277,6 +321,7 @@ export interface Order {
   shippingAddress: Address;
   territory: ShippingZone;
   shippingMethod: string;
+  /** Free-text lead time for the shipping zone ("2-3 semaines"), not a date. */
   estimatedDelivery: string;
   /** Free-text note the buyer left when placing the order. */
   customerNote?: string;

@@ -5,6 +5,7 @@ import { AdminProductsService } from './admin-products.service';
 import { AdminCategoriesController } from './admin-categories.controller';
 import { AdminCategoriesService } from './admin-categories.service';
 import { AdminMediaController } from './admin-media.controller';
+import { AdminMediaService } from './admin-media.service';
 import { AdminOrdersController } from './admin-orders.controller';
 import { AdminOrdersService } from './admin-orders.service';
 import { AdminQuotesController } from './admin-quotes.controller';
@@ -58,6 +59,7 @@ import { PaymentsModule } from '../payments/payments.module';
   providers: [
     AdminProductsService,
     AdminCategoriesService,
+    AdminMediaService,
     AdminOrdersService,
     AdminQuotesService,
     AdminDashboardService,

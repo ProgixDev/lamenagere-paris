@@ -6,7 +6,7 @@ import { areaFormula } from "./area-formulas";
  * the sequence below is fixed here so a manager reordering blocks can never ask
  * for the gamme before the shape.
  *
- * Forme → Mesures → Îlot → Gamme → Couleurs → Accessoires → Récapitulatif
+ * Forme → Mesures → Îlot → Gamme → Couleurs → Accessoires → 3D → Récapitulatif
  */
 /** Reserved id of the synthetic entry that carries the product's own colour. */
 export const PRODUCT_COLOR_BLOCK_ID = "product-color";
@@ -20,6 +20,7 @@ export type Step =
   | { kind: "tiers" }
   | { kind: "colors"; block: ConfigBlock }
   | { kind: "extras"; blocks: ConfigBlock[] }
+  | { kind: "scene" }
   | { kind: "summary" };
 
 /** How many runs each shape bills. Unknown shapes bill everything filled in. */
@@ -78,8 +79,30 @@ export function buildSteps(
   );
   if (extras.length) steps.push({ kind: "extras", blocks: extras });
 
+  // The 3D view comes last, once every answer it draws from is in: it needs the
+  // shape for the runs and the measurements for the room, so it can only be
+  // shown after both. Products without either — a sofa, an accessory — skip it.
+  if (canPlanIn3D(blocks)) steps.push({ kind: "scene" });
+
   steps.push({ kind: "summary" });
   return steps;
+}
+
+/**
+ * Whether this product is laid out along walls at all.
+ *
+ * A shape block whose options declare runs plus a measurement tagged `run1` is
+ * what makes a room drawable; anything else is a product the customer places in
+ * a room rather than one that fills it.
+ */
+export function canPlanIn3D(blocks: ConfigBlock[]): boolean {
+  const hasRuns = blocks.some(
+    (b) => b.type === "shape" && (b.options ?? []).some((o) => (o.runs ?? 0) > 0),
+  );
+  const hasWallMeasure = blocks.some(
+    (b) => b.type === "measurements" && (b.fields ?? []).some((f) => f.priceRole === "run1"),
+  );
+  return hasRuns && hasWallMeasure;
 }
 
 /** Screen title + one-line subtitle, so every step reads as a single question. */
@@ -101,6 +124,11 @@ export function stepCopy(step: Step): { title: string; subtitle: string } {
       return { title: step.block.label || "La couleur", subtitle: "L'aperçu se met à jour à chaque choix." };
     case "extras":
       return { title: "Vos options", subtitle: "Accessoires, équipements et finitions." };
+    case "scene":
+      return {
+        title: "Votre cuisine en 3D",
+        subtitle: "Tournez autour, zoomez, vérifiez l'implantation avant de valider.",
+      };
     case "summary":
       return { title: "Récapitulatif", subtitle: "Vérifiez votre configuration avant de l'ajouter au panier." };
   }

@@ -261,6 +261,10 @@ export default function RootLayout() {
                     name="auth/callback"
                     options={{ animation: "none" }}
                   />
+                  <Stack.Screen
+                    name="stripe-redirect"
+                    options={{ animation: "none" }}
+                  />
                 </Stack>
                 <PopupGate />
               </GuestModeChrome>

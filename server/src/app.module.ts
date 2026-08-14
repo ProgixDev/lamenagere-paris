@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { validateEnv } from './config/env.validation';
 import { SupabaseModule } from './common/supabase/supabase.module';
 import { StorageModule } from './common/storage/storage.module';
+import { ImagesModule } from './common/images/images.module';
 import { ActivityModule } from './common/activity/activity.module';
 import { PricingModule } from './common/pricing/pricing.module';
 import { AuthGuard } from './common/auth/auth.guard';
@@ -31,6 +32,7 @@ import { AppController } from './app.controller';
     }),
     SupabaseModule,
     StorageModule,
+    ImagesModule,
     ActivityModule,
     PricingModule,
     AuthModule,

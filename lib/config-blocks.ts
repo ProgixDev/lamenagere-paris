@@ -286,7 +286,44 @@ export function configRecapRows(config?: ItemConfiguration | null): RecapRow[] {
         rows.push({ label: m.label, value: `${m.value} ${m.unit ?? "cm"}`, sub: true }),
       );
 
-    if (e.type === "ilot") {
+    if (e.layout) {
+      const l = e.layout;
+      const count = l.runs.reduce((n, r) => n + r.modules.length, 0);
+      const shape = l.shape === "u" ? "en U" : l.shape === "l" ? "en L" : "en I";
+      rows.push({
+        label: e.label,
+        value: `Cuisine ${shape} · ${count} élément${count > 1 ? "s" : ""}`,
+      });
+      // One line per wall and per level, in the order they stand along the run.
+      // Bas and hauts share the same offsets, so listing them together reads as
+      // a jumble to whoever has to build it.
+      const LEVELS: { slot: string; label: string }[] = [
+        { slot: "bas", label: "bas" },
+        { slot: "colonne", label: "colonnes" },
+        { slot: "haut", label: "hauts" },
+      ];
+      l.runs.forEach((run, i) => {
+        const wall = `Mur ${i + 1} (${run.lengthM.toFixed(2).replace(".", ",")} m)`;
+        for (const level of LEVELS) {
+          const picked = run.modules.filter((m) => m.slot === level.slot);
+          if (!picked.length) continue;
+          rows.push({
+            label: `${wall} · ${level.label}`,
+            value: picked.map((m) => m.label).join(", "),
+            sub: true,
+          });
+        }
+      });
+      if (l.ilot) {
+        rows.push({
+          label: "Îlot",
+          value: `${l.ilot.widthM.toFixed(2).replace(".", ",")} × ${l.ilot.depthM
+            .toFixed(2)
+            .replace(".", ",")} m`,
+          sub: true,
+        });
+      }
+    } else if (e.type === "ilot") {
       if (!e.ilot?.included) continue;
       rows.push({ label: e.label, value: "Oui", priceCents: e.ilot.surchargeCents });
       detail();

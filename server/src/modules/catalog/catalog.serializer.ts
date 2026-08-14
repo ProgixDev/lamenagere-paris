@@ -26,7 +26,13 @@ export type ConfigBlockType =
   | 'accessories'
   | 'opening_details'
   | 'photos'
-  | 'options';
+  | 'options'
+  /**
+   * Synthetic: carries the 3D implantation the customer arranged. No back
+   * office block produces one — the app derives it from the shape, the
+   * measurements and the îlot — and it is priced by nothing.
+   */
+  | 'layout';
 
 export interface ConfigBlockField {
   key: string;
@@ -120,6 +126,41 @@ export interface ConfigSelectionEntry {
    * and its measurements are dropped from the snapshot.
    */
   ilot?: { included: boolean; surchargeCents?: number; image?: string };
+  /**
+   * `layout` entries: the implantation the customer arranged in the 3D step,
+   * kept so the workshop receives the exact project rather than a description
+   * of it. Indicative only — the line is still priced by gamme and surface, so
+   * nothing here is ever trusted for money.
+   */
+  layout?: ConfiguredLayout;
+}
+
+/** The arranged kitchen, as stored on a cart line and an order. */
+export interface ConfiguredLayout {
+  shape: string;
+  room: { widthM: number; depthM: number; heightM: number };
+  runs: {
+    wall: string;
+    lengthM: number;
+    modules: {
+      moduleId: string;
+      label: string;
+      /** "bas" | "haut" | "colonne" — snapshotted so a recap needs no catalogue. */
+      slot: string;
+      offsetM: number;
+      /** Snapshotted so the back office can draw the plan without a catalogue. */
+      widthMm: number;
+      depthMm: number;
+      priceCents: number;
+    }[];
+  }[];
+  ilot?: { widthM: number; depthM: number; topM: number; tight?: boolean };
+  /** Floor to the top of the worktop, as the customer asked for it. */
+  worktopTopM: number;
+  /** Whether the customer kept the crédence. */
+  credence: boolean;
+  /** What the placed modules would come to, for the workshop's reference. */
+  modulesTotalCents: number;
 }
 export type ItemConfiguration = ConfigSelectionEntry[];
 

@@ -8,7 +8,7 @@ async function takePhoto(): Promise<string | null> {
     return null;
   }
   const result = await ImagePicker.launchCameraAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    mediaTypes: ["images"],
     quality: 0.7,
   });
   if (result.canceled || !result.assets?.[0]?.uri) return null;
@@ -22,7 +22,7 @@ async function pickFromLibrary(): Promise<string | null> {
     return null;
   }
   const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    mediaTypes: ["images"],
     quality: 0.7,
   });
   if (result.canceled || !result.assets?.[0]?.uri) return null;

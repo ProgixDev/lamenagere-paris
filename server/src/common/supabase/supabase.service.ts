@@ -58,10 +58,14 @@ export class SupabaseService implements OnModuleInit {
     return this._client.auth.admin;
   }
 
+  /** Name of the shared bucket configured via SUPABASE_STORAGE_BUCKET. */
+  get defaultBucketName(): string {
+    return this.config.getOrThrow<string>('SUPABASE_STORAGE_BUCKET');
+  }
+
   /** Storage bucket configured via SUPABASE_STORAGE_BUCKET. */
   get storage() {
-    const bucket = this.config.getOrThrow<string>('SUPABASE_STORAGE_BUCKET');
-    return this._client.storage.from(bucket);
+    return this._client.storage.from(this.defaultBucketName);
   }
 
   /** Storage client for an explicit bucket (e.g. the dedicated category bucket). */

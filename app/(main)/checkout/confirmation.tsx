@@ -213,9 +213,11 @@ export default function CheckoutConfirmationScreen() {
 
               <View style={{ height: 1, backgroundColor: COLORS.surfaceContainer, marginVertical: 12 }} />
 
+              {/* Not a date — the server stores the zone's lead time as free
+                  text ("2-3 semaines"), so show it verbatim. */}
               <Line
                 label="Livraison estimée"
-                value={order.estimatedDelivery ? formatDate(new Date(order.estimatedDelivery)) : "à confirmer"}
+                value={order.estimatedDelivery || "à confirmer"}
               />
               <Line
                 label="Adresse"

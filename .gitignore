@@ -50,5 +50,9 @@ daily-report-2026-07-01.md
 /web
 # Google Play submission credential
 play-service-account.json
-lamenagere-paris-preview.apk
+# Build artefacts. Named individually before, which let a 127 MB APK reach a
+# commit and block the push — GitHub refuses any commit holding a file over
+# 100 MB even once a later commit deletes it.
+*.apk
+*.aab
 daily-report-2026-07-30.md
