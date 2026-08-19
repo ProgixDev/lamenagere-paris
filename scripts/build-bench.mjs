@@ -27,17 +27,18 @@ import { buildScene } from "./lib/kitchen3d/scene";
 import { MODULES, moduleById } from "./lib/kitchen3d/catalog";
 import { RENDERER_HTML } from "./lib/kitchen3d/renderer-html";
 import {
-  addModule, applyEdits, editsOfScene, fitsOnRun, ILOT_KEY, moveIlot,
-  moveModule, moveRun, removeModule, rotateRun, runIndexOfKey,
+  addModuleAnywhere, addTargetFor, applyEdits, editsOfScene, ILOT_KEY, isFreeModule,
+  moveIlot, moveModuleFree, moveRun, removeModule, reseatModule, rotateModule,
+  rotateRun, runIndexOfKey,
 } from "./lib/kitchen3d/edit";
 import { layoutOfScene, moduleCount } from "./lib/kitchen3d/selection";
 import { sceneTotalCents } from "./lib/kitchen3d/scene";
 
 globalThis.KITCHEN = {
   buildScene, MODULES, moduleById, RENDERER_HTML,
-  addModule, applyEdits, editsOfScene, fitsOnRun, ILOT_KEY, moveIlot,
-  moveModule, moveRun, removeModule, rotateRun, runIndexOfKey,
-  layoutOfScene, moduleCount, sceneTotalCents,
+  addModuleAnywhere, addTargetFor, applyEdits, editsOfScene, ILOT_KEY, isFreeModule,
+  moveIlot, moveModuleFree, moveRun, removeModule, reseatModule, rotateModule,
+  rotateRun, runIndexOfKey, layoutOfScene, moduleCount, sceneTotalCents,
 };
 `;
 
@@ -193,6 +194,15 @@ const PAGE = `<!DOCTYPE html>
     </div>
 
     <div class="group">
+      <h2>Ajouter un meuble</h2>
+      <div class="act">
+        <select id="addPick"></select>
+        <button id="addGo">Ajouter</button>
+      </div>
+      <div class="hint" id="addWhere"></div>
+    </div>
+
+    <div class="group">
       <h2>Actions</h2>
       <div class="act">
         <button id="reset">Réinitialiser l'implantation</button>
@@ -296,7 +306,7 @@ addEventListener("message", (e) => {
   if (!m || typeof m !== "object") return;
   if (m.type === "boot") { ready = true; push(); return; }
   if (m.type === "select") { selectedKey = m.key ?? null; paintSel(); return; }
-  if (m.type === "moved") { commit(K.moveModule(scene, m.runIndex, m.key, m.offsetM)); return; }
+  if (m.type === "movedModule") { commit(K.moveModuleFree(scene, m.key, m.x, m.z)); return; }
   if (m.type === "movedRun") { commit(K.moveRun(scene, m.runIndex, m.x, m.z)); return; }
   if (m.type === "movedIlot") { commit(K.moveIlot(scene, m.x, m.z)); return; }
   if (m.type === "error") { console.error("renderer:", m.message); }
@@ -316,6 +326,7 @@ function paintHud() {
     (scene.decor && scene.decor.table ? "<span>table r=" + scene.decor.table.radiusM + "</span>" : "") +
     (clash ? "<span class='bad'>chevauchement</span>" : "");
   paintSel();
+  paintWhere();
 }
 
 function paintSel() {
@@ -344,11 +355,18 @@ function paintSel() {
   scene.runs.forEach((r, i) => r.modules.forEach((m) => { if (m.key === selectedKey) { found = m; owner = i; } }));
   if (!found) { text.textContent = selectedKey; return; }
   const mod = K.moduleById(found.moduleId);
-  text.textContent = (mod ? mod.label : found.moduleId) + " · côté " + (owner + 1);
-  const b = document.createElement("button");
-  b.textContent = "Retirer";
-  b.onclick = () => { commit(K.removeModule(scene, owner, selectedKey)); selectedKey = null; paintSel(); };
-  acts.appendChild(b);
+  const free = K.isFreeModule(scene, selectedKey);
+  text.textContent = (mod ? mod.label : found.moduleId) + " · côté " + (owner + 1) +
+    (free ? " · posé librement" : "");
+  const act = (label, fn) => {
+    const b = document.createElement("button");
+    b.textContent = label;
+    b.onclick = fn;
+    acts.appendChild(b);
+  };
+  act("Pivoter", () => commit(K.rotateModule(scene, selectedKey)));
+  if (free) act("Remettre", () => commit(K.reseatModule(scene, selectedKey)));
+  act("Retirer", () => { commit(K.removeModule(scene, owner, selectedKey)); selectedKey = null; paintSel(); });
 }
 
 // ── Wiring ─────────────────────────────────────────────────────────────────
@@ -386,6 +404,42 @@ document.getElementById("ilot").addEventListener("change", (e) => { ui.ilot = e.
 document.getElementById("credence").addEventListener("change", (e) => { ui.credence = e.target.checked; rebuild(true); });
 document.getElementById("facade").addEventListener("input", (e) => { ui.facadeHex = e.target.value; rebuild(true); });
 document.getElementById("worktop").addEventListener("input", (e) => { ui.worktopHex = e.target.value; rebuild(true); });
+
+/**
+ * The library, as a picker.
+ *
+ * Says where the unit will land before it is added — a full kitchen stands the
+ * next caisson on the floor rather than refusing it, and that is surprising
+ * unless it was announced.
+ */
+const addPick = document.getElementById("addPick");
+for (const m of K.MODULES) {
+  const o = document.createElement("option");
+  o.value = m.id;
+  o.textContent = m.label + " (" + m.widthMm + " mm)";
+  addPick.appendChild(o);
+}
+/** The run new units join: whichever the selection is on, or the first. */
+function ownerOfSelection() {
+  const asRun = K.runIndexOfKey(selectedKey || "");
+  if (asRun >= 0) return asRun;
+  let owner = -1;
+  scene.runs.forEach((r, i) => r.modules.forEach((m) => { if (m.key === selectedKey) owner = i; }));
+  return owner >= 0 ? owner : 0;
+}
+function paintWhere() {
+  if (!scene) return;
+  const to = K.addTargetFor(scene, ownerOfSelection(), addPick.value);
+  document.getElementById("addWhere").textContent =
+    to >= 0 ? "ira sur le côté " + (to + 1) : "se posera au sol";
+}
+addPick.onchange = paintWhere;
+document.getElementById("addGo").onclick = () => {
+  const next = K.addModuleAnywhere(scene, ownerOfSelection(), addPick.value);
+  if (!next.key) return;
+  selectedKey = next.key;
+  commit(next.scene);
+};
 
 document.getElementById("reset").onclick = () => { edits = null; rebuild(false); };
 document.getElementById("reload").onclick = () => mountRenderer();

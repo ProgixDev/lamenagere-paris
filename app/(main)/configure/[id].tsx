@@ -4,8 +4,12 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Animated, {
   FadeInDown,
+  FadeOutUp,
+  LinearTransition,
   SlideInLeft,
   SlideInRight,
+  ZoomIn,
+  ZoomOut,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -20,7 +24,8 @@ import ProductConfigBlocks from "../../../components/product/ProductConfigBlocks
 import ConfigRecap from "../../../components/product/ConfigRecap";
 import ShapePlan, { type PlanHighlight } from "../../../components/product/ShapePlan";
 import { IndicativeChip, IndicativeSheet } from "../../../components/product/IndicativeNotice";
-import { COLORS, PRODUCT_TYPES, PRICE_MODES } from "../../../lib/constants";
+import { ModulePicker } from "../../../components/product/ModulePicker";
+import { BRAND, COLORS, PRODUCT_TYPES, PRICE_MODES } from "../../../lib/constants";
 import { FONTS, TYPE, SHADOW, SPACE } from "../../../lib/typography";
 import { formatPrice } from "../../../lib/utils";
 import { computeConfiguredPrice, perSqmRate } from "../../../lib/pricing";
@@ -48,10 +53,10 @@ import Kitchen3D, { ZOOM_STEP, type Kitchen3DHandle } from "../../../components/
 import { buildScene } from "../../../lib/kitchen3d/scene";
 import { kitchenConfigFrom } from "../../../lib/kitchen3d/derive";
 import {
-  addModule,
+  addModuleAnywhere,
+  addTargetFor,
   applyEdits,
   editsOfScene,
-  fitsOnRun,
   ILOT_KEY,
   isFreeModule,
   moveIlot,
@@ -86,6 +91,8 @@ export default function ConfigureScreen() {
   const addItem = useCartStore((s) => s.addItem);
 
   const [stepIdx, setStepIdx] = useState(0);
+  /** The library sheet the floating "Ajouter" button opens over the studio. */
+  const [pickerOpen, setPickerOpen] = useState(false);
   /** Which way the last move went, so the screen slides in from that side. */
   const [dir, setDir] = useState<1 | -1>(1);
   const [dimInputs, setDimInputs] = useState<Record<string, string>>({});
@@ -211,6 +218,24 @@ export default function ConfigureScreen() {
     progress.value = withTiming(target, { duration: reduceMotion ? 0 : 320 });
   }, [stepIdx, steps.length, progress, reduceMotion]);
 
+  const step = steps[stepIdx];
+
+  /**
+   * The disclaimer meets the customer the first time the 3D appears, not on a
+   * later step where it would have nothing to refer to.
+   *
+   * Above the loading return, and it has to stay there: a hook after an early
+   * return runs on some renders and not others, and React throws the moment the
+   * product arrives and the count goes up. It only ever survived because the
+   * product is usually already in the query cache when this screen opens — a
+   * cold link to it crashed.
+   */
+  useEffect(() => {
+    if (step?.kind !== "scene" || noticeShown.current) return;
+    noticeShown.current = true;
+    setNoticeOpen(true);
+  }, [step?.kind]);
+
   if (isLoading || !product) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background, alignItems: "center", justifyContent: "center" }}>
@@ -219,18 +244,7 @@ export default function ConfigureScreen() {
     );
   }
 
-  const step = steps[stepIdx];
   const isLast = stepIdx === steps.length - 1;
-
-  /**
-   * The disclaimer meets the customer the first time the 3D appears, not on a
-   * later step where it would have nothing to refer to.
-   */
-  useEffect(() => {
-    if (step?.kind !== "scene" || noticeShown.current) return;
-    noticeShown.current = true;
-    setNoticeOpen(true);
-  }, [step?.kind]);
 
   // ── Derived state ────────────────────────────────────────────────────────
   const shapeBlock = blocks.find((b) => b.type === "shape");
@@ -350,6 +364,126 @@ export default function ConfigureScreen() {
       : undefined;
   /** True once the customer has dragged this cabinet off the row it came from. */
   const selectedIsFree = isFreeModule(scene, selectedKey);
+
+  /**
+   * Adds a unit and hands the customer straight to placing it.
+   *
+   * Move mode comes on with it: they asked for a caisson, so the next thing
+   * they want is to put it somewhere, and making them press "Déplacer les
+   * éléments" first to touch the thing they just created is a step that exists
+   * only because the screen has two states.
+   */
+  const addCaisson = (moduleId: string) => {
+    const next = addModuleAnywhere(scene, targetRun, moduleId);
+    if (!next.key) return;
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    commitScene(next.scene);
+    setSelectedKey(next.key);
+    setMoveMode(true);
+    setPickerOpen(false);
+  };
+
+  /**
+   * What the selection is called, shown floating over the canvas.
+   *
+   * Derived once rather than spelled out where it is drawn: the same answer
+   * decides whether the title card appears at all, and a second copy of this
+   * ladder would drift the first time a case was added.
+   */
+  const selectionTitle = selectedIsIlot
+    ? "Îlot central"
+    : selectedRun
+      ? `${RUN_LABEL[selectedRun.wall] ?? "Mur"} · ${Math.round(selectedRun.lengthM * 100)} cm`
+      : selectedModule
+        ? selectedIsFree
+          ? `${selectedModule.label} · posé librement`
+          : selectedModule.label
+        : null;
+
+  /** The one message worth interrupting for: this piece is standing in another. */
+  const selectionWarning =
+    selectedRun?.overlaps ? "Ce côté en chevauche un autre" : null;
+
+  /** Turns whatever is selected, each in the way that piece turns. */
+  const rotateSelected = () => {
+    void Haptics.selectionAsync();
+    if (selectedIsIlot) {
+      setIlotRotation((q) => (q + 1) % 4);
+      return;
+    }
+    if (selectedRunKeyIndex >= 0) {
+      commitScene(rotateRun(scene, selectedRunKeyIndex));
+      return;
+    }
+    if (selectedKey) commitScene(rotateModule(scene, selectedKey));
+  };
+
+  /**
+   * The buttons the right-hand rail offers for what is selected.
+   *
+   * A list rather than a run of conditionals in the JSX so the rail can animate
+   * them in and out by key, and so "what can I do to this?" is answerable by
+   * reading one place.
+   */
+  const railActions: {
+    key: string;
+    icon: string;
+    color: string;
+    label: string;
+    onPress: () => void;
+  }[] = !moveMode
+    ? []
+    : [
+        ...(selectedIsIlot || selectedRun || selectedModule
+          ? [
+              {
+                key: "rotate",
+                icon: "rotate-right",
+                color: COLORS.primary,
+                label: "Pivoter d'un quart de tour",
+                onPress: rotateSelected,
+              },
+            ]
+          : []),
+        // Only when it is out of its row: a caisson pulled out of a side that
+        // has since been packed solid has nowhere to land by hand, and dragging
+        // it back would simply fail.
+        ...(selectedModule && selectedIsFree
+          ? [
+              {
+                key: "reseat",
+                icon: "backup-restore",
+                color: COLORS.primary,
+                label: "Remettre ce meuble dans son côté",
+                onPress: () => {
+                  void Haptics.selectionAsync();
+                  commitScene(reseatModule(scene, selectedKey!));
+                },
+              },
+            ]
+          : []),
+        // Last, and furthest from the plus: the only control on this canvas
+        // that destroys anything should not sit directly under the one that
+        // creates things.
+        ...(selectedModule && !selectedIsIlot
+          ? [
+              {
+                key: "remove",
+                icon: "trash-can-outline",
+                color: COLORS.error,
+                label: `Retirer ${selectedModule.label}`,
+                onPress: () => removeSelected(),
+              },
+            ]
+          : []),
+      ];
+
+  const removeSelected = () => {
+    if (!selectedKey || selectedRunIndex < 0) return;
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    commitScene(removeModule(scene, selectedRunIndex, selectedKey));
+    setSelectedKey(null);
+  };
   /** New modules join the run the selection is on, or the main wall. */
   const targetRun = selectedRunIndex >= 0 ? selectedRunIndex : 0;
 
@@ -1129,6 +1263,57 @@ export default function ConfigureScreen() {
               onPress={() => setStudioNoticeOpen(true)}
             />
 
+            {/*
+              What is selected, floating over the top of the canvas.
+
+              Below the two top chips rather than beside them, and centred: this
+              is the one label that changes as the customer taps around, so it
+              wants the middle of the frame where the eye already is — not a
+              caption under the picture that has to be looked away to read. It
+              takes no touches; everything that acts on the selection is on the
+              right-hand rail.
+            */}
+            {selectionTitle ? (
+              <Animated.View
+                pointerEvents="none"
+                entering={reduceMotion ? undefined : FadeInDown.duration(180)}
+                exiting={reduceMotion ? undefined : FadeOutUp.duration(140)}
+                style={{ position: "absolute", left: 0, right: 0, top: 60, alignItems: "center" }}
+              >
+                <View
+                  style={{
+                    maxWidth: "76%",
+                    paddingHorizontal: 14,
+                    paddingVertical: 7,
+                    borderRadius: 999,
+                    backgroundColor: "rgba(255,255,255,0.94)",
+                    borderWidth: 1,
+                    borderColor: selectionWarning ? COLORS.error : COLORS.outlineVariant,
+                    alignItems: "center",
+                  }}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}
+                  >
+                    {selectionTitle}
+                  </Text>
+                  {selectionWarning ? (
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontFamily: "Inter_400Regular",
+                        color: COLORS.error,
+                        marginTop: 1,
+                      }}
+                    >
+                      {selectionWarning}
+                    </Text>
+                  ) : null}
+                </View>
+              </Animated.View>
+            ) : null}
+
             {/* Room size, opposite the zoom pill. */}
             <View
               style={{
@@ -1190,11 +1375,83 @@ export default function ConfigureScreen() {
               ))}
             </View>
 
+            {/* The right-hand rail: add on top, zoom under it. */}
             <View
               style={{
                 position: "absolute",
                 right: 12,
                 bottom: 12,
+                alignItems: "flex-end",
+                gap: 8,
+              }}
+            >
+              {/*
+                Just a plus, in brand blue.
+                Sat over the zoom pill it needs to be unmistakably not a third
+                zoom level, which is what the fill does — and why the zoom keeps
+                magnifiers rather than the bare plus/minus it used to have.
+
+                It rides on a layout transition because the rail grows under it:
+                the moment something is selected its actions appear below, and
+                the column is anchored at the bottom, so the plus is pushed up.
+                Animating that move is what makes the new buttons read as having
+                come out of the plus rather than as the rail jumping.
+              */}
+              <Animated.View layout={reduceMotion ? undefined : LinearTransition.duration(220)}>
+                <TouchableOpacity
+                  onPress={() => {
+                    void Haptics.selectionAsync();
+                    setPickerOpen(true);
+                  }}
+                  accessibilityLabel="Ajouter un meuble"
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 999,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: BRAND.blue,
+                  }}
+                >
+                  <Icon name="plus" size={24} color="#ffffff" />
+                </TouchableOpacity>
+              </Animated.View>
+
+              {/*
+                What can be done to the selection, under the plus.
+
+                Nothing here is ever disabled — a button appears exactly when it
+                means something and is gone otherwise, so the rail is a list of
+                what is possible right now rather than a panel of mostly grey.
+              */}
+              {railActions.map((a) => (
+                <Animated.View
+                  key={a.key}
+                  entering={reduceMotion ? undefined : ZoomIn.duration(170)}
+                  exiting={reduceMotion ? undefined : ZoomOut.duration(120)}
+                  layout={reduceMotion ? undefined : LinearTransition.duration(220)}
+                >
+                  <TouchableOpacity
+                    onPress={a.onPress}
+                    accessibilityLabel={a.label}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 999,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: "rgba(255,255,255,0.94)",
+                      borderWidth: 1,
+                      borderColor: COLORS.outlineVariant,
+                    }}
+                  >
+                    <Icon name={a.icon} size={21} color={a.color} />
+                  </TouchableOpacity>
+                </Animated.View>
+              ))}
+
+            <View
+              style={{
                 borderRadius: 999,
                 overflow: "hidden",
                 backgroundColor: "rgba(255,255,255,0.92)",
@@ -1203,8 +1460,8 @@ export default function ConfigureScreen() {
               }}
             >
               {([
-                { key: "in", icon: "plus", factor: ZOOM_STEP.in, label: "Zoom avant" },
-                { key: "out", icon: "minus", factor: ZOOM_STEP.out, label: "Zoom arrière" },
+                { key: "in", icon: "magnify-plus-outline", factor: ZOOM_STEP.in, label: "Zoom avant" },
+                { key: "out", icon: "magnify-minus-outline", factor: ZOOM_STEP.out, label: "Zoom arrière" },
               ] as const).map((z, i) => (
                 <TouchableOpacity
                   key={z.key}
@@ -1227,10 +1484,44 @@ export default function ConfigureScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+            </View>
           </View>
 
           {/* Controls live under the canvas so nothing covers the kitchen. */}
           <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16, gap: 10 }}>
+            {/*
+              The two things a customer does here, each in its own brand colour.
+
+              Blue and yellow both carry meaning already — blue is the CTA
+              colour on the product page, yellow marks the curated rails — and
+              giving one to each action is what makes them tell apart at a
+              glance instead of being two grey pills with different words on
+              them. Text on yellow is navy and never white: white on #FEC103 is
+              1.6:1, navy is 9.7:1.
+            */}
+            <PressableScale
+              onPress={() => {
+                void Haptics.selectionAsync();
+                setPickerOpen(true);
+              }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                paddingVertical: 12,
+                borderRadius: 999,
+                backgroundColor: BRAND.blue,
+              }}
+            >
+              <Icon name="plus" size={18} color="#ffffff" />
+              <Text
+                style={{ fontSize: 13.5, fontFamily: "Inter_600SemiBold", color: "#ffffff" }}
+              >
+                Ajouter de nouveaux éléments
+              </Text>
+            </PressableScale>
+
             <PressableScale
               onPress={() => {
                 Haptics.selectionAsync();
@@ -1244,19 +1535,23 @@ export default function ConfigureScreen() {
                 gap: 8,
                 paddingVertical: 12,
                 borderRadius: 999,
-                backgroundColor: moveMode ? COLORS.primary : COLORS.surfaceContainer,
+                // Inverted rather than merely darkened while it is on: the
+                // button is the only thing saying whether a tap on the kitchen
+                // will move something or turn it, so the two states have to be
+                // unmistakable across the room.
+                backgroundColor: moveMode ? COLORS.primary : BRAND.yellow,
               }}
             >
               <Icon
                 name={moveMode ? "check" : "cursor-move"}
                 size={18}
-                color={moveMode ? COLORS.onPrimary : COLORS.onSurfaceVariant}
+                color={moveMode ? COLORS.onPrimary : COLORS.primary}
               />
               <Text
                 style={{
                   fontSize: 13.5,
                   fontFamily: "Inter_600SemiBold",
-                  color: moveMode ? COLORS.onPrimary : COLORS.onSurfaceVariant,
+                  color: moveMode ? COLORS.onPrimary : COLORS.primary,
                 }}
               >
                 {moveMode ? "Terminer le déplacement" : "Déplacer les éléments"}
@@ -1265,16 +1560,18 @@ export default function ConfigureScreen() {
 
             {moveMode ? (
               <>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, minHeight: 44 }}>
-                  <View style={{ flex: 1 }}>
+                {/*
+                  Only while nothing is picked.
+
+                  Once something is, its name floats over the kitchen and its
+                  buttons are on the rail beside it — so repeating either down
+                  here would make the customer read the bottom of the screen to
+                  find out about the thing they are touching at the top of it.
+                */}
+                {!selectedKey ? (
+                  <View style={{ minHeight: 44, justifyContent: "center" }}>
                     <Text style={{ fontSize: 14, fontFamily: FONTS.serif, color: COLORS.onSurface }}>
-                      {selectedIsIlot
-                        ? "Îlot central"
-                        : selectedRun
-                          ? `${RUN_LABEL[selectedRun.wall] ?? "Mur"} · ${Math.round(selectedRun.lengthM * 100)} cm`
-                          : selectedModule
-                            ? selectedModule.label
-                            : "Touchez un côté de la cuisine"}
+                      Touchez un côté de la cuisine
                     </Text>
                     <Text
                       style={{
@@ -1284,96 +1581,10 @@ export default function ConfigureScreen() {
                         marginTop: 1,
                       }}
                     >
-                      {selectedIsIlot
-                        ? "Glissez-le sur le sol, ou pivotez-le d'un quart de tour."
-                        : selectedRun
-                          ? selectedRun.overlaps
-                            ? "En rouge : ce côté en chevauche un autre. Déplacez-le pour libérer la place."
-                            : "Glissez-le où vous voulez, ou pivotez-le. Touchez un meuble pour le déplacer seul."
-                          : selectedModule
-                            ? selectedIsFree
-                              ? `${selectedModule.widthMm} mm, posé librement — glissez-le n'importe où, ou contre un côté pour l'y remettre.`
-                              : `${selectedModule.widthMm} mm — glissez-le n'importe où dans la pièce, ou le long de son côté pour échanger sa place.`
-                            : "Il se déplace d'un bloc. Touchez-le à nouveau pour prendre un seul meuble."}
+                      Il se déplace d&apos;un bloc. Touchez-le à nouveau pour prendre un seul meuble.
                     </Text>
                   </View>
-                  {selectedIsIlot ? (
-                    <TouchableOpacity
-                      onPress={() => {
-                        void Haptics.selectionAsync();
-                        setIlotRotation((q) => (q + 1) % 4);
-                      }}
-                      hitSlop={8}
-                      style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-                    >
-                      <Icon name="rotate-right" size={20} color={COLORS.primary} />
-                      <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.primary }}>
-                        Pivoter
-                      </Text>
-                    </TouchableOpacity>
-                  ) : null}
-                  {selectedRun ? (
-                    <TouchableOpacity
-                      onPress={() => {
-                        void Haptics.selectionAsync();
-                        commitScene(rotateRun(scene, selectedRunKeyIndex));
-                      }}
-                      hitSlop={8}
-                      style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-                    >
-                      <Icon name="rotate-right" size={20} color={COLORS.primary} />
-                      <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.primary }}>
-                        Pivoter
-                      </Text>
-                    </TouchableOpacity>
-                  ) : null}
-                  {/* A single cabinet has three things it can have done to it,
-                      so these are icons: the labels the run and the island can
-                      afford would leave no room for the name of the meuble. */}
-                  {selectedModule && !selectedIsIlot ? (
-                    <TouchableOpacity
-                      onPress={() => {
-                        void Haptics.selectionAsync();
-                        commitScene(rotateModule(scene, selectedKey!));
-                      }}
-                      accessibilityLabel="Pivoter ce meuble d'un quart de tour"
-                      hitSlop={10}
-                      style={{ paddingHorizontal: 2 }}
-                    >
-                      <Icon name="rotate-right" size={22} color={COLORS.primary} />
-                    </TouchableOpacity>
-                  ) : null}
-                  {/* Only when it is out of its row: a caisson pulled out of a
-                      side that has since been packed solid has nowhere to land
-                      by hand, and dragging it back would simply fail. */}
-                  {selectedModule && selectedIsFree ? (
-                    <TouchableOpacity
-                      onPress={() => {
-                        void Haptics.selectionAsync();
-                        commitScene(reseatModule(scene, selectedKey!));
-                      }}
-                      accessibilityLabel="Remettre ce meuble dans son côté"
-                      hitSlop={10}
-                      style={{ paddingHorizontal: 2 }}
-                    >
-                      <Icon name="backup-restore" size={22} color={COLORS.primary} />
-                    </TouchableOpacity>
-                  ) : null}
-                  {selectedModule && !selectedIsIlot ? (
-                    <TouchableOpacity
-                      onPress={() => {
-                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                        commitScene(removeModule(scene, targetRun, selectedKey!));
-                        setSelectedKey(null);
-                      }}
-                      accessibilityLabel="Retirer ce meuble"
-                      hitSlop={10}
-                      style={{ paddingHorizontal: 2 }}
-                    >
-                      <Icon name="trash-can-outline" size={22} color={COLORS.error} />
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
+                ) : null}
 
                 <ScrollView
                   horizontal
@@ -1381,18 +1592,14 @@ export default function ConfigureScreen() {
                   contentContainerStyle={{ gap: 8, paddingRight: 16 }}
                 >
                   {MODULES.map((m) => {
-                    const fits = fitsOnRun(scene, targetRun, m.id);
+                    // Where it will go, not whether it may: a unit with no room
+                    // left in any row stands on the floor now, so there is
+                    // nothing left to grey out.
+                    const goesTo = addTargetFor(scene, targetRun, m.id);
                     return (
                       <PressableScale
                         key={m.id}
-                        disabled={!fits}
-                        onPress={() => {
-                          const next = addModule(scene, targetRun, m.id);
-                          if (!next.key) return;
-                          Haptics.selectionAsync();
-                          commitScene(next.scene);
-                          setSelectedKey(next.key);
-                        }}
+                        onPress={() => addCaisson(m.id)}
                         style={{
                           paddingHorizontal: 12,
                           paddingVertical: 8,
@@ -1400,7 +1607,6 @@ export default function ConfigureScreen() {
                           backgroundColor: COLORS.surfaceContainerLowest,
                           borderWidth: 1,
                           borderColor: COLORS.outlineVariant,
-                          opacity: fits ? 1 : 0.38,
                           minWidth: 124,
                         }}
                       >
@@ -1415,7 +1621,7 @@ export default function ConfigureScreen() {
                             marginTop: 1,
                           }}
                         >
-                          {fits ? `${m.widthMm} mm · mur ${targetRun + 1}` : "Ne rentre pas"}
+                          {goesTo >= 0 ? `${m.widthMm} mm · mur ${goesTo + 1}` : `${m.widthMm} mm · au sol`}
                         </Text>
                       </PressableScale>
                     );
@@ -1443,6 +1649,13 @@ export default function ConfigureScreen() {
         <IndicativeSheet
           visible={studioNoticeOpen}
           onClose={() => setStudioNoticeOpen(false)}
+        />
+
+        <ModulePicker
+          visible={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          onPick={(m) => addCaisson(m.id)}
+          landing={(id) => addTargetFor(scene, targetRun, id)}
         />
       </Modal>
 

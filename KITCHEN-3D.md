@@ -86,9 +86,49 @@ renderer could be replaced without touching the rules.
 ## Rules that hold the thing together
 
 **A run is one-dimensional *inside itself*.** Cabinets sit side by side along
-the run; the only question is whether they fit. No constraint solver — a move is
-a clamp between two neighbours. This is what keeps `moveModule` a few dozen lines
-and not a CAD engine.
+the run; the only question is whether they fit. No constraint solver — a move
+along a run is a clamp between two neighbours. This is what keeps `moveModule` a
+few dozen lines and not a CAD engine.
+
+**A cabinet is not a prisoner of its run.** Dragged off one it stands free
+anywhere on the floor (`PlacedModule.free = { x, z, rotationQuarters }`, kitchen
+frame, like a run's own position); pushed back against any run — its own or
+another — it re-joins that row. `moveModuleFree()` decides which of the two a
+drag was, from where the finger let go and nothing else:
+
+- within `ATTACH_ACROSS_M` (30 cm) of a run's line, and not past either end by
+  more than `ATTACH_ALONG_M`, it joins that row; nearest line wins, so a cabinet
+  dropped in a corner joins the run it is squarest to
+- still on the run it started on, it is the ordinary slide, so it keeps
+  `moveModule`'s flush snap and its swap-with-your-neighbour
+- arriving from outside a row there is no "where it stands now" to derive bounds
+  from and nobody to swap with, so it takes the nearest *gap that fits*
+  (`nearestGapOffset`); a full row refuses it and it stays standing where it was
+  dropped rather than being stacked on top of something
+- anywhere else, it stands there
+
+A free cabinet still belongs to its run in the data — that is what keeps it on
+the devis under a heading the workshop recognises — but nothing about the row is
+drawn from it: `spansOn` skips it (so its old place is a gap its neighbours can
+slide through), the worktop stops at it, and it hangs off the room rather than
+off the run's pivot so moving the side does not drag it along. `offsetM` is left
+alone while it is free, which is the place `reseatModule()` aims for when the
+customer puts it back by hand.
+
+**Adding a cabinet never refuses.** `addModuleAnywhere()` tries the row the
+customer is working on, then any other row, and failing both stands the unit on
+open floor (`freeSpot()` grid-searches for a clear place, preferring the front of
+the room where the floor and the camera both are). "Ne rentre pas" was the honest
+answer while a cabinet had to live in a row; it is simply wrong now, and a
+disabled button that will not explain itself is the worst version of it — so the
+library says *where* a unit will land (`addTargetFor()`) instead of greying it
+out. `addModule()` still answers the narrow question — is there a gap on *this*
+run — which is what the drag path needs.
+
+`rotateModule()` necessarily detaches — a caisson at ninety degrees to its
+neighbours is not on that run any more. It deliberately does *not* route back
+through `moveModuleFree`: a cabinet turned in place is still sitting on its run's
+line, so the attach test would seat it straight back and undo the turn.
 
 **A run stands where the customer put it.** Each one carries `x`, `z` and its own
 `rotationQuarters`, exactly as the island always has, and can be dragged anywhere
@@ -105,10 +145,16 @@ rides through to the order. This is the "afficher une alerte visuelle" half of
 the brief's clause, chosen over the "empêcher" half.
 
 **The kitchen is still laid out in its own frame and rotated as one piece.**
-`rotationQuarters` (0-3, clockwise) turns the whole group; runs hold their
-positions in that frame, and `roomToKitchen` / `kitchenToRoom` convert at the
-edges — a drag arrives in the room's frame and has to be un-turned before it
-means anything to a run. Consequences that bite:
+`rotationQuarters` (0-3, clockwise) turns the whole group; runs and free-standing
+cabinets hold their positions in that frame, and `roomToKitchen` /
+`kitchenToRoom` convert at the edges — a drag arrives in the room's frame and has
+to be un-turned before it means anything to a run. The two functions carried each
+other's bodies until 2026-08-18: three's `rotation.y = -q * PI/2` sends a kitchen
+point `(x, z)` to the room point `(-z, x)` on a quarter turn, not to `(z, -x)`.
+Nothing showed it, because every existing caller either round-tripped through
+both or only ever ran on an unturned kitchen. If a position ever looks mirrored,
+check this first, and check it against three rather than against intuition.
+Consequences that bite:
 - on an odd quarter the room's width and depth swap roles for the layout, so the
   minimum room size swaps with them (`canonWidth`/`canonDepth`), and so do the
   clamps in `moveRun`
@@ -130,9 +176,33 @@ backs out to that side. Only cabinets are ever raycast — a run has no surface 
 its own, and putting the pivots in `pickables` too cannot work, because the run
 encloses its cabinets so the walk up to the nearest tagged ancestor always stops
 at the cabinet. What the tap *means* is decided after the hit, from what is
-already selected (`runOfKey`). This replaced a two-button mode toggle, which was
-built first and rejected: the client wanted moving a side and moving its items to
-be one flow, not two tools.
+already selected. This replaced a two-button mode toggle, which was built first
+and rejected: the client wanted moving a side and moving its items to be one
+flow, not two tools.
+
+**Add and remove float on the canvas.** Left edge, centred — the four corners
+were already spoken for by Pivoter, the notice chip, the room size and the zoom.
+The column is `pointerEvents="box-none"` so only the pills themselves swallow a
+touch and the rest of that strip is still canvas to drag on. "Ajouter" opens the
+library as a sheet and is always there; "Retirer" appears only with a cabinet in
+hand. Adding turns move mode on and selects the new unit, because someone who
+just asked for a caisson wants to place it, and making them press "Déplacer les
+éléments" first is a step that exists only because the screen has two states.
+
+A cabinet standing free of its run skips the drill-down in both directions: it is
+not part of a side, so tapping it takes it straight away, and having it selected
+does not count as being inside the side it is still listed under.
+
+**Everything on the floor drags in two axes.** A side, the island and a single
+cabinet all follow the finger on a horizontal plane and all report a *room point*
+on release; the host re-clamps and decides what it means. A cabinet used to slide
+along its run and nowhere else, which meant the only way to put a caisson
+somewhere else in the room was to move the whole side it was on. The live drag
+tracks a **world** point rather than nudging a local position, because a cabinet
+in a row hangs off a group that is both turned and offset — a world delta applied
+to its local position goes the wrong way the moment its run is not facing front.
+`userData.centre` is where the middle of a group sits in its parent, which is
+what lets the same few lines drive a cabinet in a row and one standing alone.
 
 **Furnishing is scenery, and stays scenery.** `placeDecor()` grid-searches the
 free floor for a table, chairs, a rug, a pendant and a picture. None of it is
@@ -217,9 +287,16 @@ No browser is needed for the rules. `buildScene`/`edit.ts` are pure, so the logi
 suites are plain Node scripts run through esbuild:
 
 ```
-hidden-check  room-check  rotate-check  swap-check
-edit-check    derive-check  ilot-check  ilot-move-check
+hidden-check  room-check   rotate-check  swap-check
+edit-check    derive-check ilot-check    ilot-move-check
+run-check     decor-check  free-module-check
 ```
+
+`free-module-check` covers cabinets dragged off their run: detaching, re-joining
+a row, landing on a *different* side, refusing a full row, turning, being put
+back by hand, surviving a rebuild, being clamped into a room shrunk under it,
+reaching the devis, and being added to a kitchen with no room left in any row. It also pins `roomToKitchen`/`kitchenToRoom` against three's
+own rotation matrix, computed by hand — see the frame note above.
 
 `derive-check` runs against the **real production config blocks** copied out of
 Supabase — that is what caught the trailing spaces in labels
@@ -230,7 +307,19 @@ Chrome, with SwiftShader. It renders, screenshots, and drives synthetic pointer
 events to test dragging. Note: SwiftShader is slow and frame-rate-variable —
 tests must poll until the camera settles, never wait a fixed duration.
 
-Server: 77 jest specs, 22 of them on `sanitizeLayout`.
+Browser suites: `drill-check` (drill-down selection), `run-drag` (a side dragged
+and an overlap outlined), `module-drag` (a single cabinet grabbed, pulled onto
+the floor, and the free-standing result drawn where the host put it),
+`bench-load` (the built bench opens clean and its add/remove controls work).
+
+Aim is the thing that goes wrong in these, not the code. A harness ray has to
+see exactly what the renderer's own ray sees, or it tests a different scene: cast
+against the same set the renderer offers `pickables` — cabinets *and the island*
+— and sweep a grid over the candidate rather than aiming at its centre, which
+usually lands on its own worktop or on whatever stands in front of it. Four
+"failures" so far have been the harness aiming through something.
+
+Server: 86 jest specs, 26 of them on `sanitizeLayout`.
 
 ---
 
@@ -240,10 +329,12 @@ Shipped in commit `89f17f6` (local; **not pushed**). Android APK built from it.
 TestFlight build 18 is older — it predates the studio.
 
 Working: the guided flow with a 3D step, a preview that opens a full-screen
-studio, move mode (drag along a run, drag-to-swap, remove, add from the library),
-island drag + pivot, kitchen rotation, room sizing on the canvas, 19 modules
-including glazed/LED doors and a gazinière,
-reflections and procedurally tinted materials, and the back-office plan.
+studio, move mode (drill-down selection; a side, the island or a single cabinet
+dragged anywhere on the floor; drag-to-swap within a row; a cabinet turned,
+re-seated, removed, or added from the library), kitchen rotation, room sizing on
+the canvas, 19 modules including glazed/LED doors and a gazinière, reflections
+and procedurally tinted materials, and the back-office plan — which draws a
+free-standing cabinet where it was left rather than at the offset it came from.
 
 ### Open
 
@@ -269,7 +360,7 @@ reflections and procedurally tinted materials, and the back-office plan.
   props (tap, chair) are still worth sourcing.
 - **In-scene drag gizmos.** A floor grip for resizing the room was built and
   rejected as bad UX. Controls belong as fixed buttons overlaid on the canvas,
-  like the zoom pill.
+  like the zoom pill — which is where Ajouter and Retirer went.
 - **Customer-facing per-module pricing.** The brief asks for it; the line is
   still priced by gamme and surface, and the module total rides along as a
   workshop reference only. Switching would change how every kitchen is billed.

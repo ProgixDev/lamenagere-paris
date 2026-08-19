@@ -36,6 +36,8 @@ import {
   List,
   Lock,
   MagnifyingGlass,
+  MagnifyingGlassMinus,
+  MagnifyingGlassPlus,
   MapPin,
   Minus,
   Oven,
@@ -88,6 +90,11 @@ const MAP: Record<string, Entry> = {
   close: { C: X },
   menu: { C: List },
   magnify: { C: MagnifyingGlass },
+  // Zoom, spelled as zoom. A bare plus/minus pair reads as "add/remove" the
+  // moment anything else on the same surface adds something — which is what
+  // happened once the 3D studio grew an add button next to the zoom pill.
+  "magnify-plus-outline": { C: MagnifyingGlassPlus },
+  "magnify-minus-outline": { C: MagnifyingGlassMinus },
   tune: { C: FadersHorizontal },
   "share-variant": { C: ShareNetwork },
   "information-outline": { C: Info },

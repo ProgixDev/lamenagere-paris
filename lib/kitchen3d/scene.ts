@@ -204,6 +204,54 @@ function occupiedBoxes(scene: {
 }
 
 /**
+ * Somewhere on the floor a cabinet of this size can stand on its own.
+ *
+ * Wanted when a caisson is added to a kitchen whose rows are already packed:
+ * refusing it was the old answer, and it is a poor one now that a cabinet can
+ * legitimately stand anywhere — the customer asked for the unit, so they get
+ * the unit and can put it where they like.
+ *
+ * Toward the front of the room by preference. The cabinetry is usually along
+ * the back walls, so that is where the open floor is, and it is also where the
+ * camera looks — a new unit that appears behind the island reads as nothing
+ * having happened.
+ *
+ * Falls back to that preferred point when the floor really is full. Overlaps
+ * are flagged rather than prevented everywhere else in this module, and an
+ * added cabinet quietly not appearing would be worse than one that appears in
+ * the way and can be dragged clear.
+ *
+ * Returns a point in the kitchen's frame, which is where a free placement is
+ * held.
+ */
+export function freeSpot(scene: KitchenScene, widthM: number, depthM: number) {
+  const boxes = occupiedBoxes(scene);
+  const { widthM: W, depthM: D } = scene.room;
+  const halfW = widthM / 2;
+  const halfD = depthM / 2;
+  /** A little air around it, so it does not arrive looking wedged in. */
+  const MARGIN = 0.08;
+  const STEP = 0.1;
+  const wantZ = D / 2 - halfD - 0.35;
+
+  let best: { x: number; z: number; cost: number } | null = null;
+  for (let x = -W / 2 + halfW; x <= W / 2 - halfW + 1e-9; x += STEP) {
+    for (let z = -D / 2 + halfD; z <= D / 2 - halfD + 1e-9; z += STEP) {
+      const clash = boxes.some(
+        (b) =>
+          Math.abs(x - b.x) < (widthM + b.w) / 2 + MARGIN &&
+          Math.abs(z - b.z) < (depthM + b.d) / 2 + MARGIN,
+      );
+      if (clash) continue;
+      const cost = Math.hypot(x, z - wantZ);
+      if (!best || cost < best.cost) best = { x, z, cost };
+    }
+  }
+  const at = best ?? { x: 0, z: wantZ };
+  return roomToKitchen(round(at.x), round(at.z), scene.rotationQuarters);
+}
+
+/**
  * Pulls stools up to the island, on the side with room to sit.
  *
  * Which side matters: a stool tucked into the 60 cm gangway behind an island

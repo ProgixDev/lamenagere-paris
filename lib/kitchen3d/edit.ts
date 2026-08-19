@@ -1,5 +1,5 @@
 import { mm, moduleById } from "./catalog";
-import { kitchenToRoom, markOverlaps, roomToKitchen } from "./scene";
+import { freeSpot, kitchenToRoom, markOverlaps, roomToKitchen } from "./scene";
 import { ilotFootprint, moduleFootprint, runFootprint, RUN_DEPTH_M } from "./types";
 import type { FreePlacement, KitchenScene, PlacedModule, Run, Slot } from "./types";
 
@@ -166,6 +166,15 @@ export function removeModule(scene: KitchenScene, runIndex: number, key: string)
  * Returns the scene unchanged and a null key when nothing fits, so the caller
  * can say so rather than silently placing it on top of something.
  */
+/** A key no cabinet in the scene is using, in any run. */
+function mintKey(scene: KitchenScene, moduleId: string): string {
+  const used = new Set(scene.runs.flatMap((r) => r.modules.map((p) => p.key)));
+  let n = 0;
+  let key = `${moduleId}-${n}`;
+  while (used.has(key)) key = `${moduleId}-${++n}`;
+  return key;
+}
+
 export function addModule(
   scene: KitchenScene,
   runIndex: number,
@@ -190,11 +199,7 @@ export function addModule(
   if (at == null && run.lengthM - cursor >= width - 1e-6) at = cursor;
   if (at == null) return { scene, key: null };
 
-  // Unique against everything already placed, including in other runs.
-  const used = new Set(scene.runs.flatMap((r) => r.modules.map((p) => p.key)));
-  let n = 0;
-  let key = `${moduleId}-${n}`;
-  while (used.has(key)) key = `${moduleId}-${++n}`;
+  const key = mintKey(scene, moduleId);
 
   return {
     scene: withRun(scene, runIndex, [...run.modules, { key, moduleId, offsetM: round(at) }]),
@@ -462,6 +467,61 @@ export function reseatModule(scene: KitchenScene, key: string): KitchenScene {
   );
   if (landing == null) return scene;
   return reseat(scene, key, runIndex, runIndex, landing);
+}
+
+/**
+ * Where a cabinet would land if it were added now, or -1 for the open floor.
+ *
+ * Exported so the library can say where a unit is about to go instead of
+ * greying it out. "Ne rentre pas" was the honest answer while a cabinet had to
+ * live in a row; now that one can stand on its own it is simply wrong, and a
+ * disabled button that will not explain itself is the worst version of it.
+ */
+export function addTargetFor(scene: KitchenScene, preferredRun: number, moduleId: string): number {
+  const order = [preferredRun, ...scene.runs.map((_, i) => i)];
+  for (const i of order) {
+    if (i >= 0 && i < scene.runs.length && addModule(scene, i, moduleId).key) return i;
+  }
+  return -1;
+}
+
+/**
+ * Adds a cabinet, and never refuses.
+ *
+ * The row the customer is working on first, then any other row, and failing
+ * both it stands on the open floor for them to place. `addModule` on its own
+ * still answers the narrow question — is there a gap on *this* run — which is
+ * what the drag path needs; this is the answer to what a customer pressing
+ * "Ajouter" means, which is that they want the unit.
+ */
+export function addModuleAnywhere(
+  scene: KitchenScene,
+  preferredRun: number,
+  moduleId: string,
+): { scene: KitchenScene; key: string | null } {
+  const mod = moduleById(moduleId);
+  if (!mod || !scene.runs.length) return { scene, key: null };
+
+  const target = addTargetFor(scene, preferredRun, moduleId);
+  if (target >= 0) return addModule(scene, target, moduleId);
+
+  const runIndex = preferredRun >= 0 && preferredRun < scene.runs.length ? preferredRun : 0;
+  const key = mintKey(scene, moduleId);
+  const at = freeSpot(scene, mm(mod.widthMm), mm(mod.depthMm));
+  // Listed under a run all the same: that is the heading it appears under on
+  // the devis, and the row it goes back to if the customer presses Remettre.
+  return {
+    scene: withRun(scene, runIndex, [
+      ...scene.runs[runIndex].modules,
+      {
+        key,
+        moduleId,
+        offsetM: 0,
+        free: { ...at, rotationQuarters: scene.runs[runIndex].rotationQuarters },
+      },
+    ]),
+    key,
+  };
 }
 
 /** Whether `key` names a cabinet the customer has stood free of its run. */
