@@ -115,6 +115,141 @@ function Pill({ active, label, sub, onPress }: { active: boolean; label: string;
   );
 }
 
+/**
+ * Two-column grid shared by every "pick from a list" block.
+ *
+ * Cards are 48% wide and the row is spread with `space-between`, so the gutter
+ * is whatever the remaining 4% works out to. Percentages resolve against
+ * whatever the block is rendered in, which keeps two columns at any container
+ * width — a fixed `columnGap` plus fixed widths overflows into one column on
+ * narrow screens. An odd last card sits on the left, as it should.
+ */
+function OptionGrid({ children }: { children: React.ReactNode }) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        flexWrap: "wrap",
+        justifyContent: "space-between",
+        rowGap: SPACE.md,
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
+/**
+ * One tile: the photo does the talking, the label and surcharge sit under it.
+ * `multiple` only decides how the choice is announced and which mark is drawn —
+ * a tick for "take as many as you like", a dot for "pick one".
+ */
+function OptionCard({
+  image,
+  label,
+  priceCents,
+  active,
+  multiple,
+  onPress,
+}: {
+  image?: string;
+  label: string;
+  priceCents?: number;
+  active: boolean;
+  multiple: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      accessibilityRole={multiple ? "checkbox" : "radio"}
+      accessibilityState={{ checked: active }}
+      accessibilityLabel={
+        priceCents ? `${label}, + ${formatPrice(priceCents / 100)}` : label
+      }
+      style={{
+        width: "48%",
+        padding: SPACE.sm,
+        borderRadius: 12,
+        borderWidth: active ? 2 : 1,
+        borderColor: active ? COLORS.primary : COLORS.outlineVariant,
+        backgroundColor: active ? `${COLORS.primary}0D` : "transparent",
+      }}
+    >
+      <View
+        style={{
+          width: "100%",
+          aspectRatio: 1,
+          borderRadius: 10,
+          backgroundColor: COLORS.surfaceContainer,
+          overflow: "hidden",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {image ? (
+          <>
+            <Image source={{ uri: image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+            <ImageZoomOverlay uri={image} />
+          </>
+        ) : (
+          <Icon name="image-off-outline" size={22} color={COLORS.outline} />
+        )}
+      </View>
+
+      {/* Sits over the photo's top corner so the mark reads at a glance down a
+          column of tiles, instead of trailing each label at a different height.
+          On its own disc, because a bare glyph disappears into whichever photo
+          happens to be behind it. */}
+      <View
+        style={{
+          position: "absolute",
+          top: SPACE.md,
+          right: SPACE.md,
+          width: 26,
+          height: 26,
+          borderRadius: 13,
+          backgroundColor: "rgba(255,255,255,0.92)",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Icon
+          name={
+            active
+              ? multiple
+                ? "checkbox-marked-circle"
+                : "radiobox-marked"
+              : multiple
+                ? "checkbox-blank-circle-outline"
+                : "radiobox-blank"
+          }
+          size={20}
+          color={active ? COLORS.primary : COLORS.outline}
+        />
+      </View>
+
+      <Text
+        numberOfLines={2}
+        style={{
+          fontSize: 13,
+          lineHeight: 17,
+          fontFamily: "Inter_600SemiBold",
+          color: COLORS.onSurface,
+          marginTop: SPACE.sm,
+        }}
+      >
+        {label}
+      </Text>
+      {priceCents ? (
+        <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.secondary, marginTop: 2 }}>
+          +{formatPrice(priceCents / 100)}
+        </Text>
+      ) : null}
+    </TouchableOpacity>
+  );
+}
+
 // Small "view fullscreen" badge + modal, meant to sit inside a relatively
 // positioned image box. Tapping it never bubbles to the box's own onPress.
 function ImageZoomOverlay({ uri }: { uri: string }) {
@@ -371,75 +506,41 @@ function AccessoriesBlock({ block, sel, patch }: { block: ConfigBlock; sel: Sel;
     }
   };
   return (
-    <View style={{ gap: 10 }}>
-      {items.map((it) => {
-        const active = selected.includes(it.id);
-        return (
-          <TouchableOpacity
-            key={it.id}
-            onPress={() => toggle(it.id)}
-            style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 8, borderRadius: 10, borderWidth: 1, borderColor: active ? COLORS.primary : COLORS.outlineVariant, backgroundColor: active ? `${COLORS.primary}0D` : "transparent" }}
-          >
-            <View style={{ width: 48, height: 48, borderRadius: 8, backgroundColor: COLORS.surfaceContainer, overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
-              {it.image ? (
-                <>
-                  <Image source={{ uri: it.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
-                  <ImageZoomOverlay uri={it.image} />
-                </>
-              ) : (
-                <Icon name="image-off-outline" size={18} color={COLORS.outline} />
-              )}
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>{it.title}</Text>
-              {it.priceCents ? (
-                <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.secondary }}>+{formatPrice(it.priceCents / 100)}</Text>
-              ) : null}
-            </View>
-            <Icon name={active ? "checkbox-marked-circle" : "checkbox-blank-circle-outline"} size={22} color={active ? COLORS.primary : COLORS.outline} />
-          </TouchableOpacity>
-        );
-      })}
-    </View>
+    <OptionGrid>
+      {items.map((it) => (
+        <OptionCard
+          key={it.id}
+          image={it.image}
+          label={it.title}
+          priceCents={it.priceCents}
+          active={selected.includes(it.id)}
+          multiple={block.multiple !== false}
+          onPress={() => toggle(it.id)}
+        />
+      ))}
+    </OptionGrid>
   );
 }
 
 function OpeningBlock({ block, sel, patch }: { block: ConfigBlock; sel: Sel; patch: Patch }) {
   const options = block.options ?? [];
   return (
-    <View style={{ gap: 10 }}>
-      {options.map((o) => {
-        const active = sel?.openingKey === o.key;
-        return (
-          <TouchableOpacity
-            key={o.key}
-            onPress={() => {
-              Haptics.selectionAsync();
-              patch({ openingKey: o.key });
-            }}
-            style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 8, borderRadius: 10, borderWidth: 1, borderColor: active ? COLORS.primary : COLORS.outlineVariant, backgroundColor: active ? `${COLORS.primary}0D` : "transparent" }}
-          >
-            <View style={{ width: 56, height: 56, borderRadius: 8, backgroundColor: COLORS.surfaceContainer, overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
-              {o.image ? (
-                <>
-                  <Image source={{ uri: o.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
-                  <ImageZoomOverlay uri={o.image} />
-                </>
-              ) : (
-                <Icon name="image-off-outline" size={20} color={COLORS.outline} />
-              )}
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>{o.label}</Text>
-              {o.surchargeCents ? (
-                <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.secondary }}>+{formatPrice(o.surchargeCents / 100)}</Text>
-              ) : null}
-            </View>
-            <Icon name={active ? "radiobox-marked" : "radiobox-blank"} size={22} color={active ? COLORS.primary : COLORS.outline} />
-          </TouchableOpacity>
-        );
-      })}
-    </View>
+    <OptionGrid>
+      {options.map((o) => (
+        <OptionCard
+          key={o.key}
+          image={o.image}
+          label={o.label}
+          priceCents={o.surchargeCents}
+          active={sel?.openingKey === o.key}
+          multiple={false}
+          onPress={() => {
+            Haptics.selectionAsync();
+            patch({ openingKey: o.key });
+          }}
+        />
+      ))}
+    </OptionGrid>
   );
 }
 
@@ -455,36 +556,19 @@ function OptionsBlock({ block, sel, patch }: { block: ConfigBlock; sel: Sel; pat
     }
   };
   return (
-    <View style={{ gap: 10 }}>
-      {options.map((o) => {
-        const active = selected.includes(o.key);
-        return (
-          <TouchableOpacity
-            key={o.key}
-            onPress={() => toggle(o.key)}
-            style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 8, borderRadius: 10, borderWidth: 1, borderColor: active ? COLORS.primary : COLORS.outlineVariant, backgroundColor: active ? `${COLORS.primary}0D` : "transparent" }}
-          >
-            <View style={{ width: 48, height: 48, borderRadius: 8, backgroundColor: COLORS.surfaceContainer, overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
-              {o.image ? (
-                <>
-                  <Image source={{ uri: o.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
-                  <ImageZoomOverlay uri={o.image} />
-                </>
-              ) : (
-                <Icon name="image-off-outline" size={18} color={COLORS.outline} />
-              )}
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.onSurface }}>{o.label}</Text>
-              {o.surchargeCents ? (
-                <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: COLORS.secondary }}>+{formatPrice(o.surchargeCents / 100)}</Text>
-              ) : null}
-            </View>
-            <Icon name={active ? (block.multiple ? "checkbox-marked-circle" : "radiobox-marked") : (block.multiple ? "checkbox-blank-circle-outline" : "radiobox-blank")} size={22} color={active ? COLORS.primary : COLORS.outline} />
-          </TouchableOpacity>
-        );
-      })}
-    </View>
+    <OptionGrid>
+      {options.map((o) => (
+        <OptionCard
+          key={o.key}
+          image={o.image}
+          label={o.label}
+          priceCents={o.surchargeCents}
+          active={selected.includes(o.key)}
+          multiple={block.multiple !== false}
+          onPress={() => toggle(o.key)}
+        />
+      ))}
+    </OptionGrid>
   );
 }
 

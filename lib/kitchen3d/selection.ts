@@ -20,6 +20,10 @@ export function layoutOfScene(scene: KitchenScene): ConfiguredLayout {
     runs: scene.runs.map((run) => ({
       wall: run.wall,
       lengthM: round(run.lengthM),
+      x: round(run.x),
+      z: round(run.z),
+      rotationQuarters: run.rotationQuarters,
+      ...(run.overlaps ? { overlaps: true } : {}),
       modules: run.modules
         .slice()
         .sort((a, b) => a.offsetM - b.offsetM)
@@ -33,6 +37,16 @@ export function layoutOfScene(scene: KitchenScene): ConfiguredLayout {
             widthMm: mod?.widthMm ?? 0,
             depthMm: mod?.depthMm ?? 0,
             priceCents: mod?.priceCents ?? 0,
+            // Only when the customer stood it somewhere of its own. Left off
+            // otherwise so a plan can tell "in the row" from "at 0,0 in the
+            // room", which are very different instructions to a fitter.
+            ...(p.free
+              ? {
+                  x: round(p.free.x),
+                  z: round(p.free.z),
+                  rotationQuarters: p.free.rotationQuarters,
+                }
+              : {}),
           };
         }),
     })),

@@ -140,8 +140,20 @@ export interface ConfiguredLayout {
   shape: string;
   room: { widthM: number; depthM: number; heightM: number };
   runs: {
+    /** What the run is called, not where it is — the position is x/z below. */
     wall: string;
     lengthM: number;
+    /**
+     * Centre of the run's footprint in the kitchen's frame, and its quarter
+     * turn. A customer can stand each run anywhere, so without these the
+     * implantation cannot be rebuilt: two kitchens with identical runs can be
+     * laid out entirely differently.
+     */
+    x?: number;
+    z?: number;
+    rotationQuarters?: number;
+    /** The customer left this run standing in another one. */
+    overlaps?: boolean;
     modules: {
       moduleId: string;
       label: string;

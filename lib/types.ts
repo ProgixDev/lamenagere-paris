@@ -193,8 +193,25 @@ export interface ConfiguredLayout {
   shape: string;
   room: { widthM: number; depthM: number; heightM: number };
   runs: {
+    /**
+     * What the run is called, not where it is.
+     *
+     * The customer can stand a run anywhere, so this is the label the devis
+     * uses ("mur du fond") and no longer implies a position — read x/z below.
+     */
     wall: string;
     lengthM: number;
+    /**
+     * Centre of the run's footprint in the kitchen's frame, metres, and the
+     * quarter turn it sits at. Without these the workshop cannot rebuild the
+     * implantation: two kitchens with identical runs can be laid out entirely
+     * differently.
+     */
+    x?: number;
+    z?: number;
+    rotationQuarters?: number;
+    /** True when the customer left this run standing in another one. */
+    overlaps?: boolean;
     modules: {
       moduleId: string;
       label: string;
@@ -208,6 +225,18 @@ export interface ConfiguredLayout {
        */
       widthMm: number;
       depthMm: number;
+      /**
+       * Where the customer stood this cabinet when they took it out of the row,
+       * in the kitchen's frame, and the quarter turn they left it at.
+       *
+       * Absent for anything still in its run, where `offsetM` says everything.
+       * A caisson pulled out into the middle of the floor is a real instruction
+       * — an island end, a spare unit against the far wall — and the workshop
+       * cannot rebuild it from an offset along a side it is no longer on.
+       */
+      x?: number;
+      z?: number;
+      rotationQuarters?: number;
       priceCents: number;
     }[];
   }[];

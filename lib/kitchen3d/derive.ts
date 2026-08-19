@@ -79,9 +79,10 @@ export function kitchenConfigFrom(
         config.ilotLengthCm = value;
       } else if (field.dimensionKey === "width" || label.includes("largeur")) {
         config.ilotWidthCm = value;
-      } else if (label.includes("hauteur")) {
-        config.ilotHeightCm = value;
       }
+      // A height on the îlot block is deliberately not read: the island is
+      // built to the kitchen's worktop height. The field is still seeded and
+      // still priced — see hiddenHeight() — it just no longer drives geometry.
     }
   }
 
@@ -90,23 +91,13 @@ export function kitchenConfigFrom(
    * Non, so the answer is read off the chosen item's title. Anything else — no
    * such block, nothing picked — leaves the crédence drawn, which is what a
    * fitted kitchen has by default.
+   *
+   * The other accessories blocks are not read here at all. Every chosen item
+   * used to be stood on the worktop as a labelled white box — a poubelle
+   * intégrée, a panier coulissant — which put objects in the picture that live
+   * inside a drawer and are never on show. They still reach the recap, the devis
+   * and the price through the ordinary config path; they are simply not drawn.
    */
-  // Everything the customer ticked in an accessories block, minus the ones that
-  // are really yes/no questions dressed as a picker (crédence, worktop material).
-  const picked: { id: string; title: string }[] = [];
-  for (const block of blocks) {
-    if (block.type !== "accessories" || isCredence(block.label)) continue;
-    const chosen = state[block.id]?.accessoryIds ?? [];
-    for (const item of block.items ?? []) {
-      if (!chosen.includes(item.id)) continue;
-      const title = item.title.trim();
-      // "Oui" / "Non" answers carry no object to stand on a worktop.
-      if (/^(oui|non)$/i.test(title)) continue;
-      picked.push({ id: item.id, title });
-    }
-  }
-  if (picked.length) config.accessories = picked;
-
   for (const block of blocks) {
     if (block.type !== "accessories" || !isCredence(block.label)) continue;
     const chosen = state[block.id]?.accessoryIds ?? [];

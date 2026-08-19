@@ -26,9 +26,14 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 // one, every metal and glossy surface renders dead flat — and it is generated,
 // so it costs no asset and works offline.
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+// Door and drawer fronts are built with a hairline radius on their edges. A
+// hard box edge catches no highlight at all, so a run of cabinets reads as one
+// flat slab; 2 mm of round is what makes each front a separate object.
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 globalThis.THREE = THREE;
 globalThis.OrbitControls = OrbitControls;
 globalThis.RoomEnvironment = RoomEnvironment;
+globalThis.RoundedBoxGeometry = RoundedBoxGeometry;
 `;
 
 const result = await build({

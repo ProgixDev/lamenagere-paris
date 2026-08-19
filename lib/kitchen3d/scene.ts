@@ -1,6 +1,7 @@
 import { mm, moduleById, MODULES, WORKTOP_TOP_MM } from "./catalog";
-import { ilotFootprint } from "./types";
+import { ilotFootprint, moduleFootprint, runFootprint, RUN_DEPTH_M } from "./types";
 import type {
+  Decor,
   KitchenConfig,
   KitchenScene,
   PlacedModule,
@@ -47,6 +48,9 @@ const MIN_WALKWAY_M = 0.7;
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
+/** Millimetre precision, so a placement never carries float dust into storage. */
+const round = (v: number) => Math.round(v * 1000) / 1000;
+
 const cm = (v: number | undefined, fallback: number) =>
   v != null && Number.isFinite(v) && v > 0 ? v / 100 : fallback;
 
@@ -69,6 +73,376 @@ export function rotatedWall(wall: Wall, quarters: number): Wall {
 
 export function runsOfShapeKey(shapeKey?: string | null): number {
   return shapeKey === "u" ? 3 : shapeKey === "l" ? 2 : 1;
+}
+
+/**
+ * Where a run stands when nobody has moved it yet.
+ *
+ * This is the old `placementFor` in the renderer, turned inside out. It used to
+ * derive a position from the wall enum on every frame, which meant a run had
+ * nowhere to record having been moved. Now the same three cases run once, at
+ * build time, to seed a position the customer is then free to change.
+ *
+ * Returns the centre of the run's footprint in the kitchen's own frame, plus
+ * the quarter turn that points its fronts into the room. The mapping to quarter
+ * turns is fixed by the renderer's convention (`rotation.y = -q * PI/2`):
+ * a back run is 0, a left return 3, a right return 1.
+ */
+export function seedPlacement(
+  wall: Wall,
+  lengthM: number,
+  canonWidth: number,
+  canonDepth: number,
+  backLenM: number,
+): { x: number; z: number; rotationQuarters: number } {
+  const d = RUN_DEPTH_M;
+  if (wall === "left") {
+    // Laid front-to-back so its cabinets face into the room, and anchored at
+    // the corner it turns out of rather than stretched to fill its wall.
+    return {
+      x: -canonWidth / 2 + d / 2,
+      z: -canonDepth / 2 + CORNER_CLEARANCE_M + lengthM / 2,
+      rotationQuarters: 3,
+    };
+  }
+  if (wall === "right") {
+    // Attached to the far end of the back run, not to the room's right wall:
+    // once the room can be wider than the kitchen those are different places,
+    // and pinning it to the wall leaves the third arm stranded metres away.
+    return {
+      x: -canonWidth / 2 + backLenM - d / 2,
+      z: -canonDepth / 2 + CORNER_CLEARANCE_M + lengthM / 2,
+      rotationQuarters: 1,
+    };
+  }
+  return {
+    x: -canonWidth / 2 + lengthM / 2,
+    z: -canonDepth / 2 + d / 2,
+    rotationQuarters: 0,
+  };
+}
+
+/**
+ * Flags every run and the island that is standing in something else.
+ *
+ * Rectangle against rectangle, axis-aligned, which is exact here because
+ * everything turns in quarters. Runs are held in the kitchen's frame and the
+ * island in the room's, so one of them has to be converted — the island is
+ * converted inwards, since there is only ever one of it.
+ *
+ * Mutates the scene it is given: it runs at the end of `buildScene` and after
+ * every edit, and copying the whole scene to set two booleans is not worth it.
+ */
+export function markOverlaps(scene: KitchenScene): KitchenScene {
+  const boxes = scene.runs.map((run) => {
+    const f = runFootprint(run);
+    return { x: run.x, z: run.z, w: f.alongX, d: f.alongZ };
+  });
+
+  if (scene.ilot) {
+    const f = ilotFootprint(scene.ilot);
+    const p = roomToKitchen(scene.ilot.x, scene.ilot.z, scene.rotationQuarters);
+    // A quarter turn swaps which way the island's own footprint lies, too.
+    const turned = ((scene.rotationQuarters % 4) + 4) % 4 % 2 === 1;
+    boxes.push({
+      x: p.x, z: p.z,
+      w: turned ? f.alongZ : f.alongX,
+      d: turned ? f.alongX : f.alongZ,
+    });
+  }
+
+  // A shared edge is not an overlap: runs are meant to meet flush in a corner.
+  const EPS = 1e-4;
+  const hits = (a: typeof boxes[number], b: typeof boxes[number]) =>
+    Math.abs(a.x - b.x) < (a.w + b.w) / 2 - EPS &&
+    Math.abs(a.z - b.z) < (a.d + b.d) / 2 - EPS;
+
+  const flagged = boxes.map((_, i) => boxes.some((_, j) => i !== j && hits(boxes[i], boxes[j])));
+
+  scene.runs.forEach((run, i) => { run.overlaps = flagged[i]; });
+  if (scene.ilot) scene.ilot.overlaps = flagged[scene.runs.length];
+  return scene;
+}
+
+/** Every footprint the kitchen occupies, in the room's own frame. */
+function occupiedBoxes(scene: {
+  runs: Run[];
+  ilot?: { x: number; z: number; widthM: number; depthM: number; rotationQuarters: number };
+  rotationQuarters: number;
+}) {
+  const q = ((scene.rotationQuarters % 4) + 4) % 4;
+  const turned = q % 2 === 1;
+  const boxes = scene.runs.map((run) => {
+    const f = runFootprint(run);
+    const p = kitchenToRoom(run.x, run.z, q);
+    // Turning the kitchen swaps which way each run's footprint lies.
+    return { x: p.x, z: p.z, w: turned ? f.alongZ : f.alongX, d: turned ? f.alongX : f.alongZ };
+  });
+  if (scene.ilot) {
+    const f = ilotFootprint(scene.ilot);
+    boxes.push({ x: scene.ilot.x, z: scene.ilot.z, w: f.alongX, d: f.alongZ });
+  }
+  // Cabinets the customer has stood free of their run occupy floor like
+  // anything else — a dining table placed straight through one would read as
+  // the renderer not knowing the caisson was there. Appended last so the run
+  // boxes stay at the front, which is what `placeStools` slices off.
+  for (const run of scene.runs) {
+    for (const m of run.modules) {
+      if (!m.free) continue;
+      const mod = moduleById(m.moduleId);
+      if (!mod) continue;
+      const f = moduleFootprint(mm(mod.widthMm), mm(mod.depthMm), m.free.rotationQuarters);
+      const p = kitchenToRoom(m.free.x, m.free.z, q);
+      boxes.push({
+        x: p.x, z: p.z,
+        w: turned ? f.alongZ : f.alongX,
+        d: turned ? f.alongX : f.alongZ,
+      });
+    }
+  }
+  return boxes;
+}
+
+/**
+ * Pulls stools up to the island, on the side with room to sit.
+ *
+ * Which side matters: a stool tucked into the 60 cm gangway behind an island
+ * is a stool nobody can reach, and it reads as a mistake rather than as
+ * seating. Each of the four sides is measured against the cabinetry and the
+ * walls, and the roomiest one wins.
+ */
+function placeStools(
+  scene: KitchenScene,
+  /**
+   * The runs only — never the island.
+   *
+   * Measuring against every footprint counts the island itself as an obstacle,
+   * and since a stool is by definition tucked right up against it, every side
+   * came back as blocked and no kitchen ever got seating.
+   */
+  boxes: { x: number; z: number; w: number; d: number }[],
+): Decor["stools"] {
+  if (!scene.ilot) return [];
+  const f = ilotFootprint(scene.ilot);
+  const { widthM: W, depthM: D } = scene.room;
+  /** A seated person needs this much floor behind the stool. */
+  const SIT_M = 0.75;
+
+  const sides = [
+    { nx: 0, nz: 1, along: f.alongX, facing: 2 },
+    { nx: 0, nz: -1, along: f.alongX, facing: 0 },
+    { nx: 1, nz: 0, along: f.alongZ, facing: 1 },
+    { nx: -1, nz: 0, along: f.alongZ, facing: 3 },
+  ].map((side) => {
+    // The point a stool would sit at, on this side of the island.
+    const out = (side.nx ? f.alongX : f.alongZ) / 2 + 0.34;
+    const px = scene.ilot!.x + side.nx * out;
+    const pz = scene.ilot!.z + side.nz * out;
+    let clear = Math.min(
+      W / 2 - Math.abs(px),
+      D / 2 - Math.abs(pz),
+    );
+    for (const b of boxes) {
+      const dx = Math.max(Math.abs(px - b.x) - b.w / 2, 0);
+      const dz = Math.max(Math.abs(pz - b.z) - b.d / 2, 0);
+      clear = Math.min(clear, Math.hypot(dx, dz));
+    }
+    return { ...side, px, pz, clear };
+  }).sort((a, b) => b.clear - a.clear);
+
+  const best = sides[0];
+  if (best.clear < SIT_M) return [];
+
+  // Two stools, spread along that side but kept inside the island's own length.
+  const spread = Math.min(best.along * 0.34, 0.62);
+  const tx = -best.nz, tz = best.nx; // along the side, perpendicular to its normal
+  return [-1, 1].map((s) => ({
+    x: round(best.px + tx * spread * s),
+    z: round(best.pz + tz * spread * s),
+    facing: best.facing,
+  }));
+}
+
+/**
+ * Finds the floor a dining set can stand on, and dresses it.
+ *
+ * A grid search rather than anything cleverer: the room is a few metres across,
+ * the kitchen is at most four boxes, and the honest answer to "where is there
+ * space" is to look. Every candidate must clear the cabinetry by a walkway and
+ * the walls by a chair's width; the winner is the one furthest from the
+ * kitchen, which puts the table across the room rather than wedged behind the
+ * island.
+ *
+ * Returns an empty decor when nothing fits — a galley kitchen does not get a
+ * dining set it has nowhere to put.
+ */
+export function placeDecor(scene: KitchenScene): Decor {
+  const boxes = occupiedBoxes(scene);
+  // occupiedBoxes puts the island last; the stools need the cabinetry alone.
+  const runBoxes = boxes.slice(0, scene.runs.length);
+  const { widthM: W, depthM: D } = scene.room;
+
+  /** How far a chair, pulled out to sit down, reaches past the table's edge. */
+  const SEAT_M = 0.62;
+  /** Breathing space kept between a chair and the wall behind it. */
+  const WALL_M = 0.12;
+
+  const clearOf = (x: number, z: number) => {
+    let worst = Infinity;
+    for (const b of boxes) {
+      // Distance from the point to the box, zero inside it.
+      const dx = Math.max(Math.abs(x - b.x) - b.w / 2, 0);
+      const dz = Math.max(Math.abs(z - b.z) - b.d / 2, 0);
+      worst = Math.min(worst, Math.hypot(dx, dz));
+    }
+    return worst;
+  };
+
+  /**
+   * Largest table first, then smaller, rather than one size that must fit.
+   *
+   * Demanding a full walkway around a 1.24 m radius meant a U with an island
+   * — the case that most wants furnishing — got nothing at all, because the
+   * only free floor was the strip in front of the island. A ladder puts a
+   * bistro table where a dining table will not go, and still prefers the
+   * dining table wherever there is room for one.
+   */
+  let radiusM = 0;
+  let best: { x: number; z: number; clear: number } | null = null;
+  const STEP = 0.1;
+
+  for (const r of [0.62, 0.55, 0.48, 0.42, 0.36]) {
+    const need = r + SEAT_M;
+    const lo = need + WALL_M;
+    if (lo * 2 > Math.min(W, D)) continue;
+    let found: { x: number; z: number; clear: number } | null = null;
+    for (let x = -W / 2 + lo; x <= W / 2 - lo + 1e-9; x += STEP) {
+      for (let z = -D / 2 + lo; z <= D / 2 - lo + 1e-9; z += STEP) {
+        // The chairs must clear the cabinetry; a walkway beyond that is a
+        // preference, expressed by picking the roomiest spot rather than a rule.
+        const clear = clearOf(x, z);
+        if (clear < need) continue;
+        /**
+         * Roomiest spot wins, but the near corner is handicapped.
+         *
+         * The opening shot looks in over the front-right, so the free floor
+         * there is exactly the floor between the lens and the kitchen: a table
+         * placed on it is cropped by the bottom of the frame and stands in
+         * front of the cabinets the customer came to look at. The penalty is
+         * small enough that a clearly better spot still wins on merit.
+         */
+        const nearness = (x / (W / 2)) * 0.18 + (z / (D / 2)) * 0.34;
+        const score = clear - nearness;
+        if (!found || score > found.clear) found = { x: round(x), z: round(z), clear: score };
+      }
+    }
+    if (found) { radiusM = r; best = found; break; }
+  }
+  if (!best) return { frames: [], stools: placeStools(scene, runBoxes) };
+
+  /**
+   * The picture goes where the wall is actually empty, not next to the table.
+   *
+   * Hanging it above the table put it behind the cabinets every time: in most
+   * kitchens the walls the camera sees are the walls the units stand against.
+   * Scanning each wall for its widest free stretch — past the ends of the runs,
+   * clear of the door and the window — is what finds the bare plaster a picture
+   * would really be hung on.
+   */
+  const frames: Decor["frames"] = [];
+  /** Lower is likelier to be facing the customer on the opening shot. */
+  const SEEN: Record<Wall, number> = { back: 0, left: 1, right: 2, front: 3 };
+  const FRAME_W = 0.52, FRAME_H = 0.68;
+  const NEAR = 0.9;
+
+  /** Where a footprint sits along a given wall, or null if it is nowhere near it. */
+  const spanOn = (wall: Wall, b: { x: number; z: number; w: number; d: number }) => {
+    if (wall === "back") {
+      return b.z - b.d / 2 < -D / 2 + NEAR ? [b.x - b.w / 2 + W / 2, b.x + b.w / 2 + W / 2] : null;
+    }
+    if (wall === "front") {
+      return b.z + b.d / 2 > D / 2 - NEAR ? [W / 2 - (b.x + b.w / 2), W / 2 - (b.x - b.w / 2)] : null;
+    }
+    if (wall === "left") {
+      return b.x - b.w / 2 < -W / 2 + NEAR ? [D / 2 - (b.z + b.d / 2), D / 2 - (b.z - b.d / 2)] : null;
+    }
+    return b.x + b.w / 2 > W / 2 - NEAR ? [b.z - b.d / 2 + D / 2, b.z + b.d / 2 + D / 2] : null;
+  };
+
+  for (const wall of (["back", "left", "right", "front"] as Wall[]).sort((a, b) => SEEN[a] - SEEN[b])) {
+    const span = wall === "back" || wall === "front" ? W : D;
+    const taken: number[][] = [];
+    for (const b of boxes) {
+      const sp = spanOn(wall, b);
+      if (sp) taken.push(sp);
+    }
+    for (const o of scene.openings) {
+      if (o.wall === wall) taken.push([o.offsetM, o.offsetM + o.widthM]);
+    }
+    taken.sort((a, b) => a[0] - b[0]);
+
+    // Walk the wall and keep the widest stretch nothing stands in front of.
+    let cursor = 0.2, bestGap: number[] | null = null;
+    for (const t of taken.concat([[span - 0.2, span]])) {
+      if (t[0] - cursor > (bestGap ? bestGap[1] - bestGap[0] : 0)) bestGap = [cursor, t[0]];
+      cursor = Math.max(cursor, t[1]);
+    }
+    if (!bestGap || bestGap[1] - bestGap[0] < FRAME_W + 0.3) continue;
+    frames.push({
+      wall,
+      offsetM: round((bestGap[0] + bestGap[1]) / 2 - FRAME_W / 2),
+      widthM: FRAME_W,
+      heightM: FRAME_H,
+      sillM: 1.15,
+    });
+    break;
+  }
+
+  return {
+    stools: placeStools(scene, runBoxes),
+    table: {
+      x: best.x,
+      z: best.z,
+      radiusM: round(radiusM),
+      seats: 4,
+      // Turned so the chairs face across the room rather than always north.
+      rotationQuarters: Math.abs(best.x) > Math.abs(best.z) ? 1 : 0,
+    },
+    rugRadiusM: round(radiusM + SEAT_M * 0.9),
+    pendant: { x: best.x, z: best.z, dropM: 0.62 },
+    frames,
+  };
+}
+
+/**
+ * Room frame to kitchen frame, and back.
+ *
+ * The implantation is turned as one piece, so a point the customer touched in
+ * the room has to be un-turned before it means anything to a run. Clockwise
+ * seen from above, matching `rotation.y = -q * PI/2` in the renderer.
+ *
+ * The two carried each other's bodies until a free-standing cabinet needed the
+ * conversion to be right: three's Y rotation by `-q * PI/2` sends a kitchen
+ * point (x, z) to the room point (-z, x) on a quarter turn, not to (z, -x).
+ * Nothing showed it, because every existing caller either round-trips through
+ * both or only ever ran on an unturned kitchen — a run dragged in a kitchen
+ * standing at a quarter turn moved along the wrong axis, and the island's
+ * overlap box was tested in the wrong corner.
+ */
+export function roomToKitchen(x: number, z: number, quarters: number) {
+  const q = ((quarters % 4) + 4) % 4;
+  if (q === 1) return { x: z, z: -x };
+  if (q === 2) return { x: -x, z: -z };
+  if (q === 3) return { x: -z, z: x };
+  return { x, z };
+}
+
+export function kitchenToRoom(x: number, z: number, quarters: number) {
+  const q = ((quarters % 4) + 4) % 4;
+  if (q === 1) return { x: -z, z: x };
+  if (q === 2) return { x: -x, z: -z };
+  if (q === 3) return { x: z, z: -x };
+  return { x, z };
 }
 
 /**
@@ -190,52 +564,6 @@ const WANTED: Record<number, string[]> = {
 };
 const FILLER = ["bas-simple-60", "bas-tiroirs-60"];
 
-/** Footprint of an accessory block, metres. Uniform on purpose — see the type. */
-const ACC = { widthM: 0.34, depthM: 0.28, heightM: 0.16, gapM: 0.08 };
-
-/**
- * Lines the chosen accessories up along the back worktop, left to right.
- *
- * They are placed rather than modelled: the point is that the customer can see
- * and read what they picked, not that a range-couverts is drawn accurately
- * inside a drawer where it would be invisible. Anything that overruns the run
- * wraps onto a second row rather than marching off the end of the counter.
- */
-function placeAccessories(
-  chosen: { id: string; title: string }[],
-  runs: Run[],
-  room: { widthM: number; depthM: number },
-  worktopTopM: number,
-) {
-  const back = runs.find((r) => r.wall === "back");
-  if (!back || !chosen.length) return [];
-
-  const pitch = ACC.widthM + ACC.gapM;
-  // Start clear of the corner when a return run turns out of it, so the first
-  // block does not straddle the join between two worktops.
-  const startM = runs.some((r) => r.wall === "left") ? CORNER_CLEARANCE_M : ACC.gapM;
-  const perRow = Math.max(1, Math.floor((back.lengthM - startM) / pitch));
-  // The back worktop spans z from the wall to one cabinet depth into the room.
-  const frontOfWorktop = -room.depthM / 2 + mm(600);
-
-  return chosen.map((a, i) => {
-    const col = i % perRow;
-    const row = Math.floor(i / perRow);
-    return {
-      id: a.id,
-      title: a.title.trim(),
-      // The back run starts at the left wall and travels +x.
-      x: -room.widthM / 2 + startM + pitch * col + ACC.widthM / 2,
-      // Rows stack towards the wall so the first one is nearest the viewer.
-      z: frontOfWorktop - ACC.depthM / 2 - row * (ACC.depthM + ACC.gapM),
-      baseM: worktopTopM,
-      widthM: ACC.widthM,
-      depthM: ACC.depthM,
-      heightM: ACC.heightM,
-    };
-  });
-}
-
 export function buildScene(config: KitchenConfig): KitchenScene {
   const runCount = runsOfShapeKey(config.shapeKey);
 
@@ -256,11 +584,14 @@ export function buildScene(config: KitchenConfig): KitchenScene {
   const quarters = ((config.rotationQuarters ?? 0) % 4 + 4) % 4;
   const turned = quarters % 2 === 1;
 
-  // What the kitchen needs along its own two axes.
+  // What the kitchen needs along its own two axes. A return starts one cabinet
+  // depth off the back wall and is built to its full measurement, so the floor
+  // it needs is the corner plus the run — not the run alone. Getting this wrong
+  // is what used to force the return to be shortened instead of the room grown.
   const alongRuns = run1;
   const acrossRuns = Math.max(
-    runCount >= 2 ? run2 : 0,
-    runCount >= 3 ? run3 : 0,
+    runCount >= 2 ? CORNER_CLEARANCE_M + run2 : 0,
+    runCount >= 3 ? CORNER_CLEARANCE_M + run3 : 0,
     // A straight run has no second wall to measure, so it needs its own floor:
     // one cabinet depth plus room to stand in front of it.
     mm(600) + 0.9,
@@ -287,17 +618,37 @@ export function buildScene(config: KitchenConfig): KitchenScene {
   const runs: Run[] = [];
   const walls: Wall[] = ["back", "left", "right"];
 
+  // The back run's length decides where the right-hand return anchors, so it
+  // has to be known before any placement is seeded.
+  const backLenM = run1;
+
   for (let i = 0; i < runCount; i++) {
-    // A return run cannot start in the corner — the back run's carcass is
-    // already there — so it loses one cabinet depth off the top.
-    const raw = i === 0 ? run1 : Math.min(i === 1 ? run2 : run3, canonDepth);
-    const lengthM = i === 0 ? raw : Math.max(0, raw - CORNER_CLEARANCE_M);
+    /**
+     * The measurement is how much cabinetry to build, on every run.
+     *
+     * Returns used to lose a cabinet's depth off the top, on the reasoning that
+     * the back run already occupies the corner — so a 250 cm wall could only
+     * hold 190 cm of units. Defensible joinery, and completely invisible: a
+     * customer who typed 150 got a single box, and one who typed 100 got an
+     * empty wall with no explanation at all.
+     *
+     * Now the number means what it says. The corner is still kept clear — the
+     * return simply starts after it and reaches further into the room — and the
+     * room's minimum depth accounts for both, so the space grows to hold what
+     * was asked for instead of the kitchen being quietly cut down to fit.
+     */
+    const asked = i === 0 ? run1 : i === 1 ? run2 : run3;
+    // Still capped by the room, for a customer who shrinks it by hand: a run
+    // longer than the floor it stands on would leave the space entirely.
+    const room = i === 0 ? canonWidth : Math.max(0, canonDepth - CORNER_CLEARANCE_M);
+    const lengthM = Math.max(0, Math.min(asked, room));
 
     const base = packRun(lengthM, WANTED[i] ?? [], FILLER);
     const uppers = wallUnitsOver(base, lengthM);
     runs.push({
       wall: walls[i],
       lengthM,
+      ...seedPlacement(walls[i], lengthM, canonWidth, canonDepth, backLenM),
       // Keys must be unique across the whole scene, not just within the run:
       // the renderer picks and highlights a module by key alone, so two runs
       // numbering their cabinets from zero would select each other's.
@@ -309,19 +660,13 @@ export function buildScene(config: KitchenConfig): KitchenScene {
     room: { widthM, depthM, heightM },
     runs,
     rotationQuarters: quarters,
-    // Accessories ride with the kitchen, so they are placed in its frame too.
-    accessories: placeAccessories(
-      config.accessories ?? [],
-      runs,
-      { widthM: canonWidth, depthM: canonDepth },
-      worktopTopM,
-    ),
     geometry: {
       worktopTopM,
       credence: config.credence !== false,
       minRoom: { widthM: minWidth, depthM: minDepth },
     },
     openings: [],
+    decor: { frames: [], stools: [] },
     materials: {
       facade: config.facadeHex || "#E8E4DC",
       worktop: config.worktopHex || "#2E2E30",
@@ -375,7 +720,16 @@ export function buildScene(config: KitchenConfig): KitchenScene {
       widthM: ilotW,
       depthM: ilotD,
       rotationQuarters: ilotQuarters,
-      topM: cm(config.ilotHeightCm, worktopTopM),
+      /**
+       * The island is built to the same worktop height as the runs.
+       *
+       * Not "defaults to" — it *is* the same number. The island used to carry
+       * its own measurement, on the reasoning that a breakfast bar is often
+       * ordered higher; in practice it meant two heights that could drift, and
+       * a question the customer had to answer about a surface that should
+       * simply match the rest of their kitchen.
+       */
+      topM: worktopTopM,
       x: (xMin + xMax) / 2,
       z: (zMin + zMax) / 2,
       tight:
@@ -406,7 +760,13 @@ export function buildScene(config: KitchenConfig): KitchenScene {
     });
   }
 
-  return scene;
+  // Dressed last: the table is placed around the cabinetry and the openings,
+  // so both have to be final before it can be told where the floor is free.
+  scene.decor = placeDecor(scene);
+
+  // A seeded kitchen never overlaps itself, but the island is sized against the
+  // floor the runs leave free and a measured one can be bigger than that fits.
+  return markOverlaps(scene);
 }
 
 /** What the scene costs, in cents — the same walk the recap and cart will do. */

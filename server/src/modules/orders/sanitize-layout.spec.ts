@@ -173,4 +173,83 @@ describe('sanitizeLayout', () => {
     (l.ilot as any).depthM = 'wide';
     expect(sanitizeLayout(l)!.ilot).toBeUndefined();
   });
+
+  /**
+   * A run's position is measured from the middle of the kitchen, so half of
+   * every legitimate coordinate is negative. The general number clamp rejects
+   * anything below zero — routing these through it would have quietly zeroed
+   * the arrangement the customer built and handed the workshop a kitchen with
+   * every run stacked in one corner.
+   */
+  it('keeps a run standing to the left of the origin', () => {
+    const l = valid();
+    (l.runs[0] as any).x = -1.9;
+    (l.runs[0] as any).z = -1.4;
+    (l.runs[0] as any).rotationQuarters = 3;
+    const out = sanitizeLayout(l)!;
+    expect(out.runs[0].x).toBe(-1.9);
+    expect(out.runs[0].z).toBe(-1.4);
+    expect(out.runs[0].rotationQuarters).toBe(3);
+  });
+
+  it('caps a run flung far outside any real room', () => {
+    const l = valid();
+    (l.runs[0] as any).x = -1e9;
+    (l.runs[0] as any).z = 'over there';
+    const out = sanitizeLayout(l)!;
+    expect(out.runs[0].x).toBe(0);
+    expect(out.runs[0].z).toBe(0);
+  });
+
+  it('rejects a quarter turn that is not one of the four', () => {
+    const l = valid();
+    (l.runs[0] as any).rotationQuarters = 9;
+    expect(sanitizeLayout(l)!.runs[0].rotationQuarters).toBe(0);
+  });
+
+  it('defaults a run with no position at all, for orders placed before moving', () => {
+    const out = sanitizeLayout(valid())!;
+    expect(out.runs[0].x).toBe(0);
+    expect(out.runs[0].z).toBe(0);
+    expect(out.runs[0].rotationQuarters).toBe(0);
+  });
+
+  it('carries the overlap flag through, and only when it is set', () => {
+    const l = valid();
+    expect((sanitizeLayout(l)! as any).runs[0].overlaps).toBeUndefined();
+    (l.runs[0] as any).overlaps = true;
+    expect((sanitizeLayout(l)! as any).runs[0].overlaps).toBe(true);
+  });
+
+  it('keeps a cabinet the customer stood free of its run', () => {
+    const l = valid();
+    Object.assign(l.runs[0].modules[0], { x: -1.2, z: 0.85, rotationQuarters: 2 });
+    const m = sanitizeLayout(l)!.runs[0].modules[0] as any;
+    expect(m.x).toBe(-1.2);
+    expect(m.z).toBe(0.85);
+    expect(m.rotationQuarters).toBe(2);
+  });
+
+  it('leaves a cabinet still in its row without a position of its own', () => {
+    const m = sanitizeLayout(valid())!.runs[0].modules[0] as any;
+    expect(m.x).toBeUndefined();
+    expect(m.z).toBeUndefined();
+    expect(m.rotationQuarters).toBeUndefined();
+  });
+
+  it('drops half a position rather than parking the cabinet at the origin', () => {
+    const l = valid();
+    // Losing one axis would otherwise default it to zero, which is the middle
+    // of the room — a place the customer never put it.
+    Object.assign(l.runs[0].modules[0], { x: -1.2, z: 'somewhere' });
+    const m = sanitizeLayout(l)!.runs[0].modules[0] as any;
+    expect(m.x).toBeUndefined();
+    expect(m.z).toBeUndefined();
+  });
+
+  it('caps a free cabinet flung far outside any real room', () => {
+    const l = valid();
+    Object.assign(l.runs[0].modules[0], { x: 1e9, z: 0.4 });
+    expect((sanitizeLayout(l)!.runs[0].modules[0] as any).x).toBeUndefined();
+  });
 });

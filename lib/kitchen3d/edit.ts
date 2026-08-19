@@ -1,15 +1,20 @@
 import { mm, moduleById } from "./catalog";
-import { rotatedWall } from "./scene";
-import { ilotFootprint } from "./types";
-import type { KitchenScene, PlacedModule, Run, Slot } from "./types";
+import { kitchenToRoom, markOverlaps, roomToKitchen } from "./scene";
+import { ilotFootprint, moduleFootprint, runFootprint, RUN_DEPTH_M } from "./types";
+import type { FreePlacement, KitchenScene, PlacedModule, Run, Slot } from "./types";
 
 /**
  * The rules for moving, adding and removing a cabinet.
  *
  * A run against a wall is one-dimensional: modules sit side by side and the
- * only question is whether they fit. That is what keeps this a few dozen lines
- * instead of a collision solver — there is no second axis to search, so a move
- * is a clamp between the two neighbours and nothing else can be in the way.
+ * only question is whether they fit. That is what keeps the sliding rules a few
+ * dozen lines instead of a collision solver — there is no second axis to
+ * search, so a move along a run is a clamp between the two neighbours.
+ *
+ * A cabinet is not confined to its run, though. Dragged off one it stands free
+ * anywhere on the floor, and pushed back against any run it re-joins the row —
+ * so `moveModuleFree` decides which of the two a drag was, and the
+ * one-dimensional rules below are what it falls back on for the first case.
  *
  * Authoritative. The renderer clamps too so a drag looks right under the
  * finger, but what it reports back is re-clamped here before it is believed.
@@ -32,11 +37,17 @@ interface Span {
   end: number;
 }
 
-/** Occupied spans on the same strip as `slot`, excluding `exceptKey`. */
+/**
+ * Occupied spans on the same strip as `slot`, excluding `exceptKey`.
+ *
+ * A cabinet standing free of the run is not in the row and holds no span there:
+ * the place it used to occupy is a gap like any other, and its neighbours can
+ * slide through it.
+ */
 function spansOn(run: Run, slot: Slot, exceptKey?: string): Span[] {
   const want = strip(slot);
   return run.modules
-    .filter((p) => p.key !== exceptKey)
+    .filter((p) => p.key !== exceptKey && !p.free)
     .map((p) => ({ p, mod: moduleById(p.moduleId) }))
     .filter((x) => x.mod && strip(x.mod.slot) === want)
     .map((x) => ({
@@ -191,38 +202,507 @@ export function addModule(
   };
 }
 
+/**
+ * How far off a run's line a released cabinet still counts as belonging to it.
+ *
+ * Generous on purpose. The alternative to landing on a run is standing free in
+ * the middle of the floor, and a customer who meant "against this wall" and
+ * missed by eight centimetres wants the row, not a caisson hanging off it — so
+ * the band is wide enough to forgive an imprecise finger and still narrower
+ * than the walkway a free-standing cabinet would be dragged out into.
+ */
+const ATTACH_ACROSS_M = 0.3;
+/** The same forgiveness past either end of the run. */
+const ATTACH_ALONG_M = 0.3;
+
+/** A point in the kitchen's frame, brought into a run's own. */
+function toRunFrame(run: Run, x: number, z: number) {
+  return roomToKitchen(x - run.x, z - run.z, run.rotationQuarters);
+}
+
+/** The reverse: a point in a run's frame, put back into the kitchen's. */
+function fromRunFrame(run: Run, x: number, z: number) {
+  const p = kitchenToRoom(x, z, run.rotationQuarters);
+  return { x: p.x + run.x, z: p.z + run.z };
+}
+
+/** Where a module sitting on a run stands, in the kitchen's frame. */
+function centreOnRun(run: Run, offsetM: number, widthM: number, depthM: number) {
+  return fromRunFrame(run, offsetM + widthM / 2 - run.lengthM / 2, depthM / 2 - RUN_DEPTH_M / 2);
+}
+
+/** The module carrying `key`, wherever on the scene it is. */
+function findPlaced(scene: KitchenScene, key: string): { runIndex: number; placed: PlacedModule } | null {
+  for (let i = 0; i < scene.runs.length; i++) {
+    const placed = scene.runs[i].modules.find((p) => p.key === key);
+    if (placed) return { runIndex: i, placed };
+  }
+  return null;
+}
+
+/** Replaces one module in place, leaving the rest of the scene untouched. */
+function withModule(
+  scene: KitchenScene,
+  runIndex: number,
+  key: string,
+  edit: (p: PlacedModule) => PlacedModule,
+): KitchenScene {
+  return withRun(
+    scene,
+    runIndex,
+    scene.runs[runIndex].modules.map((p) => (p.key === key ? edit(p) : p)),
+  );
+}
+
+/**
+ * The nearest offset on `run` where a cabinet of `width` actually fits.
+ *
+ * Used when a cabinet arrives from outside the row — off another run, or off
+ * the floor — where the slide rules have nothing to work with: there is no
+ * "where it stands now" to derive bounds from and no neighbour to swap with,
+ * because it was not next to anybody. Returns null when the row is full, and
+ * the caller leaves the cabinet standing free rather than stacking it on top of
+ * whatever is already there.
+ */
+function nearestGapOffset(
+  run: Run,
+  slot: Slot,
+  exceptKey: string,
+  wanted: number,
+  width: number,
+): number | null {
+  const taken = spansOn(run, slot, exceptKey);
+  let cursor = 0;
+  let best: number | null = null;
+  const consider = (from: number, to: number) => {
+    if (to - from < width - 1e-6) return;
+    let at = Math.min(Math.max(wanted, from), to - width);
+    // Flush against whatever bounds the gap, the same alignment a slide gets.
+    if (Math.abs(at - from) <= SNAP_M) at = from;
+    else if (Math.abs(at - (to - width)) <= SNAP_M) at = to - width;
+    if (best == null || Math.abs(at - wanted) < Math.abs(best - wanted)) best = at;
+  };
+  for (const span of taken) {
+    consider(cursor, span.start);
+    cursor = Math.max(cursor, span.end);
+  }
+  consider(cursor, run.lengthM);
+  return best == null ? null : round(best);
+}
+
+/** A free placement, brought back inside the room it stands in. */
+function clampFree(
+  scene: KitchenScene,
+  widthM: number,
+  depthM: number,
+  free: FreePlacement,
+): FreePlacement {
+  const foot = moduleFootprint(widthM, depthM, free.rotationQuarters);
+  const turned = ((scene.rotationQuarters % 4) + 4) % 4 % 2 === 1;
+  const roomW = turned ? scene.room.depthM : scene.room.widthM;
+  const roomD = turned ? scene.room.widthM : scene.room.depthM;
+  return {
+    x: clampAxis(free.x, roomW, foot.alongX),
+    z: clampAxis(free.z, roomD, foot.alongZ),
+    rotationQuarters: free.rotationQuarters,
+  };
+}
+
+/** Moves a module's record from one run's list to another's, or within one. */
+function reseat(
+  scene: KitchenScene,
+  key: string,
+  fromRun: number,
+  toRun: number,
+  offsetM: number,
+): KitchenScene {
+  const placed = scene.runs[fromRun].modules.find((p) => p.key === key);
+  if (!placed) return scene;
+  // Built fresh rather than spread, so the free placement is gone rather than
+  // carried along to reappear the next time anything reads it.
+  const seated: PlacedModule = {
+    key: placed.key,
+    moduleId: placed.moduleId,
+    offsetM: round(offsetM),
+  };
+  return {
+    ...scene,
+    runs: scene.runs.map((r, i) => {
+      if (i === fromRun && i === toRun) {
+        return { ...r, modules: r.modules.map((p) => (p.key === key ? seated : p)) };
+      }
+      if (i === fromRun) return { ...r, modules: r.modules.filter((p) => p.key !== key) };
+      if (i === toRun) return { ...r, modules: [...r.modules, seated] };
+      return r;
+    }),
+  };
+}
+
+/**
+ * Drags a single cabinet anywhere on the floor.
+ *
+ * The whole point is that a caisson is not a prisoner of the side it was
+ * proposed on: the customer can pull one out into the middle of the room, park
+ * it at the end of another run, or push it back into the row it came from —
+ * without having to move the whole wall to do it.
+ *
+ * Which of those a drag was is decided here, from where the finger let go
+ * rather than from a mode the customer had to choose first:
+ *
+ *   released against a run  -> it joins that row, aligned and flush
+ *   released anywhere else  -> it stands there, free
+ *
+ * A drag that never leaves the run it started on is the ordinary slide, so it
+ * goes through `moveModule` and keeps the swap-with-your-neighbour behaviour
+ * that packing a full row depends on.
+ *
+ * `x`/`z` arrive in the room's frame, which is where the finger is.
+ */
+export function moveModuleFree(scene: KitchenScene, key: string, x: number, z: number): KitchenScene {
+  const found = findPlaced(scene, key);
+  if (!found) return scene;
+  const { runIndex, placed } = found;
+  const mod = moduleById(placed.moduleId);
+  if (!mod) return scene;
+
+  const w = mm(mod.widthMm);
+  const d = mm(mod.depthMm);
+  const k = roomToKitchen(x, z, scene.rotationQuarters);
+
+  // The run it would join, if it was let go against one. Nearest line wins, so
+  // a cabinet dropped in a corner where two runs meet joins the one it is
+  // squarest to rather than whichever happens to be first in the list.
+  let bestRun = -1;
+  let bestAlong = 0;
+  let bestAcross = Infinity;
+  for (let i = 0; i < scene.runs.length; i++) {
+    const run = scene.runs[i];
+    const local = toRunFrame(run, k.x, k.z);
+    const along = local.x + run.lengthM / 2 - w / 2;
+    const across = local.z + RUN_DEPTH_M / 2 - d / 2;
+    if (Math.abs(across) > ATTACH_ACROSS_M) continue;
+    if (along < -ATTACH_ALONG_M || along > run.lengthM - w + ATTACH_ALONG_M) continue;
+    if (Math.abs(across) < Math.abs(bestAcross)) {
+      bestRun = i;
+      bestAlong = along;
+      bestAcross = across;
+    }
+  }
+
+  if (bestRun >= 0) {
+    // Never left its own row: the ordinary slide, neighbour swap and all.
+    if (bestRun === runIndex && !placed.free) return moveModule(scene, runIndex, key, bestAlong);
+    const landing = nearestGapOffset(scene.runs[bestRun], mod.slot, key, bestAlong, w);
+    if (landing != null) return reseat(scene, key, runIndex, bestRun, landing);
+    // The row is full. Fall through and leave it standing where it was dropped
+    // rather than pushing it into a place that is already taken.
+  }
+
+  // Keeps whichever way it was already facing — a cabinet turned to face the
+  // room and then nudged along must not spring back to its run's orientation.
+  const rotationQuarters = placed.free
+    ? placed.free.rotationQuarters
+    : scene.runs[runIndex].rotationQuarters;
+  const free = clampFree(scene, w, d, { x: k.x, z: k.z, rotationQuarters });
+  return withModule(scene, runIndex, key, (p) => ({ ...p, free }));
+}
+
+/**
+ * Turns a single cabinet a quarter about its own centre.
+ *
+ * Turning one that is still in the row necessarily takes it out of the row —
+ * a caisson at ninety degrees to its neighbours is not on that run any more —
+ * so it detaches where it stands instead of refusing. Deliberately not routed
+ * back through `moveModuleFree`: a cabinet turned in place is still sitting on
+ * its run's line, so the attach test would find that run and seat it straight
+ * back, undoing the turn.
+ */
+export function rotateModule(scene: KitchenScene, key: string): KitchenScene {
+  const found = findPlaced(scene, key);
+  if (!found) return scene;
+  const { runIndex, placed } = found;
+  const mod = moduleById(placed.moduleId);
+  if (!mod) return scene;
+
+  const w = mm(mod.widthMm);
+  const d = mm(mod.depthMm);
+  const run = scene.runs[runIndex];
+  const at: FreePlacement = placed.free ?? {
+    ...centreOnRun(run, placed.offsetM, w, d),
+    rotationQuarters: run.rotationQuarters,
+  };
+  const free = clampFree(scene, w, d, {
+    x: at.x,
+    z: at.z,
+    rotationQuarters: (at.rotationQuarters + 1) % 4,
+  });
+  return withModule(scene, runIndex, key, (p) => ({ ...p, free }));
+}
+
+/**
+ * Puts a free-standing cabinet back in its row.
+ *
+ * The drag can always do this, but not always reach: a caisson pulled out of a
+ * row that has since been packed solid has nowhere to land, and a customer who
+ * simply wants it back should not have to make space by hand first. Returns the
+ * scene unchanged when the row really is full, so the caller can say so.
+ */
+export function reseatModule(scene: KitchenScene, key: string): KitchenScene {
+  const found = findPlaced(scene, key);
+  if (!found || !found.placed.free) return scene;
+  const { runIndex, placed } = found;
+  const mod = moduleById(placed.moduleId);
+  if (!mod) return scene;
+  const landing = nearestGapOffset(
+    scene.runs[runIndex],
+    mod.slot,
+    key,
+    placed.offsetM,
+    mm(mod.widthMm),
+  );
+  if (landing == null) return scene;
+  return reseat(scene, key, runIndex, runIndex, landing);
+}
+
+/** Whether `key` names a cabinet the customer has stood free of its run. */
+export function isFreeModule(scene: KitchenScene, key: string | null): boolean {
+  if (!key) return false;
+  const found = findPlaced(scene, key);
+  return !!found?.placed.free;
+}
+
 /** Reserved selection key for the island, which belongs to no run. */
 export const ILOT_KEY = "__ilot";
 
 /**
- * Slides the island across the floor the runs have left free.
+ * Slides the island across the floor.
  *
- * Clamped to the centre of its own footprint rather than refused, so pushing it
- * into a wall parks it against that wall. When the island is too big for the
- * space it cannot move at all — the bounds cross — and it is re-centred instead
- * of jumping to a corner.
+ * Clamped to the room's walls rather than refused, so pushing it into a wall
+ * parks it against that wall. When the island is too big for the room it cannot
+ * move at all — the bounds cross — and it is re-centred instead of jumping to a
+ * corner.
+ *
+ * This used to reserve a cabinet's depth along whichever walls had runs against
+ * them, which was a fair guess while a run's position *was* its wall. Now that
+ * runs stand anywhere, the guess is simply wrong — a run parked in the middle
+ * of the floor would have gone on reserving a strip along a wall it left. The
+ * island is clamped to the room and any real collision is flagged by
+ * `markOverlaps`, which measures the runs where they actually are.
  */
 export function moveIlot(scene: KitchenScene, x: number, z: number): KitchenScene {
   if (!scene.ilot) return scene;
-  const runDepth = mm(600);
-  const has = (w: string) => scene.runs.some((r) => rotatedWall(r.wall, scene.rotationQuarters) === w);
-  // Measured against the turned footprint, not the raw dimensions — otherwise a
-  // island swung round parks half of itself inside a wall.
+  // Measured against the turned footprint, not the raw dimensions — otherwise
+  // an island swung round parks half of itself inside a wall.
   const foot = ilotFootprint(scene.ilot);
   const halfW = foot.alongX / 2;
   const halfD = foot.alongZ / 2;
 
-  const xMin = -scene.room.widthM / 2 + (has("left") ? runDepth : 0) + halfW;
-  const xMax = scene.room.widthM / 2 - (has("right") ? runDepth : 0) - halfW;
-  const zMin = -scene.room.depthM / 2 + (has("back") ? runDepth : 0) + halfD;
+  const xMin = -scene.room.widthM / 2 + halfW;
+  const xMax = scene.room.widthM / 2 - halfW;
+  const zMin = -scene.room.depthM / 2 + halfD;
   const zMax = scene.room.depthM / 2 - halfD;
 
   const pick = (v: number, lo: number, hi: number) =>
     lo > hi ? (lo + hi) / 2 : Math.min(Math.max(v, lo), hi);
 
-  return {
+  return markOverlaps({
     ...scene,
     ilot: { ...scene.ilot, x: round(pick(x, xMin, xMax)), z: round(pick(z, zMin, zMax)) },
+  });
+}
+
+/** Selection key prefix for a whole run, which is not a module. */
+export const RUN_KEY = "__run";
+export const runKey = (index: number) => `${RUN_KEY}${index}`;
+export const runIndexOfKey = (key: string) =>
+  key.startsWith(RUN_KEY) ? Number(key.slice(RUN_KEY.length)) : -1;
+
+/**
+ * How close to a wall a dragged run snaps flush against it, metres.
+ *
+ * Wider than the module snap: a run is pushed with a whole hand's worth of
+ * travel on screen, and the customer aiming it at a wall means the wall, not
+ * four centimetres off it.
+ */
+const WALL_SNAP_M = 0.12;
+
+/**
+ * Slides a whole run across the floor.
+ *
+ * The counterpart of `moveIlot`, and deliberately the same shape: clamped to
+ * the room rather than refused, so pushing a run into a wall parks it against
+ * that wall. Overlaps with other runs are *not* prevented — they are recorded
+ * by `markOverlaps` and drawn in red, because a customer rearranging a U passes
+ * through a dozen illegal states on the way to a legal one and snatching the
+ * drag back each time makes the kitchen feel broken.
+ *
+ * `x`/`z` arrive in the room's frame, which is where the finger is. Runs live
+ * in the kitchen's frame, so the point is un-turned on the way in.
+ */
+export function moveRun(scene: KitchenScene, runIndex: number, x: number, z: number): KitchenScene {
+  const run = scene.runs[runIndex];
+  if (!run) return scene;
+
+  const local = roomToKitchen(x, z, scene.rotationQuarters);
+  const foot = runFootprint(run);
+  // The room's own extent, in the kitchen's frame — on an odd quarter the two
+  // swap, exactly as the minimum room size does.
+  const turned = ((scene.rotationQuarters % 4) + 4) % 4 % 2 === 1;
+  const roomW = turned ? scene.room.depthM : scene.room.widthM;
+  const roomD = turned ? scene.room.widthM : scene.room.depthM;
+
+  const halfW = foot.alongX / 2;
+  const halfD = foot.alongZ / 2;
+  const xMin = -roomW / 2 + halfW, xMax = roomW / 2 - halfW;
+  const zMin = -roomD / 2 + halfD, zMax = roomD / 2 - halfD;
+
+  // A run longer than the room it is in cannot be placed legally at all; centre
+  // it rather than flinging it into a corner.
+  const pick = (v: number, lo: number, hi: number) =>
+    lo > hi ? (lo + hi) / 2 : Math.min(Math.max(v, lo), hi);
+
+  let nx = pick(local.x, xMin, xMax);
+  let nz = pick(local.z, zMin, zMax);
+  // Flush against a wall when close — the aimantation the brief asks for.
+  if (Math.abs(nx - xMin) <= WALL_SNAP_M) nx = xMin;
+  else if (Math.abs(nx - xMax) <= WALL_SNAP_M) nx = xMax;
+  if (Math.abs(nz - zMin) <= WALL_SNAP_M) nz = zMin;
+  else if (Math.abs(nz - zMax) <= WALL_SNAP_M) nz = zMax;
+
+  return markOverlaps({
+    ...scene,
+    runs: scene.runs.map((r, i) => (i === runIndex ? { ...r, x: round(nx), z: round(nz) } : r)),
+  });
+}
+
+/**
+ * Turns a run a quarter about its own centre.
+ *
+ * Pivots in place rather than swinging round a corner, which is what the island
+ * already does and the only version that behaves the way a hand expects. The
+ * footprint swaps its axes, so the result is re-clamped into the room — a long
+ * run turned broadside in a narrow kitchen would otherwise end up half outside.
+ */
+export function rotateRun(scene: KitchenScene, runIndex: number): KitchenScene {
+  const run = scene.runs[runIndex];
+  if (!run) return scene;
+  const turnedRun = { ...run, rotationQuarters: (run.rotationQuarters + 1) % 4 };
+  const spun = { ...scene, runs: scene.runs.map((r, i) => (i === runIndex ? turnedRun : r)) };
+  // Re-clamped by asking moveRun for the position it already has, in the frame
+  // moveRun expects.
+  const back = kitchenToRoom(turnedRun.x, turnedRun.z, scene.rotationQuarters);
+  return moveRun(spun, runIndex, back.x, back.z);
+}
+
+/**
+ * Everything the customer changed about a proposed kitchen.
+ *
+ * The configure screen rebuilds the scene from the answers on every render and
+ * replays this on top, so whatever is missing here is silently discarded the
+ * next time anything re-renders. It cost a round of "the side moves but will not
+ * stay" to learn that, which is why capture and replay now sit next to each
+ * other and are round-tripped by a test rather than being two hand-written
+ * object literals a screen apart.
+ */
+export interface SceneEdits {
+  runs: {
+    modules: PlacedModule[];
+    x: number;
+    z: number;
+    rotationQuarters: number;
+  }[];
+  ilot: { x: number; z: number } | null;
+}
+
+/** Everything about `scene` that a rebuild from the answers would not reproduce. */
+export function editsOfScene(scene: KitchenScene): SceneEdits {
+  return {
+    runs: scene.runs.map((r) => ({
+      modules: r.modules,
+      x: r.x,
+      z: r.z,
+      rotationQuarters: r.rotationQuarters,
+    })),
+    ilot: scene.ilot ? { x: scene.ilot.x, z: scene.ilot.z } : null,
+  };
+}
+
+/**
+ * The freshly proposed kitchen, with the customer's changes laid back over it.
+ *
+ * Positions are re-clamped rather than trusted. What was proposed can differ
+ * from what the edits were made against — pivoting the island swaps its
+ * footprint, and a piece that fitted lengthways may not fit across — so a
+ * remembered position can be illegal by the time it is replayed. Clamping here
+ * is what lets the island be turned without the whole arrangement having to be
+ * thrown away and proposed again.
+ */
+export function applyEdits(proposed: KitchenScene, edits: SceneEdits): KitchenScene {
+  const laid: KitchenScene = {
+    ...proposed,
+    runs: proposed.runs.map((r, i) => {
+      const e = edits.runs[i];
+      return e
+        ? { ...r, modules: e.modules, x: e.x, z: e.z, rotationQuarters: e.rotationQuarters }
+        : { ...r };
+    }),
+    ilot:
+      proposed.ilot && edits.ilot
+        ? { ...proposed.ilot, x: edits.ilot.x, z: edits.ilot.z }
+        : proposed.ilot
+          ? { ...proposed.ilot }
+          : undefined,
+  };
+
+  // Clamp-only, deliberately not through moveRun/moveIlot: those also snap to
+  // the nearest wall, and a snap re-applied on every render would creep a piece
+  // the customer parked just off a wall until it was against it.
+  laid.runs = laid.runs.map((r) => {
+    const p = clampRunTo(laid, r);
+    const positioned = p.x === r.x && p.z === r.z ? r : { ...r, x: p.x, z: p.z };
+    // Free-standing cabinets are clamped on the same terms as everything else:
+    // the room can be resized under one, and a caisson left standing outside
+    // its own walls is worse than one nudged back inside them.
+    let changed = false;
+    const modules = positioned.modules.map((m) => {
+      if (!m.free) return m;
+      const mod = moduleById(m.moduleId);
+      if (!mod) return m;
+      const free = clampFree(laid, mm(mod.widthMm), mm(mod.depthMm), m.free);
+      if (free.x === m.free.x && free.z === m.free.z) return m;
+      changed = true;
+      return { ...m, free };
+    });
+    return changed ? { ...positioned, modules } : positioned;
+  });
+  if (laid.ilot) {
+    const foot = ilotFootprint(laid.ilot);
+    const x = clampAxis(laid.ilot.x, laid.room.widthM, foot.alongX);
+    const z = clampAxis(laid.ilot.z, laid.room.depthM, foot.alongZ);
+    if (x !== laid.ilot.x || z !== laid.ilot.z) laid.ilot = { ...laid.ilot, x, z };
+  }
+
+  return markOverlaps(laid);
+}
+
+/** Keeps a centre inside a span of `room`, given how much of it the piece takes. */
+function clampAxis(v: number, room: number, extent: number): number {
+  const half = extent / 2;
+  const lo = -room / 2 + half;
+  const hi = room / 2 - half;
+  // Too big to fit at all: centre it rather than fling it into a corner.
+  return lo > hi ? round((lo + hi) / 2) : round(Math.min(Math.max(v, lo), hi));
+}
+
+/** A run's position, brought back inside the room it stands in. */
+function clampRunTo(scene: KitchenScene, run: Run): { x: number; z: number } {
+  const foot = runFootprint(run);
+  const turned = ((scene.rotationQuarters % 4) + 4) % 4 % 2 === 1;
+  const roomW = turned ? scene.room.depthM : scene.room.widthM;
+  const roomD = turned ? scene.room.widthM : scene.room.depthM;
+  return {
+    x: clampAxis(run.x, roomW, foot.alongX),
+    z: clampAxis(run.z, roomD, foot.alongZ),
   };
 }
 

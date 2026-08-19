@@ -35,14 +35,20 @@ const Kitchen3D = forwardRef<
   Kitchen3DHandle,
   {
     scene: KitchenScene;
-    /** Lets the customer tap a cabinet and slide it along its run. */
+    /** Lets the customer tap a side, a cabinet or the island and drag it. */
     editable?: boolean;
     selectedKey?: string | null;
     onSelect?: (key: string | null) => void;
-    /** Fired on release with the dragged position — re-clamp before trusting it. */
-    onMove?: (runIndex: number, key: string, offsetM: number) => void;
+    /**
+     * A single cabinet was dragged. Room-frame metres of where its centre was
+     * let go; whether that means back in its row, onto another run or standing
+     * free on the floor is the host's decision — re-clamp before trusting it.
+     */
+    onMoveModule?: (key: string, x: number, z: number) => void;
     /** The island moves in two axes, so it reports a point rather than an offset. */
     onMoveIlot?: (x: number, z: number) => void;
+    /** A whole run moved. Room-frame metres; re-clamp before trusting it. */
+    onMoveRun?: (runIndex: number, x: number, z: number) => void;
     /**
      * Live while a room grip is dragged. The renderer has already resized
      * itself, so this is for showing the figure — committing it here would
@@ -60,8 +66,9 @@ const Kitchen3D = forwardRef<
     editable = false,
     selectedKey = null,
     onSelect,
-    onMove,
+    onMoveModule,
     onMoveIlot,
+    onMoveRun,
     onRoomPreview,
     onRoomResized,
     style,
@@ -117,11 +124,14 @@ const Kitchen3D = forwardRef<
       }
       if (msg.type === "boot") setBooted(true);
       if (msg.type === "select") onSelect?.(msg.key ?? null);
-      if (msg.type === "moved" && typeof msg.offsetM === "number") {
-        onMove?.(msg.runIndex, msg.key, msg.offsetM);
+      if (msg.type === "movedModule" && typeof msg.x === "number" && typeof msg.z === "number") {
+        onMoveModule?.(msg.key, msg.x, msg.z);
       }
       if (msg.type === "movedIlot" && typeof msg.x === "number" && typeof msg.z === "number") {
         onMoveIlot?.(msg.x, msg.z);
+      }
+      if (msg.type === "movedRun" && typeof msg.x === "number" && typeof msg.z === "number") {
+        onMoveRun?.(msg.runIndex, msg.x, msg.z);
       }
       if (msg.type === "roomPreview") onRoomPreview?.(msg.lengthCm, msg.widthCm);
       if (msg.type === "roomResized") onRoomResized?.(msg.lengthCm, msg.widthCm);
@@ -130,7 +140,7 @@ const Kitchen3D = forwardRef<
         onError?.(msg.message);
       }
     },
-    [onError, onSelect, onMove, onMoveIlot, onRoomPreview, onRoomResized],
+    [onError, onSelect, onMoveModule, onMoveIlot, onMoveRun, onRoomPreview, onRoomResized],
   );
 
   return (

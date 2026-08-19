@@ -19,6 +19,7 @@ import PressableScale from "../../../components/ui/PressableScale";
 import ProductConfigBlocks from "../../../components/product/ProductConfigBlocks";
 import ConfigRecap from "../../../components/product/ConfigRecap";
 import ShapePlan, { type PlanHighlight } from "../../../components/product/ShapePlan";
+import { IndicativeChip, IndicativeSheet } from "../../../components/product/IndicativeNotice";
 import { COLORS, PRODUCT_TYPES, PRICE_MODES } from "../../../lib/constants";
 import { FONTS, TYPE, SHADOW, SPACE } from "../../../lib/typography";
 import { formatPrice } from "../../../lib/utils";
@@ -48,15 +49,32 @@ import { buildScene } from "../../../lib/kitchen3d/scene";
 import { kitchenConfigFrom } from "../../../lib/kitchen3d/derive";
 import {
   addModule,
+  applyEdits,
+  editsOfScene,
   fitsOnRun,
   ILOT_KEY,
+  isFreeModule,
   moveIlot,
-  moveModule,
+  moveModuleFree,
+  moveRun,
   removeModule,
+  reseatModule,
+  rotateModule,
+  rotateRun,
+  runIndexOfKey,
 } from "../../../lib/kitchen3d/edit";
 import { MODULES, moduleById } from "../../../lib/kitchen3d/catalog";
 import { layoutEntry } from "../../../lib/kitchen3d/selection";
-import type { KitchenScene, PlacedModule } from "../../../lib/kitchen3d/types";
+import type { SceneEdits } from "../../../lib/kitchen3d/edit";
+import type { KitchenScene, Wall } from "../../../lib/kitchen3d/types";
+
+/** What each run is called on screen, once it no longer has to be on its wall. */
+const RUN_LABEL: Partial<Record<Wall, string>> = {
+  back: "Mur du fond",
+  left: "Mur de gauche",
+  right: "Mur de droite",
+  front: "Mur avant",
+};
 import type { ConfigBlock, ConfigBlockOption, ProductColor } from "../../../lib/types";
 import { useProduct } from "../../../features/products/hooks";
 import { useCartStore } from "../../../features/cart/store";
@@ -97,11 +115,9 @@ export default function ConfigureScreen() {
    * made for no longer exists, so the edits are dropped and the kitchen is
    * proposed again rather than half-migrated onto a different space.
    */
-  const [sceneEdits, setSceneEdits] = useState<{
-    signature: string;
-    runs: PlacedModule[][];
-    ilot: { x: number; z: number } | null;
-  } | null>(null);
+  const [sceneEdits, setSceneEdits] = useState<(SceneEdits & { signature: string }) | null>(
+    null,
+  );
   /**
    * The room the kitchen stands in, which no config block asks for.
    *
@@ -116,6 +132,18 @@ export default function ConfigureScreen() {
   });
   /** The full-screen 3D studio, which has room for controls the step does not. */
   const [studioOpen, setStudioOpen] = useState(false);
+  /**
+   * The "this is not your final kitchen" sheet.
+   *
+   * Two separate flags because they are two separate Modals: one belongs to the
+   * screen, the other has to be rendered *inside* the studio's Modal to appear
+   * above it. A single sheet at screen level would slide up behind the studio
+   * and never be seen.
+   */
+  const [noticeOpen, setNoticeOpen] = useState(false);
+  const [studioNoticeOpen, setStudioNoticeOpen] = useState(false);
+  /** Shown once per configuration; the chip on the canvas brings it back. */
+  const noticeShown = useRef(false);
   /** Which corner the kitchen sits in: quarter turns clockwise, 0-3. */
   const [rotation, setRotation] = useState(0);
   /** Which way the island faces, independently of the kitchen. */
@@ -147,9 +175,11 @@ export default function ConfigureScreen() {
   useEffect(() => {
     const seed: ConfigState = {};
     for (const block of blocks) {
-      if (block.type !== "measurements") continue;
+      // The îlot block too: its height is hidden and filled from the worktop,
+      // and leaving it blank would bill the island at zero on a per-m² formula.
+      if (block.type !== "measurements" && block.type !== "ilot") continue;
       for (const field of block.fields ?? []) {
-        const kind = hiddenHeight(field);
+        const kind = hiddenHeight(field, block.type);
         if (!kind) continue;
         const current = configState[block.id]?.measurements?.[field.key];
         if (current != null && current !== "") continue;
@@ -191,6 +221,16 @@ export default function ConfigureScreen() {
 
   const step = steps[stepIdx];
   const isLast = stepIdx === steps.length - 1;
+
+  /**
+   * The disclaimer meets the customer the first time the 3D appears, not on a
+   * later step where it would have nothing to refer to.
+   */
+  useEffect(() => {
+    if (step?.kind !== "scene" || noticeShown.current) return;
+    noticeShown.current = true;
+    setNoticeOpen(true);
+  }, [step?.kind]);
 
   // ── Derived state ────────────────────────────────────────────────────────
   const shapeBlock = blocks.find((b) => b.type === "shape");
@@ -283,31 +323,22 @@ export default function ConfigureScreen() {
     // island the customer positioned by hand has to be re-proposed.
     sceneConfig.roomLengthCm,
     sceneConfig.roomWidthCm,
-    // Turning the island changes the footprint its clearances are measured
-    // against, so a hand-placed one has to be re-proposed.
-    sceneConfig.ilotRotationQuarters,
+    // Turning the island is deliberately *not* here. It used to be, because a
+    // turned island had to be re-placed against its new footprint — but that
+    // threw away every side the customer had moved as well, for the sake of one
+    // pivot. `applyEdits` re-clamps instead, so the arrangement survives.
   ]);
   const edits = sceneEdits?.signature === sceneSignature ? sceneEdits : null;
-  const scene: KitchenScene = edits
-    ? {
-        ...proposed,
-        runs: proposed.runs.map((r, i) => ({ ...r, modules: edits.runs[i] ?? r.modules })),
-        ilot:
-          proposed.ilot && edits.ilot
-            ? { ...proposed.ilot, x: edits.ilot.x, z: edits.ilot.z }
-            : proposed.ilot,
-      }
-    : proposed;
+  const scene: KitchenScene = edits ? applyEdits(proposed, edits) : proposed;
   const showsScene = steps.some((s) => s.kind === "scene");
 
   const commitScene = (next: KitchenScene) =>
-    setSceneEdits({
-      signature: sceneSignature,
-      runs: next.runs.map((r) => r.modules),
-      ilot: next.ilot ? { x: next.ilot.x, z: next.ilot.z } : null,
-    });
+    setSceneEdits({ signature: sceneSignature, ...editsOfScene(next) });
 
   const selectedIsIlot = selectedKey === ILOT_KEY;
+  /** Which run the selection is, when a whole run is what was tapped. */
+  const selectedRunKeyIndex = selectedKey ? runIndexOfKey(selectedKey) : -1;
+  const selectedRun = selectedRunKeyIndex >= 0 ? scene.runs[selectedRunKeyIndex] : null;
   const selectedRunIndex = scene.runs.findIndex((r) =>
     r.modules.some((m) => m.key === selectedKey),
   );
@@ -317,6 +348,8 @@ export default function ConfigureScreen() {
           scene.runs[selectedRunIndex].modules.find((m) => m.key === selectedKey)!.moduleId,
         )
       : undefined;
+  /** True once the customer has dragged this cabinet off the row it came from. */
+  const selectedIsFree = isFreeModule(scene, selectedKey);
   /** New modules join the run the selection is on, or the main wall. */
   const targetRun = selectedRunIndex >= 0 ? selectedRunIndex : 0;
 
@@ -724,7 +757,7 @@ export default function ConfigureScreen() {
                 </View>
               )}
               {ilotOn &&
-                (step.block.fields ?? []).map((f, i) => {
+                visibleFields(step.block, { byShape: false, runs: 0 }).map((f, i) => {
                   const blockId = step.block.id;
                   return (
                     <Animated.View key={f.key} entering={reduceMotion ? undefined : FadeInDown.delay(i * 50).springify()}>
@@ -884,6 +917,10 @@ export default function ConfigureScreen() {
                     carrying their own three.js is a lot to keep alive on a
                     phone, and this one is behind a full-screen sheet anyway. */}
                 {!studioOpen && <Kitchen3D scene={scene} />}
+                <IndicativeChip
+                  style={{ position: "absolute", left: 10, top: 10 }}
+                  onPress={() => setNoticeOpen(true)}
+                />
               </View>
 
               <Button
@@ -916,11 +953,8 @@ export default function ConfigureScreen() {
                   }}
                 >
                   Pièce {scene.room.widthM.toFixed(2).replace(".", ",")} ×{" "}
-                  {scene.room.depthM.toFixed(2).replace(".", ",")} m
-                  {scene.accessories.length
-                    ? ` · ${scene.accessories.length} accessoire${scene.accessories.length > 1 ? "s" : ""}`
-                    : ""}
-                  . Ouvrez le studio pour changer la taille de la pièce et déplacer les meubles.
+                  {scene.room.depthM.toFixed(2).replace(".", ",")} m. Ouvrez le studio pour
+                  changer la taille de la pièce et déplacer les meubles.
                 </Text>
               </View>
             </View>
@@ -1057,10 +1091,9 @@ export default function ConfigureScreen() {
                 editable={moveMode}
                 selectedKey={selectedKey}
                 onSelect={setSelectedKey}
-                onMove={(runIndex, key, offsetM) =>
-                  commitScene(moveModule(scene, runIndex, key, offsetM))
-                }
+                onMoveModule={(key, x, z) => commitScene(moveModuleFree(scene, key, x, z))}
                 onMoveIlot={(x, z) => commitScene(moveIlot(scene, x, z))}
+                onMoveRun={(runIndex, x, z) => commitScene(moveRun(scene, runIndex, x, z))}
               />
             )}
 
@@ -1088,6 +1121,13 @@ export default function ConfigureScreen() {
                 Pivoter
               </Text>
             </TouchableOpacity>
+
+            {/* Top-right is the only free corner: Pivoter holds top-left, the
+                room size bottom-left, the zoom bottom-right. */}
+            <IndicativeChip
+              style={{ position: "absolute", right: 12, top: 12 }}
+              onPress={() => setStudioNoticeOpen(true)}
+            />
 
             {/* Room size, opposite the zoom pill. */}
             <View
@@ -1230,9 +1270,11 @@ export default function ConfigureScreen() {
                     <Text style={{ fontSize: 14, fontFamily: FONTS.serif, color: COLORS.onSurface }}>
                       {selectedIsIlot
                         ? "Îlot central"
-                        : selectedModule
-                          ? selectedModule.label
-                          : "Touchez un élément"}
+                        : selectedRun
+                          ? `${RUN_LABEL[selectedRun.wall] ?? "Mur"} · ${Math.round(selectedRun.lengthM * 100)} cm`
+                          : selectedModule
+                            ? selectedModule.label
+                            : "Touchez un côté de la cuisine"}
                     </Text>
                     <Text
                       style={{
@@ -1244,9 +1286,15 @@ export default function ConfigureScreen() {
                     >
                       {selectedIsIlot
                         ? "Glissez-le sur le sol, ou pivotez-le d'un quart de tour."
-                        : selectedModule
-                          ? `Mur ${targetRun + 1} · ${selectedModule.widthMm} mm — glissez-le, il échange sa place avec son voisin`
-                          : "Puis glissez-le le long de son mur."}
+                        : selectedRun
+                          ? selectedRun.overlaps
+                            ? "En rouge : ce côté en chevauche un autre. Déplacez-le pour libérer la place."
+                            : "Glissez-le où vous voulez, ou pivotez-le. Touchez un meuble pour le déplacer seul."
+                          : selectedModule
+                            ? selectedIsFree
+                              ? `${selectedModule.widthMm} mm, posé librement — glissez-le n'importe où, ou contre un côté pour l'y remettre.`
+                              : `${selectedModule.widthMm} mm — glissez-le n'importe où dans la pièce, ou le long de son côté pour échanger sa place.`
+                            : "Il se déplace d'un bloc. Touchez-le à nouveau pour prendre un seul meuble."}
                     </Text>
                   </View>
                   {selectedIsIlot ? (
@@ -1264,6 +1312,53 @@ export default function ConfigureScreen() {
                       </Text>
                     </TouchableOpacity>
                   ) : null}
+                  {selectedRun ? (
+                    <TouchableOpacity
+                      onPress={() => {
+                        void Haptics.selectionAsync();
+                        commitScene(rotateRun(scene, selectedRunKeyIndex));
+                      }}
+                      hitSlop={8}
+                      style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+                    >
+                      <Icon name="rotate-right" size={20} color={COLORS.primary} />
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.primary }}>
+                        Pivoter
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  {/* A single cabinet has three things it can have done to it,
+                      so these are icons: the labels the run and the island can
+                      afford would leave no room for the name of the meuble. */}
+                  {selectedModule && !selectedIsIlot ? (
+                    <TouchableOpacity
+                      onPress={() => {
+                        void Haptics.selectionAsync();
+                        commitScene(rotateModule(scene, selectedKey!));
+                      }}
+                      accessibilityLabel="Pivoter ce meuble d'un quart de tour"
+                      hitSlop={10}
+                      style={{ paddingHorizontal: 2 }}
+                    >
+                      <Icon name="rotate-right" size={22} color={COLORS.primary} />
+                    </TouchableOpacity>
+                  ) : null}
+                  {/* Only when it is out of its row: a caisson pulled out of a
+                      side that has since been packed solid has nowhere to land
+                      by hand, and dragging it back would simply fail. */}
+                  {selectedModule && selectedIsFree ? (
+                    <TouchableOpacity
+                      onPress={() => {
+                        void Haptics.selectionAsync();
+                        commitScene(reseatModule(scene, selectedKey!));
+                      }}
+                      accessibilityLabel="Remettre ce meuble dans son côté"
+                      hitSlop={10}
+                      style={{ paddingHorizontal: 2 }}
+                    >
+                      <Icon name="backup-restore" size={22} color={COLORS.primary} />
+                    </TouchableOpacity>
+                  ) : null}
                   {selectedModule && !selectedIsIlot ? (
                     <TouchableOpacity
                       onPress={() => {
@@ -1271,13 +1366,11 @@ export default function ConfigureScreen() {
                         commitScene(removeModule(scene, targetRun, selectedKey!));
                         setSelectedKey(null);
                       }}
-                      hitSlop={8}
-                      style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+                      accessibilityLabel="Retirer ce meuble"
+                      hitSlop={10}
+                      style={{ paddingHorizontal: 2 }}
                     >
-                      <Icon name="trash-can-outline" size={20} color={COLORS.error} />
-                      <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: COLORS.error }}>
-                        Retirer
-                      </Text>
+                      <Icon name="trash-can-outline" size={22} color={COLORS.error} />
                     </TouchableOpacity>
                   ) : null}
                 </View>
@@ -1339,12 +1432,21 @@ export default function ConfigureScreen() {
                 }}
               >
                 Tournez avec un doigt, pincez pour zoomer. LON / LAR règlent la taille de la
-                pièce{scene.accessories.length ? ", vos accessoires sont posés sur le plan" : ""}.
+                pièce.
               </Text>
             )}
           </View>
         </View>
+
+        {/* Inside the studio's Modal on purpose: a sheet rendered outside it
+            would slide up behind the studio and never be seen. */}
+        <IndicativeSheet
+          visible={studioNoticeOpen}
+          onClose={() => setStudioNoticeOpen(false)}
+        />
       </Modal>
+
+      <IndicativeSheet visible={noticeOpen} onClose={() => setNoticeOpen(false)} />
     </SafeAreaView>
   );
 }

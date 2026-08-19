@@ -62,6 +62,18 @@ export function sanitizeLayout(raw: unknown): ConfiguredLayout | null {
     const n = typeof v === 'number' ? v : Number.NaN;
     return Number.isFinite(n) && n >= 0 && n <= max ? Math.round(n * 1000) / 1000 : null;
   };
+  /**
+   * The same clamp, for a coordinate that may sit either side of the origin.
+   *
+   * Run and island positions are measured from the middle of the kitchen, so
+   * half of every legitimate value is negative — passing them through `num`
+   * would silently null them and lose the arrangement the customer built.
+   */
+  const signed = (v: unknown, max: number): number | null => {
+    const n = typeof v === 'number' ? v : Number.NaN;
+    return Number.isFinite(n) && Math.abs(n) <= max ? Math.round(n * 1000) / 1000 : null;
+  };
+  const quarters = (v: unknown): number => ([0, 1, 2, 3] as unknown[]).includes(v) ? (v as number) : 0;
   const text = (v: unknown, max = 80): string =>
     typeof v === 'string' ? v.slice(0, max) : '';
   const cents = (v: unknown): number => {
@@ -77,6 +89,12 @@ export function sanitizeLayout(raw: unknown): ConfiguredLayout | null {
   const runs = (Array.isArray(l.runs) ? l.runs : []).slice(0, 4).map((r: any) => ({
     wall: text(r?.wall, 12),
     lengthM: num(r?.lengthM, 40) ?? 0,
+    // Where the customer actually stood this run. Kept even when it is zero:
+    // the plan cannot be drawn from lengths and wall names alone any more.
+    x: signed(r?.x, 40) ?? 0,
+    z: signed(r?.z, 40) ?? 0,
+    rotationQuarters: quarters(r?.rotationQuarters),
+    ...(r?.overlaps === true ? { overlaps: true } : {}),
     modules: (Array.isArray(r?.modules) ? r.modules : [])
       .slice(0, 60)
       .map((m: any) => ({
@@ -90,6 +108,17 @@ export function sanitizeLayout(raw: unknown): ConfiguredLayout | null {
         // the back office plan would then have to draw.
         widthMm: Math.round((num(m?.widthMm, 40_000) ?? 0) as number),
         depthMm: Math.round((num(m?.depthMm, 40_000) ?? 0) as number),
+        // Only carried when the customer took this cabinet out of the row and
+        // stood it somewhere of its own. Dropped as a pair: half a position is
+        // no position, and defaulting the missing half to zero would put the
+        // caisson in the middle of the room rather than admit it was lost.
+        ...(signed(m?.x, 40) != null && signed(m?.z, 40) != null
+          ? {
+              x: signed(m?.x, 40) as number,
+              z: signed(m?.z, 40) as number,
+              rotationQuarters: quarters(m?.rotationQuarters),
+            }
+          : {}),
         priceCents: cents(m?.priceCents),
       }))
       .filter((m: { moduleId: string }) => m.moduleId.length > 0),

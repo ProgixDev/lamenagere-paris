@@ -46,10 +46,29 @@ export const FIXED_HEIGHTS_CM = { wall: 210, worktop: 90 } as const;
 const norm = (v: string) =>
   v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
-/** Whether a measurement is one of the two the customer never sees. */
-export function hiddenHeight(field: ConfigBlockField): "wall" | "worktop" | null {
+/**
+ * Whether a measurement is one the customer never sees.
+ *
+ * The block matters, not just the field. A height on the measurements block is
+ * the ceiling; the very same field on an îlot block is the island's worktop,
+ * which is built to the same height as the runs — so it is filled in from the
+ * worktop height rather than asked for, and the two can never disagree.
+ *
+ * Still seeded into `configState` after being hidden, never dropped: an island
+ * is often billed on a per-m² formula that multiplies by its height, and
+ * `ilotSurchargeCents` bills nothing at all when a dimension it needs is
+ * missing. Hiding the field without seeding it would quietly zero the island.
+ */
+export function hiddenHeight(
+  field: ConfigBlockField,
+  blockType?: string,
+): "wall" | "worktop" | null {
+  const label = norm(field.label);
+  if (blockType === "ilot") {
+    return field.priceRole === "height" || label.startsWith("hauteur") ? "worktop" : null;
+  }
   if (field.priceRole === "height") return "wall";
-  if (norm(field.label).includes("plan de travail")) return "worktop";
+  if (label.includes("plan de travail")) return "worktop";
   return null;
 }
 
@@ -66,8 +85,9 @@ export function visibleFields(
   opts: { byShape: boolean; runs: number },
 ): ConfigBlockField[] {
   // The fixed heights are filtered first, so they vanish from the mesures step,
-  // the studio panel and the "have you filled this in" check alike.
-  const fields = (block.fields ?? []).filter((f) => !hiddenHeight(f));
+  // the îlot step, the studio panel and the "have you filled this in" check
+  // alike.
+  const fields = (block.fields ?? []).filter((f) => !hiddenHeight(f, block.type));
   if (!opts.byShape) return fields;
   return fields.filter((f) => {
     const idx = RUN_ROLES.indexOf(f.priceRole as (typeof RUN_ROLES)[number]);

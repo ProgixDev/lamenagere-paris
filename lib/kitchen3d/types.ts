@@ -60,6 +60,20 @@ export interface KitchenModule {
   drawers?: number;
 }
 
+/**
+ * A cabinet pulled off its run and stood somewhere on its own.
+ *
+ * Held in the kitchen's frame, exactly like `Run.x/z` — the whole implantation
+ * is still turned as one piece, so a free-standing caisson has to turn with it
+ * rather than staying put while the kitchen swings round it.
+ */
+export interface FreePlacement {
+  x: number;
+  z: number;
+  /** Quarter turns clockwise, 0-3, about the cabinet's own centre. */
+  rotationQuarters: number;
+}
+
 /** A module placed on a run, at a distance from the run's start. */
 export interface PlacedModule {
   /** Unique within the scene, so the renderer can track selection. */
@@ -67,13 +81,78 @@ export interface PlacedModule {
   moduleId: string;
   /** Metres from the start of the run to this module's left edge. */
   offsetM: number;
+  /**
+   * Where it stands once it has been dragged off its run, if it has.
+   *
+   * A cabinet still belongs to a run when it is free — that is what keeps it on
+   * the devis under a heading the workshop recognises, and what it re-joins when
+   * it is pushed back against one. Absent for anything still in the row, which
+   * is what every rule tests: `offsetM` is left alone while a module is free, so
+   * the position it came from is still there to fall back on.
+   */
+  free?: FreePlacement;
 }
 
+/**
+ * A cabinet's footprint as the room sees it. The counterpart of `runFootprint`,
+ * and used by the same clamps — turned a quarter, its width runs the other way.
+ */
+export function moduleFootprint(widthM: number, depthM: number, rotationQuarters: number) {
+  const turned = (((rotationQuarters % 4) + 4) % 4) % 2 === 1;
+  return {
+    alongX: turned ? depthM : widthM,
+    alongZ: turned ? widthM : depthM,
+  };
+}
+
+/** How deep a run's carcasses stand, metres. Base units and columns share it. */
+export const RUN_DEPTH_M = 0.6;
+
 export interface Run {
+  /**
+   * Which wall the run was *seeded* against, and what the workshop calls it.
+   *
+   * No longer where it is. A run carries its own placement now, and the
+   * customer can stand it anywhere — this survives as the label on the devis
+   * ("mur du fond") and as the seed the auto-layout starts from.
+   */
   wall: Wall;
   /** Usable length of this run, metres. */
   lengthM: number;
   modules: PlacedModule[];
+  /**
+   * Centre of the run's footprint, metres, in the kitchen's own frame.
+   *
+   * The kitchen's frame and not the room's: the whole implantation is still
+   * turned as one piece by `rotationQuarters`, so keeping runs in the frame
+   * they are laid out in is what stops every rule needing four versions. The
+   * renderer and the drag handler convert at the edge — see `roomToKitchen`.
+   */
+  x: number;
+  z: number;
+  /** Quarter turns clockwise, 0–3, about the run's own centre. */
+  rotationQuarters: number;
+  /**
+   * True when this run's footprint overlaps another run or the island.
+   *
+   * Recorded rather than prevented. A customer pushing two runs together is
+   * usually mid-thought, and snatching the drag back is worse than letting them
+   * see the problem — so the overlap is drawn in red and carried through to the
+   * recap instead of being refused.
+   */
+  overlaps?: boolean;
+}
+
+/**
+ * A run's footprint as the room sees it — turned a quarter, its length runs the
+ * other way. The counterpart of `ilotFootprint`, and used by the same checks.
+ */
+export function runFootprint(run: { lengthM: number; rotationQuarters: number }) {
+  const turned = (((run.rotationQuarters % 4) + 4) % 4) % 2 === 1;
+  return {
+    alongX: turned ? RUN_DEPTH_M : run.lengthM,
+    alongZ: turned ? run.lengthM : RUN_DEPTH_M,
+  };
 }
 
 export interface Ilot {
@@ -92,6 +171,8 @@ export interface Ilot {
   rotationQuarters: number;
   /** True when the measured island does not leave a walkway all round. */
   tight?: boolean;
+  /** True when the island's footprint overlaps a run. See `Run.overlaps`. */
+  overlaps?: boolean;
 }
 
 /**
@@ -104,6 +185,58 @@ export function ilotFootprint(ilot: { widthM: number; depthM: number; rotationQu
     alongX: turned ? ilot.depthM : ilot.widthM,
     alongZ: turned ? ilot.widthM : ilot.depthM,
   };
+}
+
+/**
+ * Furnishing that is not part of the order.
+ *
+ * A kitchen drawn alone in an empty room reads as a parts list — there is
+ * nothing to tell the eye how big anything is. A table gives the room a scale
+ * everyone already knows, and the customer sees the space rather than the
+ * cabinetry. None of it is selectable, none of it reaches the devis, and none
+ * of it is allowed to influence the camera: it dresses the shot and no more.
+ *
+ * Empty whenever the floor cannot spare the room, which is what keeps a galley
+ * kitchen from acquiring a dining set it has nowhere to put.
+ */
+export interface Decor {
+  /** Round table with chairs around it, in room coordinates. */
+  table?: {
+    x: number;
+    z: number;
+    /** Radius of the top. Chairs are placed from it. */
+    radiusM: number;
+    seats: number;
+    /** Quarter turn, so the chairs do not always face the same way. */
+    rotationQuarters: number;
+  };
+  /** A rug under the table, sized from it. */
+  rugRadiusM?: number;
+  /**
+   * Stools pulled up to the island, on whichever side has floor to sit on.
+   *
+   * An island with nothing at it reads as a block of storage; the same island
+   * with two stools reads as somewhere people eat, which is how the client's
+   * own reference photography shows it. Seating, not cabinetry — it is decor
+   * and never reaches the order.
+   */
+  stools: { x: number; z: number; facing: number }[];
+  /** A pendant hanging over the table, measured from the ceiling. */
+  pendant?: { x: number; z: number; dropM: number };
+  /**
+   * Framed pictures. Held per wall and drawn inside that wall's group, so a
+   * frame is hidden by the same culling that hides the wall it hangs on —
+   * otherwise it floats in mid-air the moment the camera passes that side.
+   */
+  frames: {
+    wall: Wall;
+    /** Metres from the start of that wall to the frame's left edge. */
+    offsetM: number;
+    widthM: number;
+    heightM: number;
+    /** Floor to the bottom of the frame. */
+    sillM: number;
+  }[];
 }
 
 /** An opening cut into a wall — a door, a window or a baie vitrée. */
@@ -128,26 +261,6 @@ export interface SceneMaterials {
   metal: string;
 }
 
-/**
- * A chosen accessory, standing on the worktop as a plain named block.
- *
- * A range-couverts really lives inside a drawer, where nobody would see it.
- * Standing them on the counter is not what the kitchen looks like — it is a
- * checklist the customer can read at a glance, which is what they are for.
- */
-export interface AccessoryBlock {
-  id: string;
-  title: string;
-  /** Centre of the block, metres, in room coordinates. */
-  x: number;
-  z: number;
-  /** Floor to the underside of the block. */
-  baseM: number;
-  widthM: number;
-  depthM: number;
-  heightM: number;
-}
-
 export interface KitchenScene {
   room: { widthM: number; depthM: number; heightM: number };
   /**
@@ -159,9 +272,10 @@ export interface KitchenScene {
    */
   rotationQuarters: number;
   runs: Run[];
-  accessories: AccessoryBlock[];
   ilot?: Ilot;
   openings: Opening[];
+  /** Table, chairs, rug and pictures. Never selectable, never ordered. */
+  decor: Decor;
   materials: SceneMaterials;
   /** What the customer decides that the renderer has to build to. */
   geometry: {
@@ -201,15 +315,12 @@ export interface KitchenConfig {
   /** The island exactly as measured, when the îlot block asked for it. */
   ilotLengthCm?: number;
   ilotWidthCm?: number;
-  ilotHeightCm?: number;
   /** "Crédence sur le mur" — the customer can decline it. */
   credence?: boolean;
   /** Which corner the kitchen occupies: quarter turns clockwise, 0–3. */
   rotationQuarters?: number;
   /** Which way the island faces: quarter turns clockwise, 0–3. */
   ilotRotationQuarters?: number;
-  /** Accessories picked in "Vos options", shown as named blocks. */
-  accessories?: { id: string; title: string }[];
   facadeHex?: string;
   worktopHex?: string;
 }
