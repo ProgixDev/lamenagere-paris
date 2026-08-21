@@ -1,4 +1,4 @@
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
 async function takePhoto(): Promise<string | null> {
@@ -16,10 +16,15 @@ async function takePhoto(): Promise<string | null> {
 }
 
 async function pickFromLibrary(): Promise<string | null> {
-  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (status !== "granted") {
-    Alert.alert("Permission requise", "Autorisez l'accès à la galerie pour la recherche par image.");
-    return null;
+  // Android n'a pas de permission à demander ici : le picker passe par le
+  // sélecteur système (Photo Picker), qui ne donne accès qu'à la photo choisie.
+  // Demander quand même échouerait, puisqu'on ne déclare plus READ_MEDIA_IMAGES.
+  if (Platform.OS === "ios") {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission requise", "Autorisez l'accès à la galerie pour la recherche par image.");
+      return null;
+    }
   }
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ["images"],

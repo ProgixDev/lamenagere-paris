@@ -20,6 +20,7 @@ import { useOnboardingStore } from "../features/onboarding/store";
 import AnimatedSplash from "../components/AnimatedSplash";
 import GuestModeChrome from "../components/GuestModeChrome";
 import ImmersiveMode from "../components/ImmersiveMode";
+import OtaUpdater from "../components/OtaUpdater";
 import PopupGate from "../components/PopupGate";
 import {
   buildDeepLinkFromTarget,
@@ -237,6 +238,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ImmersiveMode />
+        <OtaUpdater />
         <QueryClientProvider client={queryClient}>
           <StripeGate>
             <AuthGate>

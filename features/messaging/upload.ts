@@ -1,4 +1,4 @@
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { apiClient } from "../../lib/api";
@@ -18,13 +18,18 @@ const JPEG_QUALITY = 0.7;
 
 /** Opens the gallery so the user can pick a photo or a video. */
 export async function pickMessageMedia(): Promise<ImagePicker.ImagePickerAsset | null> {
-  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (status !== "granted") {
-    Alert.alert(
-      "Permission requise",
-      "Autorisez l'accès à la galerie pour envoyer une photo ou une vidéo.",
-    );
-    return null;
+  // iOS seulement. Sur Android, launchImageLibraryAsync ouvre le sélecteur
+  // système, qui ne rend que le média choisi et ne demande donc aucune
+  // permission — Play interdit READ_MEDIA_IMAGES/VIDEO dès lors qu'il suffit.
+  if (Platform.OS === "ios") {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission requise",
+        "Autorisez l'accès à la galerie pour envoyer une photo ou une vidéo.",
+      );
+      return null;
+    }
   }
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ["images", "videos"],
