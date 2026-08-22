@@ -3,7 +3,7 @@
   "version": "1.2.0",
   "main": "expo-router/entry",
   "scripts": {
-    "ota": "eas update --branch production",
+    "ota": "eas update --branch production --environment production",
     "ota:preview": "eas update --branch preview",
     "start": "expo start",
     "android": "expo run:android",

@@ -20,7 +20,11 @@ import PhoneInput from "../../components/ui/PhoneInput";
 import Button from "../../components/ui/Button";
 import Toast from "../../components/ui/Toast";
 import { useAuthStore } from "../../features/auth/store";
-import { combinePhone, DEFAULT_PHONE_COUNTRY } from "../../lib/phone";
+import {
+  combinePhone,
+  DEFAULT_PHONE_COUNTRY,
+  isPhoneCountryCode,
+} from "../../lib/phone";
 import type { AccountType } from "../../lib/types";
 
 const registerSchema = z
@@ -28,7 +32,7 @@ const registerSchema = z
     accountType: z.enum(["particulier", "professionnel"]),
     fullName: z.string().min(1, "Nom complet requis"),
     email: z.string().min(1, "Email requis").email("Email invalide"),
-    phoneCountry: z.enum(["FR", "SN"]),
+    phoneCountry: z.string().refine(isPhoneCountryCode, "Pays invalide"),
     phone: z
       .string()
       .min(1, "Téléphone requis")
