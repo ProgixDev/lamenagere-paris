@@ -21,6 +21,12 @@ async function create(): Promise<NestFastifyApplication> {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),
+    // Must mirror main.ts: rawBody exposes req.rawBody (Buffer), which the
+    // Stripe webhook needs to verify the signature. Without it the controller
+    // guard rejects every delivery with "Missing Stripe signature or body"
+    // before the secret is ever read — the webhook backstop is dead on Vercel,
+    // which is the only deployment that serves it.
+    { rawBody: true },
   );
 
   // Smaller cap than the standalone server: Vercel functions have a request
