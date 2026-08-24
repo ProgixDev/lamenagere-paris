@@ -1,4 +1,4 @@
-import type { ConfigBlock, ConfigBlockField, Product } from "./types";
+import type { Category, ConfigBlock, ConfigBlockField, Product } from "./types";
 import { areaFormula } from "./area-formulas";
 
 /**
@@ -61,8 +61,16 @@ const norm = (v: string) =>
  */
 export function hiddenHeight(
   field: ConfigBlockField,
-  blockType?: string,
+  blockType: string | undefined,
+  isKitchen: boolean,
 ): "wall" | "worktop" | null {
+  // Kitchens only, and `isKitchen` is required rather than defaulted so the
+  // compiler makes every call site answer the question. Outside a kitchen there
+  // is no ceiling and no worktop, so nothing here applies: a `height` role is
+  // just a measurement the customer is asked for like any other. CANAPÉ MONACO
+  // tags its "Profondeur" that way — hiding it silently billed the sofa at
+  // 2,10 m deep, which is where this guard comes from.
+  if (!isKitchen) return null;
   const label = norm(field.label);
   if (blockType === "ilot") {
     return field.priceRole === "height" || label.startsWith("hauteur") ? "worktop" : null;
@@ -82,12 +90,14 @@ export function hiddenHeight(
  */
 export function visibleFields(
   block: ConfigBlock,
-  opts: { byShape: boolean; runs: number },
+  opts: { byShape: boolean; runs: number; isKitchen: boolean },
 ): ConfigBlockField[] {
   // The fixed heights are filtered first, so they vanish from the mesures step,
   // the îlot step, the studio panel and the "have you filled this in" check
   // alike.
-  const fields = (block.fields ?? []).filter((f) => !hiddenHeight(f, block.type));
+  const fields = (block.fields ?? []).filter(
+    (f) => !hiddenHeight(f, block.type, opts.isKitchen),
+  );
   if (!opts.byShape) return fields;
   return fields.filter((f) => {
     const idx = RUN_ROLES.indexOf(f.priceRole as (typeof RUN_ROLES)[number]);
@@ -125,21 +135,31 @@ export function buildSteps(
 
   // The 3D view comes last, once every answer it draws from is in: it needs the
   // shape for the runs and the measurements for the room, so it can only be
-  // shown after both. Products without either — a sofa, an accessory — skip it.
-  if (canPlanIn3D(blocks)) steps.push({ kind: "scene" });
+  // shown after both — and it draws a kitchen, so only kitchens get it.
+  if (canPlanIn3D(product, blocks)) steps.push({ kind: "scene" });
 
   steps.push({ kind: "summary" });
   return steps;
 }
 
 /**
- * Whether this product is laid out along walls at all.
+ * Whether this product is a kitchen laid out along walls.
  *
- * A shape block whose options declare runs plus a measurement tagged `run1` is
- * what makes a room drawable; anything else is a product the customer places in
- * a room rather than one that fills it.
+ * Two conditions, and both are load-bearing.
+ *
+ * The blocks have to describe a room: a shape block whose options declare runs
+ * plus a measurement tagged `run1`. Anything else is a product the customer
+ * places in a room rather than one that fills it.
+ *
+ * The product also has to *be* a kitchen. The studio draws cabinets, worktops
+ * and an island from a fixed catalogue — there is nothing generic about it — so
+ * the block shape alone is not enough. A corner sofa priced per linear metre is
+ * described exactly like a kitchen (forme I/L/U, longueur tagged `run1`), and
+ * before this check it earned a 3D step that showed the customer a kitchen at
+ * the end of configuring a canapé.
  */
-export function canPlanIn3D(blocks: ConfigBlock[]): boolean {
+export function canPlanIn3D(product: Product, blocks: ConfigBlock[]): boolean {
+  if (!isKitchenCategory(product.category)) return false;
   const hasRuns = blocks.some(
     (b) => b.type === "shape" && (b.options ?? []).some((o) => (o.runs ?? 0) > 0),
   );
@@ -147,6 +167,22 @@ export function canPlanIn3D(blocks: ConfigBlock[]): boolean {
     (b) => b.type === "measurements" && (b.fields ?? []).some((f) => f.priceRole === "run1"),
   );
   return hasRuns && hasWallMeasure;
+}
+
+/**
+ * Whether a category is kitchens — the one place the app is allowed to assume a
+ * ceiling, a worktop and a run of cabinets. Gates the 3D studio and the hidden
+ * heights alike.
+ *
+ * Matched on the name and the slug both, accent- and case-insensitively, so
+ * "Cuisines", "cuisines", "Cuisine équipée" and a "cuisines-sur-mesure"
+ * sub-category all count. Kept loose on purpose: the back office renames
+ * categories freely, and an id list here would silently drop the 3D the first
+ * time someone created a second kitchen category.
+ */
+export function isKitchenCategory(category: Category | undefined): boolean {
+  if (!category) return false;
+  return norm(category.name).includes("cuisine") || norm(category.slug).includes("cuisine");
 }
 
 /** Screen title + one-line subtitle, so every step reads as a single question. */

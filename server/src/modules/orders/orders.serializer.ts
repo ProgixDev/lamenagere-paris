@@ -16,6 +16,11 @@ import type { AreaDimensions } from '../../common/pricing/area-formulas';
 
 // ── Rows ────────────────────────────────────────────────────────────────────
 export type RefundStatus = 'none' | 'requested' | 'refunded' | 'rejected';
+export type { RefundSettlement, DisputeStatus } from '../payments/reconciliation';
+import type {
+  RefundSettlement,
+  DisputeStatus,
+} from '../payments/reconciliation';
 
 export interface OrderAttachment {
   url: string;
@@ -89,6 +94,18 @@ export interface OrderRow {
   refund_decided_at: string | null;
   refund_amount_cents: number | null;
   stripe_refund_id: string | null;
+  // Money state reconciled from Stripe webhooks (0037). Back office only — the
+  // published app crashes on a refund_status it doesn't know, so the finer
+  // truth is carried here instead of widening that field.
+  refund_settlement: RefundSettlement | null;
+  refund_failure_reason: string | null;
+  refunded_total_cents: number | null;
+  stripe_charge_id: string | null;
+  stripe_dispute_id: string | null;
+  dispute_status: DisputeStatus | null;
+  dispute_reason: string | null;
+  dispute_amount_cents: number | null;
+  dispute_evidence_due_at: string | null;
   created_at: string;
   items?: OrderItemRow[];
   timeline?: OrderTimelineRow[];
@@ -133,6 +150,19 @@ export interface OrderDto {
   customerNote?: string;
   customerAttachments: OrderAttachment[];
   refundStatus: RefundStatus;
+  /**
+   * Reconciled from Stripe (0037). Additive on purpose: the published app
+   * ignores fields it doesn't read, whereas widening `refundStatus` itself
+   * would crash its order screen.
+   */
+  refundSettlement?: RefundSettlement;
+  refundFailureReason?: string;
+  refundedTotal?: number;
+  disputeStatus?: DisputeStatus;
+  disputeReason?: string;
+  disputeAmount?: number;
+  disputeEvidenceDueAt?: string;
+  needsAttention?: boolean;
   refundReason?: string;
   refundDecisionNote?: string;
   refundRequestedAt?: string;
@@ -153,6 +183,16 @@ export interface AdminOrderDto {
   status: OrderStatus;
   statusLabel: string;
   refundStatus: RefundStatus;
+  /** Where the refund actually is with the bank; 'failed' needs a human. */
+  refundSettlement: RefundSettlement;
+  refundFailureReason?: string;
+  refundedTotal?: string;
+  disputeStatus: DisputeStatus;
+  disputeReason?: string;
+  disputeAmount?: string;
+  disputeEvidenceDueAt?: string;
+  /** True when this order is waiting on someone: failed refund or open dispute. */
+  needsAttention: boolean;
   image: string;
   createdAt: string;
   territory: ShippingZone;
@@ -260,6 +300,20 @@ export function toOrderDto(row: OrderRow): OrderDto {
     customerNote: row.customer_note ?? undefined,
     customerAttachments: row.customer_attachments ?? [],
     refundStatus: row.refund_status ?? 'none',
+    refundSettlement: row.refund_settlement ?? 'none',
+    refundFailureReason: row.refund_failure_reason ?? undefined,
+    refundedTotal: row.refunded_total_cents
+      ? centsToEuros(row.refunded_total_cents)
+      : undefined,
+    disputeStatus: row.dispute_status ?? 'none',
+    disputeReason: row.dispute_reason ?? undefined,
+    disputeAmount:
+      row.dispute_amount_cents != null
+        ? centsToEuros(row.dispute_amount_cents)
+        : undefined,
+    disputeEvidenceDueAt: row.dispute_evidence_due_at ?? undefined,
+    needsAttention:
+      row.refund_settlement === 'failed' || row.dispute_status === 'open',
     refundReason: row.refund_reason ?? undefined,
     refundDecisionNote: row.refund_decision_note ?? undefined,
     refundRequestedAt: row.refund_requested_at ?? undefined,
@@ -306,6 +360,20 @@ export function toAdminOrderDto(row: OrderRow): AdminOrderDto {
     status: row.status,
     statusLabel: orderStatusLabel(row.status),
     refundStatus: row.refund_status ?? 'none',
+    refundSettlement: row.refund_settlement ?? 'none',
+    refundFailureReason: row.refund_failure_reason ?? undefined,
+    refundedTotal: row.refunded_total_cents
+      ? formatEURFromCents(row.refunded_total_cents)
+      : undefined,
+    disputeStatus: row.dispute_status ?? 'none',
+    disputeReason: row.dispute_reason ?? undefined,
+    disputeAmount:
+      row.dispute_amount_cents != null
+        ? formatEURFromCents(row.dispute_amount_cents)
+        : undefined,
+    disputeEvidenceDueAt: row.dispute_evidence_due_at ?? undefined,
+    needsAttention:
+      row.refund_settlement === 'failed' || row.dispute_status === 'open',
     image: firstImage ?? '',
     createdAt: row.created_at,
     territory: row.territory,

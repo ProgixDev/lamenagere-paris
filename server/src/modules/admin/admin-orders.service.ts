@@ -173,9 +173,16 @@ export class AdminOrdersService {
   }
 
   /**
-   * Accepts a refund: issues the real Stripe refund (idempotent), marks the
-   * order refunded, records an audit note and notifies the customer. Works
-   * whether or not the customer filed a request first (admin-initiated refund).
+   * Accepts a refund: issues the real Stripe refund (idempotent), records an
+   * audit note and notifies the customer. Works whether or not the customer
+   * filed a request first (admin-initiated refund).
+   *
+   * The order is only marked *refunded* once Stripe says the money actually
+   * settled. A card refund answers `pending` and reaches the customer days
+   * later, so until then the request stays open and the customer is told it is
+   * on its way rather than done — `refund.updated` closes it out. Previously
+   * this announced every refund as "traité" the instant Stripe accepted it,
+   * which was a promise that could still fail silently.
    */
   async acceptRefund(
     idOrNumber: string,
@@ -186,14 +193,17 @@ export class AdminOrdersService {
       return toAdminOrderDto(row); // already done — no-op
     }
 
-    const { refundId, amountCents: refunded, partial } =
+    const { refundId, amountCents: refunded, partial, settlement } =
       await this.payments.refundOrder(row.id, amountCents);
     const kind = partial ? 'partiel' : 'total';
+    const settled = settlement === 'succeeded';
 
     await this.supabase.client
       .from('orders')
       .update({
-        refund_status: 'refunded',
+        // Still "requested" while the bank has the money in flight: it keeps
+        // the order in the refund queue until the webhook confirms it landed.
+        refund_status: settled ? 'refunded' : 'requested',
         refund_amount_cents: refunded,
         refund_decided_at: new Date().toISOString(),
       })
@@ -201,13 +211,20 @@ export class AdminOrdersService {
 
     await this.supabase.client.from('order_notes').insert({
       order_id: row.id,
-      body: `Remboursement ${kind} accepté et traité (Stripe ${refundId}, ${formatEURFromCents(refunded)}).`,
+      body: settled
+        ? `Remboursement ${kind} accepté et confirmé (Stripe ${refundId}, ${formatEURFromCents(refunded)}).`
+        : `Remboursement ${kind} accepté et envoyé à la banque (Stripe ${refundId}, ` +
+          `${formatEURFromCents(refunded)}). En attente de confirmation — le statut ` +
+          `passera à « remboursé » automatiquement.`,
     });
 
     await this.notifyCustomer(
       row.profile_id,
       'Remboursement accepté',
-      `Votre remboursement ${kind} de ${formatEURFromCents(refunded)} pour la commande ${row.order_number} a été traité.`,
+      settled
+        ? `Votre remboursement ${kind} de ${formatEURFromCents(refunded)} pour la commande ${row.order_number} a été traité.`
+        : `Votre remboursement ${kind} de ${formatEURFromCents(refunded)} pour la commande ${row.order_number} est en cours. ` +
+          `Comptez quelques jours ouvrés avant de le voir sur votre compte.`,
       row.id,
     );
 

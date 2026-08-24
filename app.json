@@ -65,7 +65,6 @@
           "microphonePermission": false
         }
       ],
-      "expo-notifications",
       "expo-secure-store",
       "expo-local-authentication",
       "expo-font",
@@ -73,6 +72,22 @@
       "expo-web-browser",
       [
         "expo-navigation-bar",
+        {
+          "visibility": "hidden",
+          "behavior": "overlay-swipe"
+        }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "enableGooglePay": false
+        }
+      ]
+    ],
+    "__pluginsNote": "expo-notifications temporarily removed from plugins to drop the aps-environment entitlement so the App Store build passes without the Push capability; re-add it once Push Notifications is enabled on the App ID.",
+    "__unused": [
+      [
+        "expo-navigation-bar-DUPLICATE-REMOVE",
         {
           "visibility": "hidden",
           "behavior": "overlay-swipe"

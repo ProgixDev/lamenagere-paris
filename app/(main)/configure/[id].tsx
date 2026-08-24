@@ -43,6 +43,7 @@ import {
   buildSteps,
   FIXED_HEIGHTS_CM,
   hiddenHeight,
+  isKitchenCategory,
   PRODUCT_COLOR_BLOCK_ID,
   runsOfShape,
   stepCopy,
@@ -161,6 +162,12 @@ export default function ConfigureScreen() {
     (b) => blockApplies(b, isPerSqm),
   );
   const byShape = isPerSqm && product?.areaFormula === "by_shape";
+  /**
+   * Kitchens get the studio and the heights the customer is never asked for.
+   * Everything else is measured exactly as the back office described it — see
+   * `hiddenHeight`, which a canapé priced per m² used to fall foul of.
+   */
+  const isKitchen = isKitchenCategory(product?.category);
   const needsDims =
     !byShape && (product?.productType === PRODUCT_TYPES.CONFIGURABLE || isPerSqm);
   const qualityTiers = product?.qualityTiers ?? [];
@@ -186,7 +193,7 @@ export default function ConfigureScreen() {
       // and leaving it blank would bill the island at zero on a per-m² formula.
       if (block.type !== "measurements" && block.type !== "ilot") continue;
       for (const field of block.fields ?? []) {
-        const kind = hiddenHeight(field, block.type);
+        const kind = hiddenHeight(field, block.type, isKitchen);
         if (!kind) continue;
         const current = configState[block.id]?.measurements?.[field.key];
         if (current != null && current !== "") continue;
@@ -208,7 +215,7 @@ export default function ConfigureScreen() {
       }
       return next;
     });
-  }, [blocks, configState]);
+  }, [blocks, configState, isKitchen]);
 
   const reduceMotion = useReducedMotion();
   const progress = useSharedValue(0);
@@ -496,7 +503,7 @@ export default function ConfigureScreen() {
   const sceneDimFields = blocks
     .filter((b) => b.type === "measurements")
     .flatMap((b) =>
-      visibleFields(b, { byShape, runs }).map((f) => {
+      visibleFields(b, { byShape, runs, isKitchen }).map((f) => {
         const raw = configState[b.id]?.measurements?.[f.key];
         const value = raw != null && raw !== "" ? parseFloat(raw) : undefined;
         return {
@@ -599,7 +606,7 @@ export default function ConfigureScreen() {
       return "Choisissez une forme";
     }
     if (step.kind === "measures") {
-      const shown = visibleFields(step.block, { byShape, runs });
+      const shown = visibleFields(step.block, { byShape, runs, isKitchen });
       if (step.block.required) {
         const filled = shown.every((f) => {
           const raw = configState[step.block.id]?.measurements?.[f.key];
@@ -755,7 +762,7 @@ export default function ConfigureScreen() {
                   heightLabel={heightLabel}
                 />
               </View>
-              {visibleFields(step.block, { byShape, runs }).map((f, i) => {
+              {visibleFields(step.block, { byShape, runs, isKitchen }).map((f, i) => {
                 const blockId = step.block.id;
                 return (
                   <Animated.View key={f.key} entering={reduceMotion ? undefined : FadeInDown.delay(i * 50).springify()}>
@@ -891,7 +898,7 @@ export default function ConfigureScreen() {
                 </View>
               )}
               {ilotOn &&
-                visibleFields(step.block, { byShape: false, runs: 0 }).map((f, i) => {
+                visibleFields(step.block, { byShape: false, runs: 0, isKitchen }).map((f, i) => {
                   const blockId = step.block.id;
                   return (
                     <Animated.View key={f.key} entering={reduceMotion ? undefined : FadeInDown.delay(i * 50).springify()}>
