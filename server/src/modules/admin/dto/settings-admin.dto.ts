@@ -19,6 +19,15 @@ export class UpdateSettingsDto {
   @IsOptional() @IsBoolean() maintenanceMode?: boolean;
   @IsOptional() @IsBoolean() depositEnabled?: boolean;
   @IsOptional() @IsNumber() depositThreshold?: number; // euros
+
+  // ── Verrou de version de l'app mobile ────────────────────────────────────
+  @IsOptional() @IsBoolean() forceUpdateEnabled?: boolean;
+  /** Version sémantique ("1.3.0") ou chaîne vide pour retirer le minimum. */
+  @IsOptional() @IsString() minAppVersionIos?: string;
+  @IsOptional() @IsString() minAppVersionAndroid?: string;
+  @IsOptional() @IsString() iosStoreUrl?: string;
+  @IsOptional() @IsString() androidStoreUrl?: string;
+  @IsOptional() @IsString() forceUpdateMessage?: string;
 }
 
 export class UpdateZoneFeeDto {

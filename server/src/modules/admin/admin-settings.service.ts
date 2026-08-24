@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { centsToEuros, eurosToCents } from '../../common/serialization/money.util';
+import { parseVersion } from '../../common/version/semver.util';
+import { AppVersionService } from '../app-version/app-version.service';
 import {
   UpdateSettingsDto,
   UpdateZoneFeeDto,
@@ -8,7 +10,10 @@ import {
 
 @Injectable()
 export class AdminSettingsService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly appVersion: AppVersionService,
+  ) {}
 
   async get() {
     const [{ data: settings }, { data: zones }] = await Promise.all([
@@ -40,6 +45,12 @@ export class AdminSettingsService {
               settings.deposit_threshold_cents != null
                 ? centsToEuros(settings.deposit_threshold_cents)
                 : null,
+            forceUpdateEnabled: !!settings.force_update_enabled,
+            minAppVersionIos: settings.min_app_version_ios,
+            minAppVersionAndroid: settings.min_app_version_android,
+            iosStoreUrl: settings.ios_store_url,
+            androidStoreUrl: settings.android_store_url,
+            forceUpdateMessage: settings.force_update_message,
           }
         : null,
       shippingZones: (zones ?? []).map((z: any) => ({
@@ -72,8 +83,26 @@ export class AdminSettingsService {
     if (dto.depositThreshold !== undefined)
       patch.deposit_threshold_cents = eurosToCents(dto.depositThreshold);
 
+    if (dto.forceUpdateEnabled !== undefined)
+      patch.force_update_enabled = dto.forceUpdateEnabled;
+    if (dto.minAppVersionIos !== undefined)
+      patch.min_app_version_ios = normalizeMinVersion(dto.minAppVersionIos, 'iOS');
+    if (dto.minAppVersionAndroid !== undefined)
+      patch.min_app_version_android = normalizeMinVersion(
+        dto.minAppVersionAndroid,
+        'Android',
+      );
+    if (dto.iosStoreUrl !== undefined) patch.ios_store_url = dto.iosStoreUrl || null;
+    if (dto.androidStoreUrl !== undefined)
+      patch.android_store_url = dto.androidStoreUrl || null;
+    if (dto.forceUpdateMessage !== undefined)
+      patch.force_update_message = dto.forceUpdateMessage || null;
+
     if (Object.keys(patch).length) {
       await this.supabase.client.from('settings').update(patch).eq('id', 1);
+      // Le verrou de version sert une copie en cache : la purger pour que la
+      // nouvelle version minimale s'applique au prochain lancement, pas 30s plus tard.
+      this.appVersion.invalidate();
     }
     return this.get();
   }
@@ -90,4 +119,21 @@ export class AdminSettingsService {
     );
     return this.get();
   }
+}
+
+/**
+ * Une version minimale illisible désactiverait silencieusement le verrou (le
+ * serveur laisse passer en cas de doute) : on refuse l'enregistrement plutôt
+ * que de laisser l'admin croire que l'app est protégée. Chaîne vide = retirer
+ * le minimum.
+ */
+function normalizeMinVersion(raw: string, label: string): string | null {
+  const value = raw.trim();
+  if (!value) return null;
+  if (!parseVersion(value)) {
+    throw new BadRequestException(
+      `Version minimale ${label} invalide : « ${value} ». Format attendu : 1.3.0`,
+    );
+  }
+  return value;
 }

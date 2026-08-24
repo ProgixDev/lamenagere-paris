@@ -22,6 +22,7 @@ import GuestModeChrome from "../components/GuestModeChrome";
 import ImmersiveMode from "../components/ImmersiveMode";
 import OtaUpdater from "../components/OtaUpdater";
 import PopupGate from "../components/PopupGate";
+import UpdateGate from "../components/UpdateGate";
 import {
   buildDeepLinkFromTarget,
   registerForPushNotifications,
@@ -273,6 +274,10 @@ export default function RootLayout() {
               {showSplash && <AnimatedSplash onFinish={handleSplashFinish} />}
             </AuthGate>
           </StripeGate>
+          {/* Monté en dernier, hors de l'AuthGate : quand une version est
+              bloquée, plus rien n'est accessible — ni l'onboarding, ni le mode
+              invité, ni le splash. */}
+          <UpdateGate />
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

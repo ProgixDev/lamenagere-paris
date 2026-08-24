@@ -22,6 +22,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
 import { PromoModule } from './modules/promo/promo.module';
 import { BriefsModule } from './modules/briefs/briefs.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { AppVersionModule } from './modules/app-version/app-version.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -48,6 +49,7 @@ import { AppController } from './app.controller';
     PromoModule,
     BriefsModule,
     AdminModule,
+    AppVersionModule,
   ],
   controllers: [AppController],
   providers: [
