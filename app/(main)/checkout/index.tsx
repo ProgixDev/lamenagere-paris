@@ -8,8 +8,10 @@ import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import {
   isOverseas,
   formatPrice,
+  formatPrice2,
   territoryFromPostalCode,
 } from "../../../lib/utils";
+import { computeTotals } from "../../../lib/vat";
 import Button from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
 import CheckoutSteps from "../../../components/cart/CheckoutSteps";
@@ -43,6 +45,8 @@ function CheckoutAddressScreenContent() {
 
   const territory = territoryFromPostalCode(form.postalCode);
   const overseas = isOverseas(territory);
+  // Same postal code that picks the shipping zone also picks the VAT rate.
+  const totals = computeTotals({ subtotalHt: subtotal, postalCode: form.postalCode });
   const valid =
     form.firstName.trim() &&
     form.lastName.trim() &&
@@ -133,10 +137,25 @@ function CheckoutAddressScreenContent() {
               </Text>
             </View>
           ))}
-          <View className="flex-row justify-between items-center mt-3 pt-3" style={{ borderTopWidth: 1, borderTopColor: COLORS.outlineVariant }}>
-            <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 18 }}>Total TTC</Text>
-            <Text style={[TYPE.price, { color: COLORS.primary }]}>{formatPrice(subtotal)}</Text>
+          <View className="flex-row justify-between mt-3 pt-3" style={{ borderTopWidth: 1, borderTopColor: COLORS.outlineVariant }}>
+            <Text className="text-xs" style={{ color: COLORS.onSurfaceVariant }}>Sous-total HT</Text>
+            <Text className="text-xs" style={{ color: COLORS.onSurface }}>{formatPrice2(subtotal)}</Text>
           </View>
+          <View className="flex-row justify-between mb-1">
+            <Text className="text-xs" style={{ color: COLORS.onSurfaceVariant }}>
+              {totals.exempt ? "TVA" : `TVA (${Math.round(totals.vatRate * 100)} %)`}
+            </Text>
+            <Text className="text-xs" style={{ color: COLORS.onSurface }}>
+              {totals.exempt ? "Non applicable" : formatPrice2(totals.vat)}
+            </Text>
+          </View>
+          <View className="flex-row justify-between items-center mt-2">
+            <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 18 }}>Total TTC</Text>
+            <Text style={[TYPE.price, { color: COLORS.primary }]}>{formatPrice(totals.ttc)}</Text>
+          </View>
+          <Text style={{ fontSize: 11, marginTop: 8, color: COLORS.outline, fontFamily: "Inter_400Regular" }}>
+            Hors frais de livraison, calculés à l'étape suivante.
+          </Text>
         </View>
 
         <Button label="Continuer vers le paiement →" onPress={onContinue} size="lg" disabled={!valid} />

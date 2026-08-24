@@ -12,6 +12,11 @@ import {
   territoryFromPostalCode,
 } from '../../common/serialization/status-labels';
 import {
+  vatCentsFor,
+  vatExemptionNoteFor,
+  vatRateBpForPostalCode,
+} from '../../common/tax/vat';
+import {
   ORDER_SELECT,
   OrderDto,
   OrderRow,
@@ -539,7 +544,13 @@ export class OrdersService {
       promoRow = res.promo;
       discountCents = Math.min(res.discountCents, subtotal);
     }
-    const total = Math.max(0, subtotal - discountCents) + shippingCost;
+    // Catalogue prices, shipping fees and promo discounts are all HT. VAT is
+    // added once, on the net taxable base, at the destination's rate — the
+    // transport of an exempt export is exempt too, so the fee follows the goods.
+    const vatRateBp = vatRateBpForPostalCode(ship.postal_code);
+    const taxableBase = Math.max(0, subtotal - discountCents) + shippingCost;
+    const vatAmount = vatCentsFor(taxableBase, vatRateBp);
+    const total = taxableBase + vatAmount;
 
     // 4. Atomic order number.
     const year = new Date().getFullYear();
@@ -565,6 +576,9 @@ export class OrdersService {
         promo_code: promoRow?.code ?? null,
         promo_code_id: promoRow?.id ?? null,
         total_cents: total,
+        vat_rate_bp: vatRateBp,
+        vat_cents: vatAmount,
+        vat_exemption_note: vatExemptionNoteFor(vatRateBp),
         territory,
         shipping_method: dto.shippingMethod,
         estimated_delivery: estimatedDelivery,

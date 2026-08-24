@@ -69,6 +69,9 @@ export interface OrderRow {
   shipping_cost_cents: number;
   discount_cents: number | null;
   promo_code: string | null;
+  vat_rate_bp: number | null;
+  vat_cents: number | null;
+  vat_exemption_note: string | null;
   total_cents: number;
   territory: ShippingZone;
   shipping_method: string;
@@ -143,6 +146,12 @@ export interface OrderDto {
   shippingCost: number;
   discount: number;
   promoCode?: string;
+  /** VAT charged, in euros. `total` is TTC and already includes it. */
+  vat: number;
+  /** Rate applied, as a percentage (20 for métropole, 0 outre-mer). */
+  vatRate: number;
+  /** Legal mention to print on the invoice when the order is VAT-exempt. */
+  vatExemptionNote?: string;
   shippingAddress: AddressDto;
   territory: ShippingZone;
   shippingMethod: string;
@@ -293,6 +302,9 @@ export function toOrderDto(row: OrderRow): OrderDto {
     shippingCost: centsToEuros(row.shipping_cost_cents),
     discount: centsToEuros(row.discount_cents ?? 0),
     promoCode: row.promo_code ?? undefined,
+    vat: centsToEuros(row.vat_cents ?? 0),
+    vatRate: (row.vat_rate_bp ?? 0) / 100,
+    vatExemptionNote: row.vat_exemption_note ?? undefined,
     shippingAddress: shippingAddress(row),
     territory: row.territory,
     shippingMethod: row.shipping_method,

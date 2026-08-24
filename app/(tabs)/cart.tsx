@@ -135,7 +135,7 @@ export default function CartScreen() {
         ))}
 
         <View style={{ marginTop: 8 }}>
-          <CartSummary subtotal={subtotal} total={subtotal} isB2b={isB2b} />
+          <CartSummary subtotal={subtotal} isB2b={isB2b} />
         </View>
       </ScrollView>
 

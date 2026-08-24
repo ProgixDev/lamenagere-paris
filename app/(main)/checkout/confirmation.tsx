@@ -197,7 +197,7 @@ export default function CheckoutConfirmationScreen() {
 
               <View style={{ height: 1, backgroundColor: COLORS.surfaceContainer, marginVertical: 8 }} />
 
-              <Line label="Sous-total" value={formatPrice(order.subtotal)} />
+              <Line label="Sous-total HT" value={formatPrice(order.subtotal)} />
               {order.discount ? (
                 <Line
                   label={order.promoCode ? `Code ${order.promoCode}` : "Remise"}
@@ -208,8 +208,17 @@ export default function CheckoutConfirmationScreen() {
                 label="Livraison"
                 value={order.shippingCost > 0 ? formatPrice(order.shippingCost) : "Offerte"}
               />
+              <Line
+                label={order.vatRate ? `TVA (${order.vatRate} %)` : "TVA"}
+                value={order.vatRate ? formatPrice(order.vat ?? 0) : "Non applicable"}
+              />
               <View style={{ height: 1, backgroundColor: COLORS.surfaceContainer, marginVertical: 8 }} />
-              <Line label="Total payé" value={formatPrice(order.total)} strong />
+              <Line label="Total payé TTC" value={formatPrice(order.total)} strong />
+              {order.vatExemptionNote ? (
+                <Text style={{ fontSize: 11, color: COLORS.outline, fontFamily: "Inter_400Regular", marginTop: 8, lineHeight: 16 }}>
+                  {order.vatExemptionNote}
+                </Text>
+              ) : null}
 
               <View style={{ height: 1, backgroundColor: COLORS.surfaceContainer, marginVertical: 12 }} />
 

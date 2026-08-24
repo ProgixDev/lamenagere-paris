@@ -282,17 +282,30 @@ function OrderDetailScreenContent() {
         {/* Total */}
         <Card padding="lg">
           <View className="flex-row justify-between mb-2">
-            <Text className="text-sm" style={{ color: COLORS.onSurface }}>Sous-total</Text>
+            <Text className="text-sm" style={{ color: COLORS.onSurface }}>Sous-total HT</Text>
             <Text className="text-sm" style={{ color: COLORS.onSurface }}>{formatPrice(order.subtotal)}</Text>
           </View>
           <View className="flex-row justify-between mb-2">
             <Text className="text-sm" style={{ color: COLORS.outline }}>Livraison</Text>
             <Text className="text-sm" style={{ color: COLORS.outline }}>{formatPrice(order.shippingCost)}</Text>
           </View>
+          <View className="flex-row justify-between mb-2">
+            <Text className="text-sm" style={{ color: COLORS.outline }}>
+              {order.vatRate ? `TVA (${order.vatRate} %)` : "TVA"}
+            </Text>
+            <Text className="text-sm" style={{ color: COLORS.outline }}>
+              {order.vatRate ? formatPrice(order.vat ?? 0) : "Non applicable"}
+            </Text>
+          </View>
           <View className="flex-row justify-between items-center mt-2 pt-3" style={{ borderTopWidth: 1, borderTopColor: COLORS.outlineVariant }}>
-            <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 20 }}>Total</Text>
+            <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 20 }}>Total TTC</Text>
             <Text style={[TYPE.priceLarge, { fontSize: 24 }]}>{formatPrice(order.total)}</Text>
           </View>
+          {order.vatExemptionNote ? (
+            <Text style={{ fontSize: 11, color: COLORS.outline, fontFamily: "Inter_400Regular", marginTop: 10, lineHeight: 16 }}>
+              {order.vatExemptionNote}
+            </Text>
+          ) : null}
         </Card>
 
         <Button label="CONTACTER LE VENDEUR" onPress={() => router.push("/(tabs)/messages")} variant="secondary" size="lg" />

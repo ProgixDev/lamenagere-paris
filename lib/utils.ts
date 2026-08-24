@@ -10,18 +10,6 @@ export const formatPrice = (amount: number, currency = "EUR"): string => {
 };
 
 
-/**
- * Splits a VAT-inclusive (TTC) amount into its excl.-VAT (HT) base and the VAT
- * portion, for the B2B price breakdown shown to professional accounts.
- */
-export const splitTtc = (
-  ttc: number,
-  rate = 0.2,
-): { ht: number; tva: number; ttc: number } => {
-  const ht = ttc / (1 + rate);
-  return { ht, tva: ttc - ht, ttc };
-};
-
 /** Like formatPrice but keeps 2 decimals (for HT/TVA lines that aren't round). */
 export const formatPrice2 = (amount: number, currency = "EUR"): string => {
   return new Intl.NumberFormat("fr-FR", {

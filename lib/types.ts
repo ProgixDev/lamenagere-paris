@@ -349,6 +349,12 @@ export interface Order {
   discount?: number;
   /** Applied promo code, if any. */
   promoCode?: string;
+  /** VAT charged. `total` is TTC and already includes it. */
+  vat?: number;
+  /** Rate applied, as a percentage: 20 métropole, 0 outre-mer. */
+  vatRate?: number;
+  /** Legal mention to show when the order was invoiced VAT-exempt. */
+  vatExemptionNote?: string;
   shippingAddress: Address;
   territory: ShippingZone;
   shippingMethod: string;

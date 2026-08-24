@@ -18,7 +18,8 @@ import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
 import { COLORS } from "../../../lib/constants";
 import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
-import { formatPrice } from "../../../lib/utils";
+import { formatPrice, formatPrice2 } from "../../../lib/utils";
+import { computeTotals } from "../../../lib/vat";
 import Button from "../../../components/ui/Button";
 import CheckoutSteps from "../../../components/cart/CheckoutSteps";
 import { useCart } from "../../../features/cart/hooks";
@@ -33,6 +34,7 @@ import {
   confirmPaymentApi,
 } from "../../../features/payments/api";
 import { useCheckoutStore } from "../../../features/checkout/store";
+import { useShippingOptions } from "../../../features/shipping/hooks";
 import { validatePromoApi } from "../../../features/promo/api";
 import { isStripeAvailable } from "../../../components/StripeGate";
 
@@ -59,7 +61,21 @@ export default function CheckoutPaymentScreen() {
   const [promoError, setPromoError] = useState<string | null>(null);
 
   const discount = appliedPromo ? appliedPromo.discountCents / 100 : 0;
-  const totalDue = Math.max(0, subtotal - discount);
+
+  // This figure has to match `orders.service.ts` to the cent: it is what the
+  // customer approves, and Stripe is charged the server's own total_cents.
+  // Shipping used to be left out here while the server charged it — an overseas
+  // buyer approved a total 250-350 € below what was actually taken.
+  const { data: shippingOptions } = useShippingOptions();
+  const shippingCost =
+    shippingOptions?.find((o) => o.territory === territory)?.fee ?? 0;
+  const totals = computeTotals({
+    subtotalHt: subtotal,
+    shippingHt: shippingCost,
+    discountHt: discount,
+    postalCode: address?.postalCode,
+  });
+  const totalDue = totals.ttc;
 
   const applyPromo = async () => {
     const code = promoInput.trim();
@@ -304,8 +320,8 @@ export default function CheckoutPaymentScreen() {
         {/* Totals */}
         <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 20, marginBottom: 32, ...SHADOW.card }}>
           <View className="flex-row justify-between items-center mb-2">
-            <Text style={{ color: COLORS.onSurfaceVariant, fontFamily: "Inter_500Medium", fontSize: 14 }}>Sous-total</Text>
-            <Text style={{ color: COLORS.onSurface, fontFamily: "Inter_500Medium", fontSize: 14 }}>{formatPrice(subtotal)}</Text>
+            <Text style={{ color: COLORS.onSurfaceVariant, fontFamily: "Inter_500Medium", fontSize: 14 }}>Sous-total HT</Text>
+            <Text style={{ color: COLORS.onSurface, fontFamily: "Inter_500Medium", fontSize: 14 }}>{formatPrice2(subtotal)}</Text>
           </View>
           {discount > 0 ? (
             <View className="flex-row justify-between items-center mb-2">
@@ -317,13 +333,30 @@ export default function CheckoutPaymentScreen() {
               </Text>
             </View>
           ) : null}
+          <View className="flex-row justify-between items-center mb-2">
+            <Text style={{ color: COLORS.onSurfaceVariant, fontFamily: "Inter_500Medium", fontSize: 14 }}>Livraison</Text>
+            <Text style={{ color: COLORS.onSurface, fontFamily: "Inter_500Medium", fontSize: 14 }}>
+              {shippingCost === 0 ? "Gratuit" : formatPrice(shippingCost)}
+            </Text>
+          </View>
+          <View className="flex-row justify-between items-center mb-2">
+            <Text style={{ color: COLORS.onSurfaceVariant, fontFamily: "Inter_500Medium", fontSize: 14 }}>
+              {totals.exempt ? "TVA" : `TVA (${Math.round(totals.vatRate * 100)} %)`}
+            </Text>
+            <Text style={{ color: COLORS.onSurface, fontFamily: "Inter_500Medium", fontSize: 14 }}>
+              {totals.exempt ? "Non applicable" : formatPrice2(totals.vat)}
+            </Text>
+          </View>
           <View className="flex-row justify-between items-center mt-2 pt-3" style={{ borderTopWidth: 1, borderTopColor: COLORS.outlineVariant }}>
             <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 20 }}>Total à payer</Text>
             <Text style={[TYPE.priceLarge, { color: COLORS.primary }]}>{formatPrice(totalDue)}</Text>
           </View>
-          <Text style={{ color: COLORS.outline, fontSize: 11, marginTop: 8, fontFamily: "Inter_400Regular" }}>
-            Hors frais de livraison, calculés selon votre zone.
-          </Text>
+          {totals.exempt ? (
+            <Text style={{ color: COLORS.outline, fontSize: 11, marginTop: 8, fontFamily: "Inter_400Regular", lineHeight: 16 }}>
+              Facture exonérée de TVA (art. 262-I et 294 du CGI). Des taxes à
+              l'importation et l'octroi de mer peuvent être dus à la réception.
+            </Text>
+          ) : null}
         </View>
 
         {/* Note + attachments — let the buyer describe their order and join photos. */}

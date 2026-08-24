@@ -98,9 +98,6 @@ export const ACCOUNT_TYPES = {
   PROFESSIONNEL: "professionnel",
 } as const;
 
-// Standard French VAT rate. Catalog prices are stored/displayed TTC (VAT
-// included); professional (B2B) accounts see the HT / TVA breakdown.
-export const TVA_RATE = 0.2;
 
 export const CATEGORIES = [
   { id: "1", name: "Portes", icon: "door", slug: "portes", description: "Portes d'entrée, intérieures et vitrées" },

@@ -5,7 +5,8 @@ import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../../lib/constants";
 import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
-import { formatPrice, isOverseas } from "../../../lib/utils";
+import { formatPrice, formatPrice2, isOverseas } from "../../../lib/utils";
+import { computeTotals } from "../../../lib/vat";
 import Button from "../../../components/ui/Button";
 import CheckoutSteps from "../../../components/cart/CheckoutSteps";
 import { useCart } from "../../../features/cart/hooks";
@@ -16,6 +17,7 @@ export default function CheckoutShippingScreen() {
   const router = useRouter();
   const { subtotal } = useCart();
   const territory = useCheckoutStore((s) => s.territory);
+  const postalCode = useCheckoutStore((s) => s.address?.postalCode);
   const setShippingMethod = useCheckoutStore((s) => s.setShippingMethod);
 
   const overseas = isOverseas(territory);
@@ -23,6 +25,13 @@ export default function CheckoutShippingScreen() {
   const option = shippingOptions?.find((o) => o.territory === territory);
 
   const shippingCost = option?.fee ?? 0;
+  // Transport of an exempt export is exempt too, so the fee is taxed at the
+  // same rate as the goods — hence it goes through computeTotals, not after it.
+  const totals = computeTotals({
+    subtotalHt: subtotal,
+    shippingHt: shippingCost,
+    postalCode,
+  });
 
   const onContinue = () => {
     if (!option) return;
@@ -86,8 +95,8 @@ export default function CheckoutShippingScreen() {
 
         <View style={{ backgroundColor: COLORS.surfaceContainerLowest, borderRadius: 16, padding: 20, marginBottom: 32, ...SHADOW.card }}>
           <View className="flex-row justify-between mb-2">
-            <Text className="text-sm" style={{ color: COLORS.onSurface }}>Sous-total</Text>
-            <Text className="text-sm" style={{ color: COLORS.onSurface }}>{formatPrice(subtotal)}</Text>
+            <Text className="text-sm" style={{ color: COLORS.onSurface }}>Sous-total HT</Text>
+            <Text className="text-sm" style={{ color: COLORS.onSurface }}>{formatPrice2(subtotal)}</Text>
           </View>
           <View className="flex-row justify-between mb-2">
             <Text className="text-sm" style={{ color: COLORS.outline }}>Livraison</Text>
@@ -95,10 +104,18 @@ export default function CheckoutShippingScreen() {
               {shippingCost === 0 ? "Gratuit" : formatPrice(shippingCost)}
             </Text>
           </View>
+          <View className="flex-row justify-between mb-2">
+            <Text className="text-sm" style={{ color: COLORS.outline }}>
+              {totals.exempt ? "TVA" : `TVA (${Math.round(totals.vatRate * 100)} %)`}
+            </Text>
+            <Text className="text-sm" style={{ color: COLORS.outline }}>
+              {totals.exempt ? "Non applicable" : formatPrice2(totals.vat)}
+            </Text>
+          </View>
           <View className="flex-row justify-between items-center mt-3 pt-3" style={{ borderTopWidth: 1, borderTopColor: COLORS.outlineVariant }}>
-            <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 20 }}>Total</Text>
+            <Text style={{ color: COLORS.onSurface, fontFamily: FONTS.serif, fontSize: 20 }}>Total TTC</Text>
             <Text style={[TYPE.priceLarge, { color: COLORS.primary }]}>
-              {formatPrice(subtotal + shippingCost)}
+              {formatPrice(totals.ttc)}
             </Text>
           </View>
         </View>

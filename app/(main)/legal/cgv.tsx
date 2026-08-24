@@ -16,7 +16,7 @@ const SECTIONS = [
   },
   {
     title: "3. Prix",
-    body: "Les prix sont indiqués en euros (€) toutes taxes comprises (TTC). Ils comprennent la TVA applicable au jour de la commande.\n\nLes frais de livraison sont calculés en fonction de la zone de livraison et sont indiqués avant la validation de la commande.\n\nLa Ménagère Paris se réserve le droit de modifier ses prix à tout moment. Les produits seront facturés au prix en vigueur au moment de la validation de la commande.",
+    body: "Les prix sont indiqués en euros (€) hors taxes (HT). La TVA applicable est calculée et ajoutée avant la validation de la commande, en fonction de l'adresse de livraison : le détail HT, TVA et total TTC est affiché au panier et au moment du paiement.\n\nLes livraisons en France métropolitaine sont soumises à la TVA au taux de 20 %. Les livraisons vers les départements, régions et collectivités d'outre-mer constituent des exportations au sens de l'article 294 du CGI : elles sont facturées en exonération de TVA (articles 262-I et 294 du CGI). Des taxes à l'importation et l'octroi de mer peuvent être dus par le destinataire auprès des douanes à la réception ; ils restent à sa charge.\n\nLes frais de livraison sont calculés en fonction de la zone de livraison et sont indiqués avant la validation de la commande.\n\nLa Ménagère Paris se réserve le droit de modifier ses prix à tout moment. Les produits seront facturés au prix en vigueur au moment de la validation de la commande.",
   },
   {
     title: "4. Commandes",
