@@ -62,3 +62,4 @@ bench/
 
 # Export ponctuel des payment_intents Stripe avant purge des commandes de test
 stripe-payment-intents-avant-purge-*.csv
+daily-report-2026-08-24.md
