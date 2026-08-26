@@ -74,7 +74,7 @@
   "devDependencies": {
     "@types/react": "~19.1.0",
     "@types/three": "^0.169.0",
-    "babel-preset-expo": "^55.0.17",
+    "babel-preset-expo": "~54.0.10",
     "esbuild": "^0.25.0",
     "eslint": "^10.2.0",
     "prettier": "^3.8.2",
