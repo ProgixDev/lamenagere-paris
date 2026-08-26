@@ -35,7 +35,7 @@ const SLIDES: Slide[] = [
       "Cuisines, chambres, portes et baies vitrées de haute facture. Une signature française, à la maison.",
   },
   {
-    image: PRODUCT_IMAGES.chambreRoyale,
+    image: PRODUCT_IMAGES.baieVitreeCarreaux,
     eyebrow: "Une exigence haut de gamme",
     title: "Sur mesure\nou prêt-à-installer.",
     subtitle:

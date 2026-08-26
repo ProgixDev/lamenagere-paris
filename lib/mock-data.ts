@@ -40,6 +40,7 @@ export const PRODUCT_IMAGES = {
   dressingWalkIn: require("../assets/la menagere/mmexport1770260677093.jpg"),
 
   // Baies vitrées
+  baieVitreeCarreaux: require("../assets/la menagere/baie-vitree-a970.jpg"),
   baieCoulissante: require("../assets/la menagere/IMG-20260317-WA0028.jpg"),
   fenetreVolet: require("../assets/la menagere/IMG-20260317-WA0031.jpg"),
 
