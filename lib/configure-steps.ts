@@ -32,15 +32,45 @@ export function runsOfShape(block: ConfigBlock | undefined, shapeKey?: string): 
 const RUN_ROLES = ["run1", "run2", "run3"] as const;
 
 /**
- * Heights the customer is never asked for, and the value each takes.
+ * The worktop height along the runs, which the customer is never asked for.
  *
- * A kitchen is built to a standard height and a standard worktop, and asking a
- * customer for either invites a wrong answer to a question they cannot check —
- * most people do not know their ceiling height, and the worktop is a decision
- * the workshop makes. They are still recorded, because the wall height is what
- * the per-m² price is multiplied by; they are simply not asked.
+ * A kitchen is built to a standard worktop, and asking the customer for it
+ * invites a wrong answer to a decision the workshop makes anyway. It is still
+ * recorded — the island opens on it, and an island can be billed on it — it is
+ * simply not asked.
  */
-export const FIXED_HEIGHTS_CM = { wall: 210, worktop: 90 } as const;
+export const FIXED_HEIGHTS_CM = { worktop: 90 } as const;
+
+/**
+ * The island's own height, which the customer *is* asked for once they take an
+ * island.
+ *
+ * It opens on the worktop height, because an island that matches the runs is
+ * what most kitchens want and nothing should drift by accident. But a
+ * breakfast bar is a real thing a customer orders, so once the island is in
+ * the configuration they can raise it — and the studio then draws it at that
+ * height, stools included, rather than pretending it matches.
+ */
+export const ILOT_HEIGHT_CM = {
+  default: FIXED_HEIGHTS_CM.worktop,
+  min: 70,
+  max: 120,
+} as const;
+
+/**
+ * The wall height, which the customer *is* asked for.
+ *
+ * It is the cote the per-m² price is multiplied by, so it is worth asking:
+ * pricing a 2,50 m room as if it were 2,10 m undercharges the kitchen by a
+ * fifth. It arrives pre-filled at the standard 2,10 m so a customer who does
+ * not know their ceiling still gets a price, and moves between bounds rather
+ * than freely — `min` is the floor of a habitable room, and without it the
+ * ruler would start at 0 and let someone bill a full kitchen at 40 cm.
+ *
+ * `min`/`max` are defaults: a back office that sets its own bounds on the
+ * field wins, since it knows the model it is selling.
+ */
+export const WALL_HEIGHT_CM = { default: 210, min: 180, max: 300 } as const;
 
 /** Accent- and case-insensitive, matching the loose labels the back office uses. */
 const norm = (v: string) =>
@@ -49,21 +79,22 @@ const norm = (v: string) =>
 /**
  * Whether a measurement is one the customer never sees.
  *
- * The block matters, not just the field. A height on the measurements block is
- * the ceiling; the very same field on an îlot block is the island's worktop,
- * which is built to the same height as the runs — so it is filled in from the
- * worktop height rather than asked for, and the two can never disagree.
+ * One field only: the worktop height along the runs, which the workshop
+ * decides. The block matters, not just the field — the two other heights a
+ * kitchen carries are both questions the customer answers, the wall on the
+ * measurements block (`isWallHeight`) and the island's own on the îlot block
+ * (`isIlotHeight`).
  *
- * Still seeded into `configState` after being hidden, never dropped: an island
- * is often billed on a per-m² formula that multiplies by its height, and
- * `ilotSurchargeCents` bills nothing at all when a dimension it needs is
- * missing. Hiding the field without seeding it would quietly zero the island.
+ * Still seeded into `configState` after being hidden, never dropped: it is
+ * what the island opens on and what the recap prints, and an island billed on
+ * a per-m² formula that multiplies by a height bills nothing at all when that
+ * height is missing.
  */
 export function hiddenHeight(
   field: ConfigBlockField,
   blockType: string | undefined,
   isKitchen: boolean,
-): "wall" | "worktop" | null {
+): "worktop" | null {
   // Kitchens only, and `isKitchen` is required rather than defaulted so the
   // compiler makes every call site answer the question. Outside a kitchen there
   // is no ceiling and no worktop, so nothing here applies: a `height` role is
@@ -71,13 +102,85 @@ export function hiddenHeight(
   // tags its "Profondeur" that way — hiding it silently billed the sofa at
   // 2,10 m deep, which is where this guard comes from.
   if (!isKitchen) return null;
-  const label = norm(field.label);
-  if (blockType === "ilot") {
-    return field.priceRole === "height" || label.startsWith("hauteur") ? "worktop" : null;
-  }
-  if (field.priceRole === "height") return "wall";
-  if (label.includes("plan de travail")) return "worktop";
+  if (blockType === "ilot") return null;
+  return norm(field.label).includes("plan de travail") ? "worktop" : null;
+}
+
+/**
+ * Whether this field is the kitchen's wall height — the one measurement that
+ * multiplies every run, and so the one the price is most sensitive to.
+ *
+ * Kitchens only, and the measurements block only. A `height` role elsewhere is
+ * an ordinary measurement: the îlot's is the island worktop (hidden above),
+ * and outside a kitchen there is no ceiling at all — CANAPÉ MONACO tags its
+ * "Profondeur" that way, and it must keep its own bounds.
+ */
+export function isWallHeight(
+  field: ConfigBlockField,
+  blockType: string | undefined,
+  isKitchen: boolean,
+): boolean {
+  return isKitchen && blockType === "measurements" && field.priceRole === "height";
+}
+
+/**
+ * Whether this field is the island's height.
+ *
+ * Tagged or simply named: the live blocks leave the îlot's fields untagged —
+ * nothing on that block feeds the product's own surface — so the label is what
+ * identifies it, exactly as the length and the width are identified in
+ * `kitchenConfigFrom`.
+ */
+export function isIlotHeight(
+  field: ConfigBlockField,
+  blockType: string | undefined,
+  isKitchen: boolean,
+): boolean {
+  if (!isKitchen || blockType !== "ilot") return false;
+  return field.priceRole === "height" || norm(field.label).startsWith("hauteur");
+}
+
+/**
+ * The value a height opens on when the customer has not answered it yet.
+ *
+ * `null` for every other measurement: a length is asked for empty, and a ruler
+ * that arrives pre-filled at a plausible number is a number the customer never
+ * checks. Only the heights get one, because each has a standard that is right
+ * far more often than not.
+ */
+export function seededHeightCm(
+  field: ConfigBlockField,
+  blockType: string | undefined,
+  isKitchen: boolean,
+): number | null {
+  const hidden = hiddenHeight(field, blockType, isKitchen);
+  if (hidden) return FIXED_HEIGHTS_CM[hidden];
+  if (isWallHeight(field, blockType, isKitchen)) return WALL_HEIGHT_CM.default;
+  if (isIlotHeight(field, blockType, isKitchen)) return ILOT_HEIGHT_CM.default;
   return null;
+}
+
+/**
+ * The bounds a measurement's ruler moves between.
+ *
+ * Whatever the back office set, except that the two heights the customer
+ * answers fall back to something buildable rather than to the ruler's own
+ * 0–1000. The wall height is the cote the m² price is multiplied by and the
+ * live blocks give it a max but no min; the island's decides a worktop nobody
+ * can cook on at 30 cm.
+ */
+export function measureBoundsCm(
+  field: ConfigBlockField,
+  blockType: string | undefined,
+  isKitchen: boolean,
+): { min?: number; max?: number } {
+  const fallback = isWallHeight(field, blockType, isKitchen)
+    ? WALL_HEIGHT_CM
+    : isIlotHeight(field, blockType, isKitchen)
+      ? ILOT_HEIGHT_CM
+      : null;
+  if (!fallback) return { min: field.min, max: field.max };
+  return { min: field.min ?? fallback.min, max: field.max ?? fallback.max };
 }
 
 /**
@@ -85,8 +188,8 @@ export function hiddenHeight(
  *
  * A straight kitchen has one wall, so asking for the second and third run is
  * noise the customer has to ignore — and filling them in would bill walls that
- * don't exist. Untagged fields (worktop height) and the wall height are always
- * asked; run fields appear as the shape earns them.
+ * don't exist. The wall height and any untagged field are always asked; run
+ * fields appear as the shape earns them.
  */
 export function visibleFields(
   block: ConfigBlock,
@@ -98,6 +201,12 @@ export function visibleFields(
   const fields = (block.fields ?? []).filter(
     (f) => !hiddenHeight(f, block.type, opts.isKitchen),
   );
+  // The island is asked for height first, so both measurement steps open on
+  // the same question — the mesures block already leads with the wall height.
+  // Ordering only, and only here: the back office keeps its own order for
+  // everything else, and nothing downstream reads these by position.
+  const height = fields.findIndex((f) => isIlotHeight(f, block.type, opts.isKitchen));
+  if (height > 0) fields.unshift(...fields.splice(height, 1));
   if (!opts.byShape) return fields;
   return fields.filter((f) => {
     const idx = RUN_ROLES.indexOf(f.priceRole as (typeof RUN_ROLES)[number]);

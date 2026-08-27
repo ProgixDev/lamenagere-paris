@@ -315,6 +315,12 @@ export interface KitchenConfig {
   /** The island exactly as measured, when the îlot block asked for it. */
   ilotLengthCm?: number;
   ilotWidthCm?: number;
+  /**
+   * Floor to the top of the island. Defaults to the worktop height, so an
+   * island the customer leaves alone matches the runs; a breakfast bar they
+   * raise is drawn raised, with the stools following it.
+   */
+  ilotHeightCm?: number;
   /** "Crédence sur le mur" — the customer can decline it. */
   credence?: boolean;
   /** Which corner the kitchen occupies: quarter turns clockwise, 0–3. */

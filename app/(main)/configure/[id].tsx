@@ -41,11 +41,11 @@ import {
 } from "../../../lib/config-blocks";
 import {
   buildSteps,
-  FIXED_HEIGHTS_CM,
-  hiddenHeight,
   isKitchenCategory,
+  measureBoundsCm,
   PRODUCT_COLOR_BLOCK_ID,
   runsOfShape,
+  seededHeightCm,
   stepCopy,
   visibleFields,
   type Step,
@@ -178,23 +178,29 @@ export default function ConfigureScreen() {
   );
 
   /**
-   * Fills in the heights the customer is never shown.
+   * Fills in the heights the customer isn't going to type.
    *
-   * They are hidden from every screen, but the wall height is what a per-m²
-   * kitchen is billed on and both belong in the recap — so they are written
-   * into the same state an answer would have gone to, not special-cased
-   * downstream. Existing values are left alone, so an order placed before this
-   * keeps whatever it was quoted on.
+   * Two different reasons, one mechanism. The worktop height along the runs is
+   * never shown at all, yet still belongs in the recap and still bills an
+   * island — leaving it blank would quietly zero one. The wall height and the
+   * island's *are* shown, and are only pre-filled: they open on the standard
+   * 2,10 m and 90 cm, so a customer who has never measured their ceiling still
+   * sees a price and an island that matches their runs, and can move either.
+   *
+   * Either way the value goes into the same state an answer would have gone
+   * to, never special-cased downstream. Existing values are left alone, so an
+   * order placed before this keeps whatever it was quoted on.
    */
   useEffect(() => {
     const seed: ConfigState = {};
     for (const block of blocks) {
-      // The îlot block too: its height is hidden and filled from the worktop,
-      // and leaving it blank would bill the island at zero on a per-m² formula.
+      // The îlot block too: it carries the island's own height, and an island
+      // billed per m² on a formula that multiplies by one bills nothing while
+      // it is blank.
       if (block.type !== "measurements" && block.type !== "ilot") continue;
       for (const field of block.fields ?? []) {
-        const kind = hiddenHeight(field, block.type, isKitchen);
-        if (!kind) continue;
+        const value = seededHeightCm(field, block.type, isKitchen);
+        if (value == null) continue;
         const current = configState[block.id]?.measurements?.[field.key];
         if (current != null && current !== "") continue;
         seed[block.id] = {
@@ -202,7 +208,7 @@ export default function ConfigureScreen() {
           measurements: {
             ...configState[block.id]?.measurements,
             ...seed[block.id]?.measurements,
-            [field.key]: String(FIXED_HEIGHTS_CM[kind]),
+            [field.key]: String(value),
           },
         };
       }
@@ -506,15 +512,16 @@ export default function ConfigureScreen() {
       visibleFields(b, { byShape, runs, isKitchen }).map((f) => {
         const raw = configState[b.id]?.measurements?.[f.key];
         const value = raw != null && raw !== "" ? parseFloat(raw) : undefined;
+        const bounds = measureBoundsCm(f, b.type, isKitchen);
         return {
           blockId: b.id,
           key: f.key,
           label: f.label,
-          min: f.min ?? 40,
-          max: f.max ?? 800,
+          min: bounds.min ?? 40,
+          max: bounds.max ?? 800,
           // Wall lengths move in 10 cm; heights are a finer decision, and
           // 10 cm steps would step straight over a 95 cm worktop.
-          step: (f.max ?? 800) >= 400 ? 10 : 5,
+          step: (bounds.max ?? 800) >= 400 ? 10 : 5,
           value: Number.isFinite(value) ? (value as number) : undefined,
         };
       }),
@@ -764,13 +771,14 @@ export default function ConfigureScreen() {
               </View>
               {visibleFields(step.block, { byShape, runs, isKitchen }).map((f, i) => {
                 const blockId = step.block.id;
+                const bounds = measureBoundsCm(f, step.block.type, isKitchen);
                 return (
                   <Animated.View key={f.key} entering={reduceMotion ? undefined : FadeInDown.delay(i * 50).springify()}>
                     <RulerPicker
                       label={f.label}
                       value={configState[blockId]?.measurements?.[f.key] ?? ""}
-                      min={f.min}
-                      max={f.max}
+                      min={bounds.min}
+                      max={bounds.max}
                       unit={f.unit ?? "cm"}
                       onChange={(t) =>
                         setConfigState((s) => ({
@@ -900,13 +908,14 @@ export default function ConfigureScreen() {
               {ilotOn &&
                 visibleFields(step.block, { byShape: false, runs: 0, isKitchen }).map((f, i) => {
                   const blockId = step.block.id;
+                  const bounds = measureBoundsCm(f, step.block.type, isKitchen);
                   return (
                     <Animated.View key={f.key} entering={reduceMotion ? undefined : FadeInDown.delay(i * 50).springify()}>
                       <RulerPicker
                         label={f.label}
                         value={configState[blockId]?.measurements?.[f.key] ?? ""}
-                        min={f.min}
-                        max={f.max}
+                        min={bounds.min}
+                        max={bounds.max}
                         unit={f.unit ?? "cm"}
                         onChange={(t) =>
                           setConfigState((s) => ({

@@ -79,10 +79,11 @@ export function kitchenConfigFrom(
         config.ilotLengthCm = value;
       } else if (field.dimensionKey === "width" || label.includes("largeur")) {
         config.ilotWidthCm = value;
+      } else if (field.priceRole === "height" || label.startsWith("hauteur")) {
+        // The island's own height — pre-filled at the worktop height, so this
+        // only differs from the runs when the customer moved it themselves.
+        config.ilotHeightCm = value;
       }
-      // A height on the îlot block is deliberately not read: the island is
-      // built to the kitchen's worktop height. The field is still seeded and
-      // still priced — see hiddenHeight() — it just no longer drives geometry.
     }
   }
 

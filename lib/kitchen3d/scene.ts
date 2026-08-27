@@ -769,15 +769,14 @@ export function buildScene(config: KitchenConfig): KitchenScene {
       depthM: ilotD,
       rotationQuarters: ilotQuarters,
       /**
-       * The island is built to the same worktop height as the runs.
+       * The island's own worktop height, falling back to the runs'.
        *
-       * Not "defaults to" — it *is* the same number. The island used to carry
-       * its own measurement, on the reasoning that a breakfast bar is often
-       * ordered higher; in practice it meant two heights that could drift, and
-       * a question the customer had to answer about a surface that should
-       * simply match the rest of their kitchen.
+       * The îlot block asks for it once the customer has taken an island, and
+       * the question opens pre-filled at the worktop height — so an island
+       * left alone still *is* the same number as the runs, and the two only
+       * differ when someone deliberately ordered a breakfast bar higher.
        */
-      topM: worktopTopM,
+      topM: cmOrNull(config.ilotHeightCm) ?? worktopTopM,
       x: (xMin + xMax) / 2,
       z: (zMin + zMax) / 2,
       tight:
