@@ -12,6 +12,9 @@ import Stripe from 'stripe';
 import type { Stripe as StripeNs } from 'stripe/cjs/stripe.core.js';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { ActivityService } from '../../common/activity/activity.service';
+import { OrdersService } from '../orders/orders.service';
+import { CreateOrderDto } from '../orders/dto/create-order.dto';
+import { OrderDto } from '../orders/orders.serializer';
 import {
   advanceDispute,
   advanceSettlement,
@@ -94,6 +97,7 @@ export class PaymentsService implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly supabase: SupabaseService,
     private readonly activity: ActivityService,
+    private readonly orders: OrdersService,
   ) {}
 
   onModuleInit() {
@@ -207,6 +211,89 @@ export class PaymentsService implements OnModuleInit {
     // Anything else (processing, requires_action, canceled…) leaves the order
     // pending; the webhook will reconcile the final state.
     return { status: 'pending' };
+  }
+
+  /**
+   * Prices the cart and creates a Stripe PaymentIntent for it, staging the
+   * cart as an `order_drafts` row instead of a real `orders` row. Unlike
+   * `createIntent`, there is no "reuse an existing intent" branch: each call
+   * prices and stages a brand-new draft, since there is no prior order to
+   * retry against. A retry within the same checkout attempt is handled
+   * entirely client-side (re-presenting the already-initialized sheet).
+   */
+  async createIntentDraft(
+    userId: string,
+    dto: CreateOrderDto,
+    isB2b: boolean,
+  ): Promise<{ clientSecret: string | null; draftId: string }> {
+    const { draftId, clientAmountCents } = await this.orders.createDraft(
+      userId,
+      dto,
+      isB2b,
+    );
+
+    const intent = await this.stripe.paymentIntents.create({
+      amount: clientAmountCents,
+      currency: 'eur',
+      metadata: { draftId },
+      automatic_payment_methods: { enabled: true },
+    });
+
+    await this.supabase.client
+      .from('order_drafts')
+      .update({ stripe_payment_intent_id: intent.id })
+      .eq('id', draftId);
+
+    return { clientSecret: intent.client_secret, draftId };
+  }
+
+  /**
+   * Server-side reconciliation right after the client's Payment Sheet reports
+   * success, for the deferred-order-creation flow. Re-verifies the
+   * PaymentIntent with Stripe (never trusts the client) and only then turns
+   * the draft into a real, paid order. The webhook is the backstop if this
+   * never runs (app killed right after payment).
+   */
+  async confirmDraft(
+    userId: string,
+    draftId: string,
+  ): Promise<{ status: 'paid'; order: OrderDto } | { status: 'pending' }> {
+    const { data: draft } = await this.supabase.client
+      .from('order_drafts')
+      .select('id, profile_id, order_id, stripe_payment_intent_id')
+      .eq('id', draftId)
+      .maybeSingle<{
+        id: string;
+        profile_id: string;
+        order_id: string | null;
+        stripe_payment_intent_id: string | null;
+      }>();
+
+    if (!draft || draft.profile_id !== userId) {
+      throw new NotFoundException('Commande introuvable');
+    }
+
+    if (!draft.order_id) {
+      if (!draft.stripe_payment_intent_id) {
+        throw new BadRequestException('Aucun paiement à confirmer');
+      }
+      let intent: StripeNs.PaymentIntent;
+      try {
+        intent = await this.stripe.paymentIntents.retrieve(
+          draft.stripe_payment_intent_id,
+        );
+      } catch (err) {
+        if (!isResourceMissing(err)) throw err;
+        this.logger.warn(
+          `Cannot confirm draft ${draftId}: PaymentIntent ${draft.stripe_payment_intent_id} not found.`,
+        );
+        return { status: 'pending' };
+      }
+      if (intent.status !== 'succeeded') return { status: 'pending' };
+    }
+
+    const order = await this.orders.finalizeDraft(draftId);
+    return order ? { status: 'paid', order } : { status: 'pending' };
   }
 
   /**
@@ -492,6 +579,34 @@ export class PaymentsService implements OnModuleInit {
       : await this.findOrder({ intentId: intent.id, chargeId });
 
     if (!order) {
+      // No order exists yet — expected under the deferred-creation flow when
+      // this event arrives before the client's own confirm-draft call could
+      // run (e.g. the app was killed right after the Payment Sheet closed).
+      // If the intent carries a draftId, finalize it here as the backstop. A
+      // failed intent must never produce an order.
+      const draftId = intent.metadata?.draftId;
+      if (status === 'paid' && draftId) {
+        try {
+          const finalized = await this.orders.finalizeDraft(draftId);
+          await this.noteEventOutcome(
+            eventId,
+            finalized
+              ? `draft ${draftId} finalized -> order ${finalized.id}`
+              : `draft ${draftId} finalize still pending`,
+            finalized?.id,
+          );
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          this.logger.error(
+            `Could not finalize draft ${draftId} from webhook: ${message}`,
+          );
+          await this.noteEventOutcome(
+            eventId,
+            `draft finalize failed: ${message}`.slice(0, 300),
+          );
+        }
+        return;
+      }
       this.logger.warn(
         `No order for PaymentIntent ${intent.id}; event ${eventId} ignored.`,
       );

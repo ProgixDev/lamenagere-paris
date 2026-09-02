@@ -157,6 +157,7 @@ export function sanitizeLayout(raw: unknown): ConfiguredLayout | null {
 }
 import { TicketsService } from '../tickets/tickets.service';
 import { PromoService, PromoCodeRow } from '../promo/promo.service';
+import { OrderAttachmentDto } from './dto/create-order.dto';
 
 interface AddressRowFull {
   id: string;
@@ -203,6 +204,66 @@ interface QuoteForOrder {
   product_image: string | null;
   quoted_price_cents: number | null;
   status: string;
+}
+
+interface PricedOrderItem {
+  product_id: string | null;
+  product_name: string;
+  product_image: string | null;
+  quantity: number;
+  unit_price_cents: number;
+  custom_width: number | null;
+  custom_height: number | null;
+  custom_length: number | null;
+  custom_left: number | null;
+  custom_back: number | null;
+  custom_right: number | null;
+  quality_tier: string | null;
+  configuration: unknown[];
+}
+
+/**
+ * Everything `finalizeDraft()` needs to insert the order, frozen at the
+ * moment the customer opened the Payment Sheet. Finalizing replays this
+ * verbatim rather than re-pricing, so `orders.total_cents` always matches
+ * what Stripe actually captured — re-pricing at confirm time could drift (a
+ * catalogue price or a promo's redemption cap can change while the sheet is
+ * open) and there is no way to correct what Stripe already charged.
+ */
+interface PricedOrder {
+  ship: {
+    first_name: string;
+    last_name: string;
+    street: string;
+    postal_code: string;
+    city: string;
+    country: string;
+    phone: string | null;
+    territory: ShippingZone;
+  };
+  territory: ShippingZone;
+  shippingMethod: string;
+  itemRows: PricedOrderItem[];
+  subtotal: number;
+  shippingCost: number;
+  promoCode: string | null;
+  promoCodeId: string | null;
+  discountCents: number;
+  vatRateBp: number;
+  vatAmount: number;
+  total: number;
+  estimatedDelivery: string;
+  customerNote: string | null;
+  customerAttachments: OrderAttachmentDto[];
+  quoteIds: string[];
+}
+
+interface OrderDraftRow {
+  id: string;
+  profile_id: string;
+  is_b2b: boolean;
+  payload: { priced: PricedOrder };
+  order_id: string | null;
 }
 
 @Injectable()
@@ -296,11 +357,16 @@ export class OrdersService {
     await this.supabase.client.from('orders').delete().eq('id', id);
   }
 
-  async create(
+  /**
+   * Prices and validates a cart server-side, with no side effects (all reads,
+   * no writes) so it's safe to call speculatively before any payment exists.
+   * The result is frozen into an `order_drafts` row by `createDraft()` and
+   * replayed verbatim by `finalizeDraft()` once payment succeeds.
+   */
+  private async priceOrder(
     userId: string,
     dto: CreateOrderDto,
-    isB2b: boolean,
-  ): Promise<OrderDto> {
+  ): Promise<PricedOrder> {
     if (dto.items.length === 0) {
       throw new BadRequestException('Le panier est vide');
     }
@@ -552,97 +618,216 @@ export class OrdersService {
     const vatAmount = vatCentsFor(taxableBase, vatRateBp);
     const total = taxableBase + vatAmount;
 
-    // 4. Atomic order number.
-    const year = new Date().getFullYear();
-    const { data: seq } = await this.supabase.client.rpc('next_counter', {
-      p_scope: `order:${year}`,
-    });
-    const orderNumber = `LMP-${year}-${String(seq ?? 1).padStart(5, '0')}`;
-
     const estimatedDelivery = isOverseas(territory)
       ? zoneFee?.delay ?? '8-12 semaines'
       : zoneFee?.delay ?? '2-3 semaines';
 
-    // 5. Insert order.
-    const { data: order, error } = await this.supabase.client
-      .from('orders')
-      .insert({
-        order_number: orderNumber,
-        profile_id: userId,
-        status: 'commande_confirmee',
-        subtotal_cents: subtotal,
-        shipping_cost_cents: shippingCost,
-        discount_cents: discountCents,
-        promo_code: promoRow?.code ?? null,
-        promo_code_id: promoRow?.id ?? null,
-        total_cents: total,
-        vat_rate_bp: vatRateBp,
-        vat_cents: vatAmount,
-        vat_exemption_note: vatExemptionNoteFor(vatRateBp),
-        territory,
-        shipping_method: dto.shippingMethod,
-        estimated_delivery: estimatedDelivery,
-        ship_first_name: ship.first_name,
-        ship_last_name: ship.last_name,
-        ship_street: ship.street,
-        ship_postal_code: ship.postal_code,
-        ship_city: ship.city,
-        ship_country: ship.country,
-        ship_territory: ship.territory,
-        ship_phone: ship.phone,
-        is_b2b: isB2b,
-        customer_note: dto.customerNote?.trim() || null,
-        customer_attachments: dto.customerAttachments ?? [],
-      })
+    return {
+      ship,
+      territory,
+      shippingMethod: dto.shippingMethod,
+      itemRows,
+      subtotal,
+      shippingCost,
+      promoCode: promoRow?.code ?? null,
+      promoCodeId: promoRow?.id ?? null,
+      discountCents,
+      vatRateBp,
+      vatAmount,
+      total,
+      estimatedDelivery,
+      customerNote: dto.customerNote?.trim() || null,
+      customerAttachments: dto.customerAttachments ?? [],
+      quoteIds,
+    };
+  }
+
+  /**
+   * Prices a cart and stages it as a draft — no `orders` row is written yet.
+   * Called right before the Stripe PaymentIntent is created, so an abandoned
+   * checkout leaves only this draft behind (never visible to the admin
+   * dashboard, which only ever reads `orders`) instead of a real order.
+   */
+  async createDraft(
+    userId: string,
+    dto: CreateOrderDto,
+    isB2b: boolean,
+  ): Promise<{ draftId: string; clientAmountCents: number }> {
+    const priced = await this.priceOrder(userId, dto);
+    const { data: draft, error } = await this.supabase.client
+      .from('order_drafts')
+      .insert({ profile_id: userId, is_b2b: isB2b, payload: { priced } })
       .select('id')
       .single<{ id: string }>();
-    if (error || !order) {
+    if (error || !draft) {
       throw new BadRequestException(
-        error?.message ?? 'Création de la commande impossible',
+        error?.message ?? 'Impossible de préparer la commande',
       );
     }
+    return { draftId: draft.id, clientAmountCents: priced.total };
+  }
 
-    // 6. Items + initial timeline.
-    await this.supabase.client
-      .from('order_items')
-      .insert(itemRows.map((r) => ({ ...r, order_id: order.id })));
-    await this.supabase.client.from('order_timeline').insert({
-      order_id: order.id,
-      status: 'commande_confirmee',
-      label: orderStatusLabel('commande_confirmee'),
-      completed: true,
-      occurred_at: new Date().toISOString(),
-    });
+  /**
+   * Turns a draft into a real, paid order. Only ever called once Stripe has
+   * confirmed the payment succeeded — either by the client's own confirm call
+   * right after the Payment Sheet closes, or by the webhook as a backstop if
+   * the app never got to make that call (e.g. killed right after payment).
+   *
+   * Idempotent and race-safe: `claimed_at` is an atomic claim (`UPDATE ...
+   * WHERE claimed_at IS NULL`) so if both callers race for the same draft,
+   * exactly one of them finalizes it; the loser polls briefly for the
+   * winner's `order_id` instead of creating a duplicate order.
+   */
+  async finalizeDraft(draftId: string): Promise<OrderDto | null> {
+    const { data: draft } = await this.supabase.client
+      .from('order_drafts')
+      .select('id, profile_id, is_b2b, payload, order_id')
+      .eq('id', draftId)
+      .maybeSingle<OrderDraftRow>();
+    if (!draft) throw new NotFoundException('Commande introuvable');
+    if (draft.order_id) return this.findOne(draft.profile_id, draft.order_id);
 
-    // 6b. Log the promo redemption (per-customer cap + global counter).
-    //     Best-effort: the order is already committed, so a failure here must
-    //     not fail the checkout.
-    if (promoRow && discountCents > 0) {
-      try {
-        await this.promo.recordRedemption(
-          promoRow,
-          userId,
-          order.id,
-          discountCents,
-        );
-      } catch {
-        // ignore — redemption logging must not block a placed order
+    const { data: claimed } = await this.supabase.client
+      .from('order_drafts')
+      .update({ claimed_at: new Date().toISOString() })
+      .eq('id', draftId)
+      .is('claimed_at', null)
+      .select('id')
+      .maybeSingle<{ id: string }>();
+
+    if (!claimed) {
+      // Another caller (client confirm vs. webhook) is finalizing this draft
+      // right now — wait for it rather than racing a duplicate order.
+      for (let i = 0; i < 8; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const { data: row } = await this.supabase.client
+          .from('order_drafts')
+          .select('order_id')
+          .eq('id', draftId)
+          .maybeSingle<{ order_id: string | null }>();
+        if (row?.order_id) return this.findOne(draft.profile_id, row.order_id);
       }
+      return null;
     }
 
-    // 7. Mark any consumed devis as accepted so they can't be re-ordered.
-    if (quoteIds.length) {
+    try {
+      const { priced } = draft.payload;
+      const userId = draft.profile_id;
+
+      // 4. Atomic order number.
+      const year = new Date().getFullYear();
+      const { data: seq } = await this.supabase.client.rpc('next_counter', {
+        p_scope: `order:${year}`,
+      });
+      const orderNumber = `LMP-${year}-${String(seq ?? 1).padStart(5, '0')}`;
+
+      // 5. Insert order — already paid, since finalizing only ever runs after
+      //    Stripe confirms the charge succeeded.
+      const { data: order, error } = await this.supabase.client
+        .from('orders')
+        .insert({
+          order_number: orderNumber,
+          profile_id: userId,
+          status: 'commande_confirmee',
+          payment_status: 'paid',
+          subtotal_cents: priced.subtotal,
+          shipping_cost_cents: priced.shippingCost,
+          discount_cents: priced.discountCents,
+          promo_code: priced.promoCode,
+          promo_code_id: priced.promoCodeId,
+          total_cents: priced.total,
+          vat_rate_bp: priced.vatRateBp,
+          vat_cents: priced.vatAmount,
+          vat_exemption_note: vatExemptionNoteFor(priced.vatRateBp),
+          territory: priced.territory,
+          shipping_method: priced.shippingMethod,
+          estimated_delivery: priced.estimatedDelivery,
+          ship_first_name: priced.ship.first_name,
+          ship_last_name: priced.ship.last_name,
+          ship_street: priced.ship.street,
+          ship_postal_code: priced.ship.postal_code,
+          ship_city: priced.ship.city,
+          ship_country: priced.ship.country,
+          ship_territory: priced.ship.territory,
+          ship_phone: priced.ship.phone,
+          is_b2b: draft.is_b2b,
+          customer_note: priced.customerNote,
+          customer_attachments: priced.customerAttachments,
+        })
+        .select('id')
+        .single<{ id: string }>();
+      if (error || !order) {
+        throw new BadRequestException(
+          error?.message ?? 'Création de la commande impossible',
+        );
+      }
+
+      // 6. Items + initial timeline.
       await this.supabase.client
-        .from('quotes')
-        .update({ status: 'devis_accepte', decided_at: new Date().toISOString() })
-        .in('id', quoteIds)
-        .eq('profile_id', userId);
+        .from('order_items')
+        .insert(priced.itemRows.map((r) => ({ ...r, order_id: order.id })));
+      await this.supabase.client.from('order_timeline').insert({
+        order_id: order.id,
+        status: 'commande_confirmee',
+        label: orderStatusLabel('commande_confirmee'),
+        completed: true,
+        occurred_at: new Date().toISOString(),
+      });
+
+      // 6b. Log the promo redemption (per-customer cap + global counter).
+      //     Best-effort: the order is already committed, so a failure here
+      //     must not fail the checkout. The promo row is re-fetched fresh
+      //     rather than reused from the frozen snapshot, so the increment
+      //     isn't based on a `times_redeemed` that may be stale by the time
+      //     payment actually completes.
+      if (priced.promoCodeId && priced.discountCents > 0) {
+        try {
+          const { data: freshPromo } = await this.supabase.client
+            .from('promo_codes')
+            .select('*')
+            .eq('id', priced.promoCodeId)
+            .maybeSingle<PromoCodeRow>();
+          if (freshPromo) {
+            await this.promo.recordRedemption(
+              freshPromo,
+              userId,
+              order.id,
+              priced.discountCents,
+            );
+          }
+        } catch {
+          // ignore — redemption logging must not block a placed order
+        }
+      }
+
+      // 7. Mark any consumed devis as accepted so they can't be re-ordered.
+      if (priced.quoteIds.length) {
+        await this.supabase.client
+          .from('quotes')
+          .update({ status: 'devis_accepte', decided_at: new Date().toISOString() })
+          .in('id', priced.quoteIds)
+          .eq('profile_id', userId);
+      }
+
+      // 8. Profile aggregates.
+      await this.bumpProfileAggregates(userId, priced.total);
+
+      await this.supabase.client
+        .from('order_drafts')
+        .update({ order_id: order.id })
+        .eq('id', draftId);
+
+      return this.findOne(userId, order.id);
+    } catch (err) {
+      // Release the claim so a retry (client confirm or the webhook) can
+      // attempt finalizing again instead of the draft being stuck forever.
+      await this.supabase.client
+        .from('order_drafts')
+        .update({ claimed_at: null })
+        .eq('id', draftId)
+        .is('order_id', null);
+      throw err;
     }
-
-    // 8. Profile aggregates.
-    await this.bumpProfileAggregates(userId, total);
-
-    return this.findOne(userId, order.id);
   }
 
   private async loadOwned(userId: string, id: string): Promise<OrderRow> {

@@ -1,6 +1,5 @@
-import type { AreaDimensions } from "../../lib/area-formulas";
 import { apiClient } from "../../lib/api";
-import type { Order, ItemConfiguration } from "../../lib/types";
+import type { Order } from "../../lib/types";
 import type { TrackingInfo } from "./types";
 
 export const getOrdersApi = async (): Promise<Order[]> => {
@@ -10,35 +9,6 @@ export const getOrdersApi = async (): Promise<Order[]> => {
 
 export const getOrderByIdApi = async (orderId: string): Promise<Order> => {
   const { data } = await apiClient.get<Order>(`/orders/${orderId}`);
-  return data;
-};
-
-export const createOrderApi = async (payload: {
-  items: {
-    productId: string;
-    quantity: number;
-    customDimensions?: AreaDimensions;
-    qualityTier?: string;
-    configuration?: ItemConfiguration;
-    quoteId?: string;
-  }[];
-  shippingAddressId?: string;
-  shippingAddress?: {
-    firstName: string;
-    lastName: string;
-    street: string;
-    postalCode: string;
-    city: string;
-    phone?: string;
-    territory?: string;
-  };
-  shippingMethod: string;
-  territory?: string;
-  promoCode?: string;
-  customerNote?: string;
-  customerAttachments?: { url: string; type: "image" | "video" }[];
-}): Promise<Order> => {
-  const { data } = await apiClient.post<Order>("/orders", payload);
   return data;
 };
 

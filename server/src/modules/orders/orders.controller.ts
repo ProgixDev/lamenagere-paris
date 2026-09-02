@@ -9,7 +9,6 @@ import {
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { AuthUser } from '../../common/auth/auth-user';
 import { OrdersService } from './orders.service';
-import { CreateOrderDto } from './dto/create-order.dto';
 import { RequestRefundDto } from './dto/request-refund.dto';
 
 @Controller('orders')
@@ -19,11 +18,6 @@ export class OrdersController {
   @Get()
   list(@CurrentUser() user: AuthUser) {
     return this.orders.list(user.id);
-  }
-
-  @Post()
-  create(@CurrentUser() user: AuthUser, @Body() dto: CreateOrderDto) {
-    return this.orders.create(user.id, dto, user.accountType === 'professionnel');
   }
 
   @Get(':id')

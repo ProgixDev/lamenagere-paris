@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useNavigation } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { useStripe } from "@stripe/stripe-react-native";
@@ -23,15 +23,14 @@ import { computeTotals } from "../../../lib/vat";
 import Button from "../../../components/ui/Button";
 import CheckoutSteps from "../../../components/cart/CheckoutSteps";
 import { useCart } from "../../../features/cart/hooks";
-import { createOrderApi } from "../../../features/orders/api";
 import {
   pickMessageMedia,
   uploadMessageMedia,
   type Attachment,
 } from "../../../features/messaging/upload";
 import {
-  createPaymentIntentApi,
-  confirmPaymentApi,
+  createIntentDraftApi,
+  confirmDraftApi,
 } from "../../../features/payments/api";
 import { useCheckoutStore } from "../../../features/checkout/store";
 import { useShippingOptions } from "../../../features/shipping/hooks";
@@ -40,6 +39,7 @@ import { isStripeAvailable } from "../../../components/StripeGate";
 
 export default function CheckoutPaymentScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const queryClient = useQueryClient();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const { items, subtotal, clearCart } = useCart();
@@ -110,6 +110,29 @@ export default function CheckoutPaymentScreen() {
     setPromoError(null);
   };
 
+  // Guards the header back button, Android hardware back, and iOS swipe-back
+  // alike while a payment attempt is in flight, so the customer doesn't lose
+  // track of an in-progress payment by leaving the screen unintentionally.
+  useEffect(() => {
+    const sub = navigation.addListener("beforeRemove", (e) => {
+      if (!loading) return;
+      e.preventDefault();
+      Alert.alert(
+        "Quitter le paiement ?",
+        "Un paiement est en cours. Si vous quittez maintenant, il pourrait rester incomplet.",
+        [
+          { text: "Rester", style: "cancel" },
+          {
+            text: "Quitter",
+            style: "destructive",
+            onPress: () => navigation.dispatch(e.data.action),
+          },
+        ],
+      );
+    });
+    return sub;
+  }, [navigation, loading]);
+
   const handlePickAttachment = async () => {
     if (uploading || loading) return;
     const asset = await pickMessageMedia();
@@ -142,8 +165,10 @@ export default function CheckoutPaymentScreen() {
     }
     setLoading(true);
     try {
-      // 1. Create the order (treated as pending payment) to obtain its id.
-      const order = await createOrderApi({
+      // 1. Price the cart and create the Stripe PaymentIntent for it. Nothing
+      // is written to `orders` yet — the cart is staged as a draft, so an
+      // abandoned checkout never reaches the admin dashboard.
+      const { clientSecret, draftId } = await createIntentDraftApi({
         items: items.map((item) => ({
           productId: item.product.id,
           quantity: item.quantity,
@@ -160,10 +185,7 @@ export default function CheckoutPaymentScreen() {
         customerAttachments: attachments.length ? attachments : undefined,
       });
 
-      // 2. Create the Stripe PaymentIntent for that order.
-      const { clientSecret } = await createPaymentIntentApi(order.id);
-
-      // 3. Initialize the Payment Sheet (Stripe collects card details itself).
+      // 2. Initialize the Payment Sheet (Stripe collects card details itself).
       const { error: initError } = await initPaymentSheet({
         merchantDisplayName: "La Ménagère Paris",
         paymentIntentClientSecret: clientSecret,
@@ -180,12 +202,29 @@ export default function CheckoutPaymentScreen() {
         return;
       }
 
-      // 4. Present the Payment Sheet and let the user pay.
+      // 3. Present the Payment Sheet and let the user pay.
       const { error: presentError } = await presentPaymentSheet();
       if (presentError) {
-        // User cancelled or the payment failed. Leave the order unpaid so they
-        // can retry; do NOT clear the cart.
-        if (presentError.code !== "Canceled") {
+        if (presentError.code === "Canceled") {
+          // Nothing was ever written to `orders` — the draft above is simply
+          // abandoned and never shows up anywhere. Let the customer choose
+          // to try again (by tapping "Payer" once more — never re-present the
+          // same sheet programmatically, stripe-react-native can open a
+          // second, stuck sheet: https://github.com/stripe/stripe-react-native/issues/1635)
+          // or leave the payment step.
+          Alert.alert(
+            "Paiement annulé",
+            "Votre commande ne sera pas enregistrée tant que le paiement n'est pas finalisé. Vous pouvez réessayer quand vous le souhaitez.",
+            [
+              { text: "Réessayer", style: "default" },
+              {
+                text: "Quitter",
+                style: "destructive",
+                onPress: () => router.back(),
+              },
+            ],
+          );
+        } else {
           Alert.alert(
             "Paiement non abouti",
             presentError.message || "Le paiement a échoué. Réessayez.",
@@ -194,21 +233,33 @@ export default function CheckoutPaymentScreen() {
         return;
       }
 
-      // 5. Payment succeeded. Ask the server to re-verify the PaymentIntent and
-      // mark the order paid immediately. Best-effort: the charge already went
-      // through, and the webhook reconciles if this call fails, so a failure
-      // here must not block the success screen.
+      // 4. Payment succeeded. Ask the server to re-verify the PaymentIntent
+      // and turn the draft into a real order immediately. Best-effort: the
+      // charge already went through, and the webhook reconciles if this call
+      // fails or times out, so a failure here must not block the success
+      // screen (the confirmation screen degrades gracefully without an id).
+      let orderNumber: string | undefined;
+      let orderId: string | undefined;
       try {
-        await confirmPaymentApi(order.id);
+        const res = await confirmDraftApi(draftId);
+        if (res.status === "paid") {
+          orderNumber = res.order.orderNumber;
+          orderId = res.order.id;
+        }
       } catch {
-        // ignore — webhook backstop will reconcile the order status
+        // ignore — webhook backstop will finalize the draft
       }
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // Cleared before navigating: `loading` gates the back-navigation guard
+      // above, and this is our own successful navigation, not an abandonment.
+      setLoading(false);
       clearCart();
       setAppliedPromo(null);
       queryClient.invalidateQueries({ queryKey: ["orders"] });
-      setLastOrderNumber(order.orderNumber);
-      setLastOrderId(order.id);
+      if (orderNumber && orderId) {
+        setLastOrderNumber(orderNumber);
+        setLastOrderId(orderId);
+      }
       router.replace("/(main)/checkout/confirmation");
     } catch (e: any) {
       Alert.alert(
