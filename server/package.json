@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Backend API for La Ménagère Paris (NestJS + Fastify + Supabase)",
   "private": true,
+  "engines": {
+    "node": ">=22.17.0"
+  },
   "scripts": {
     "build": "nest build",
     "start": "nest start",
@@ -20,11 +23,14 @@
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.6",
     "@nestjs/platform-fastify": "^11.1.6",
+    "@sparticuz/chromium": "^149.0.0",
     "@supabase/supabase-js": "^2.49.4",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "expo-server-sdk": "^3.15.0",
     "firebase-admin": "^13.10.0",
+    "nodemailer": "^9.1.1",
+    "puppeteer-core": "^25.9.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "sharp": "^0.35.3",
@@ -37,7 +43,9 @@
     "@nestjs/testing": "^11.1.6",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.13.0",
+    "@types/nodemailer": "^8.0.1",
     "jest": "^30.2.0",
+    "puppeteer": "^25.9.0",
     "ts-jest": "^29.4.4",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
@@ -66,5 +74,8 @@
     "moduleNameMapper": {
       "^src/(.*)$": "<rootDir>/src/$1"
     }
+  },
+  "allowScripts": {
+    "puppeteer@25.9.0": true
   }
 }

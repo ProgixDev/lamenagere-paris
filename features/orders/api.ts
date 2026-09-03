@@ -35,3 +35,23 @@ export const trackOrderApi = async (
   );
   return data;
 };
+
+// A short-lived link (5 min) to the order's PDF facture — open it right away
+// (e.g. via Linking.openURL), don't store it.
+export const getInvoiceLinkApi = async (
+  orderId: string,
+): Promise<{ invoiceNumber: string; url: string }> => {
+  const { data } = await apiClient.get<{ invoiceNumber: string; url: string }>(
+    `/orders/${orderId}/invoice`,
+  );
+  return data;
+};
+
+export const emailInvoiceApi = async (
+  orderId: string,
+): Promise<{ sent: boolean; reason?: string }> => {
+  const { data } = await apiClient.post<{ sent: boolean; reason?: string }>(
+    `/orders/${orderId}/invoice/email`,
+  );
+  return data;
+};

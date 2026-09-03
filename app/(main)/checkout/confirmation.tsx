@@ -17,6 +17,7 @@ import { FONTS, TYPE, SHADOW } from "../../../lib/typography";
 import { formatDate, formatPrice } from "../../../lib/utils";
 import Button from "../../../components/ui/Button";
 import Skeleton from "../../../components/ui/Skeleton";
+import InvoiceActions from "../../../components/orders/InvoiceActions";
 import { useCheckoutStore } from "../../../features/checkout/store";
 import { useOrder } from "../../../features/orders/hooks";
 
@@ -129,7 +130,7 @@ export default function CheckoutConfirmationScreen() {
           <SuccessMark />
           <Animated.View entering={enter(240)} style={{ alignItems: "center" }}>
             <Text style={[TYPE.hero, { textAlign: "center", marginTop: 18 }]}>
-              Commande confirmée
+              Merci pour votre confiance
             </Text>
             <Text
               style={{
@@ -141,7 +142,7 @@ export default function CheckoutConfirmationScreen() {
                 marginTop: 6,
               }}
             >
-              Merci pour votre confiance.{"\n"}
+              Votre commande auprès de La Ménagère Paris est confirmée.{"\n"}
               {lastOrderNumber ? `Commande ${lastOrderNumber}` : ""}
             </Text>
           </Animated.View>
@@ -244,6 +245,21 @@ export default function CheckoutConfirmationScreen() {
           )}
         </Animated.View>
 
+        {lastOrderId ? (
+          <Animated.View
+            entering={enter(460)}
+            style={{
+              backgroundColor: COLORS.surfaceContainerLowest,
+              borderRadius: 20,
+              padding: 18,
+              marginTop: 16,
+              ...SHADOW.card,
+            }}
+          >
+            <InvoiceActions orderId={lastOrderId} />
+          </Animated.View>
+        ) : null}
+
         <Animated.View entering={enter(500)} style={{ marginTop: 24, gap: 12 }}>
           <Button label="Suivre ma commande" onPress={() => goTo("/(main)/orders")} size="lg" />
           <Button
@@ -253,18 +269,6 @@ export default function CheckoutConfirmationScreen() {
             size="lg"
           />
         </Animated.View>
-
-        <Text
-          style={{
-            fontSize: 12,
-            fontFamily: FONTS.body,
-            color: COLORS.outline,
-            textAlign: "center",
-            marginTop: 20,
-          }}
-        >
-          Un e-mail de confirmation a été envoyé à votre adresse.
-        </Text>
       </ScrollView>
     </SafeAreaView>
   );

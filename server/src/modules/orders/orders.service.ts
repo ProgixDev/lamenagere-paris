@@ -1,9 +1,11 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
+import { InvoicesService } from '../invoices/invoices.service';
 import { blockApplies, PricingService } from '../../common/pricing/pricing.service';
 import {
   isOverseas,
@@ -268,11 +270,14 @@ interface OrderDraftRow {
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private readonly supabase: SupabaseService,
     private readonly pricing: PricingService,
     private readonly tickets: TicketsService,
     private readonly promo: PromoService,
+    private readonly invoices: InvoicesService,
   ) {}
 
   async list(userId: string): Promise<OrderDto[]> {
@@ -293,6 +298,41 @@ export class OrdersService {
   async tracking(userId: string, id: string): Promise<TrackingInfo> {
     const row = await this.loadOwned(userId, id);
     return toTracking(row);
+  }
+
+  /**
+   * A short-lived link to the order's PDF facture, for the app to open
+   * directly. Generates it on the spot if it isn't there yet (defensive:
+   * normally already generated at checkout time by `finalizeDraft`) —
+   * `generateForOrder` is idempotent, so this is safe to call every time.
+   */
+  async getInvoiceLink(
+    userId: string,
+    id: string,
+  ): Promise<{ invoiceNumber: string; url: string }> {
+    const row = await this.loadOwned(userId, id);
+    if (row.payment_status !== 'paid') {
+      throw new BadRequestException("Cette commande n'a pas encore été payée");
+    }
+    await this.invoices.generateForOrder(toOrderDto(row));
+    const link = await this.invoices.getSignedUrl(id);
+    if (!link) {
+      throw new NotFoundException('Facture indisponible pour le moment');
+    }
+    return link;
+  }
+
+  /** Emails the order's facture to the customer, on their request — never automatic. */
+  async emailInvoice(
+    userId: string,
+    id: string,
+  ): Promise<{ sent: boolean; reason?: string }> {
+    const row = await this.loadOwned(userId, id);
+    if (row.payment_status !== 'paid') {
+      throw new BadRequestException("Cette commande n'a pas encore été payée");
+    }
+    await this.invoices.generateForOrder(toOrderDto(row));
+    return this.invoices.emailExistingInvoice(id);
   }
 
   /**
@@ -817,7 +857,21 @@ export class OrdersService {
         .update({ order_id: order.id })
         .eq('id', draftId);
 
-      return this.findOne(userId, order.id);
+      const finalOrder = await this.findOne(userId, order.id);
+
+      // 9. Invoice (PDF + email), best-effort: a customer must never lose
+      // their paid order over a rendering/email failure. Safe to retry —
+      // generateForOrder() is idempotent per order.
+      try {
+        await this.invoices.generateForOrder(finalOrder);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `Invoice generation failed for order ${order.id}: ${message}`,
+        );
+      }
+
+      return finalOrder;
     } catch (err) {
       // Release the claim so a retry (client confirm or the webhook) can
       // attempt finalizing again instead of the draft being stuck forever.

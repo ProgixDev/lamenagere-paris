@@ -18,6 +18,7 @@ import Skeleton from "../../../components/ui/Skeleton";
 import OrderTimeline from "../../../components/order/OrderTimeline";
 import Button from "../../../components/ui/Button";
 import Card from "../../../components/ui/Card";
+import InvoiceActions from "../../../components/orders/InvoiceActions";
 import StarRating from "../../../components/ui/StarRating";
 import {
   useOrder,
@@ -307,6 +308,12 @@ function OrderDetailScreenContent() {
             </Text>
           ) : null}
         </Card>
+
+        {order.paymentStatus === "paid" && (
+          <Card padding="lg">
+            <InvoiceActions orderId={order.id} />
+          </Card>
+        )}
 
         <Button label="CONTACTER LE VENDEUR" onPress={() => router.push("/(tabs)/messages")} variant="secondary" size="lg" />
 

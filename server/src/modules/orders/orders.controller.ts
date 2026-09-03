@@ -30,6 +30,17 @@ export class OrdersController {
     return this.orders.tracking(user.id, id);
   }
 
+  @Get(':id/invoice')
+  getInvoice(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.orders.getInvoiceLink(user.id, id);
+  }
+
+  @Post(':id/invoice/email')
+  @HttpCode(200)
+  emailInvoice(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.orders.emailInvoice(user.id, id);
+  }
+
   @Post(':id/cancel')
   @HttpCode(200)
   cancel(@CurrentUser() user: AuthUser, @Param('id') id: string) {

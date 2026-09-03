@@ -99,6 +99,7 @@ function SettingsScreenContent() {
         <SettingsSection title="Compte">
           <SettingsRow icon="account-outline" label="Modifier mon profil" onPress={() => router.push("/(main)/edit-profile")} />
           <SettingsRow icon="lock-outline" label="Modifier mon mot de passe" onPress={() => router.push("/(main)/change-password")} />
+          <SettingsRow icon="receipt-outline" label="Paiements & factures" onPress={() => router.push("/(main)/payments-invoices")} />
           <SettingsRow icon="bell-outline" label="Notifications" rightComponent={
             <Switch value={notifications} onValueChange={handleNotifToggle} trackColor={{ true: COLORS.primary, false: "#e0e0e0" }} />
           } last />
