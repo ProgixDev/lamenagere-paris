@@ -302,9 +302,11 @@ export class OrdersService {
 
   /**
    * A short-lived link to the order's PDF facture, for the app to open
-   * directly. Generates it on the spot if it isn't there yet (defensive:
-   * normally already generated at checkout time by `finalizeDraft`) —
-   * `generateForOrder` is idempotent, so this is safe to call every time.
+   * directly. Issues it on the spot if it isn't there yet (defensive:
+   * normally already issued at checkout time by `finalizeDraft`) —
+   * `issueForOrder` is idempotent, so this is safe to call every time, and
+   * doubles as the retry that recovers a facture whose automatic email
+   * failed at checkout.
    */
   async getInvoiceLink(
     userId: string,
@@ -314,25 +316,12 @@ export class OrdersService {
     if (row.payment_status !== 'paid') {
       throw new BadRequestException("Cette commande n'a pas encore été payée");
     }
-    await this.invoices.generateForOrder(toOrderDto(row));
+    await this.invoices.issueForOrder(toOrderDto(row));
     const link = await this.invoices.getSignedUrl(id);
     if (!link) {
       throw new NotFoundException('Facture indisponible pour le moment');
     }
     return link;
-  }
-
-  /** Emails the order's facture to the customer, on their request — never automatic. */
-  async emailInvoice(
-    userId: string,
-    id: string,
-  ): Promise<{ sent: boolean; reason?: string }> {
-    const row = await this.loadOwned(userId, id);
-    if (row.payment_status !== 'paid') {
-      throw new BadRequestException("Cette commande n'a pas encore été payée");
-    }
-    await this.invoices.generateForOrder(toOrderDto(row));
-    return this.invoices.emailExistingInvoice(id);
   }
 
   /**
@@ -859,17 +848,12 @@ export class OrdersService {
 
       const finalOrder = await this.findOne(userId, order.id);
 
-      // 9. Invoice (PDF + email), best-effort: a customer must never lose
-      // their paid order over a rendering/email failure. Safe to retry —
-      // generateForOrder() is idempotent per order.
-      try {
-        await this.invoices.generateForOrder(finalOrder);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        this.logger.warn(
-          `Invoice generation failed for order ${order.id}: ${message}`,
-        );
-      }
+      // 9. Facture: rendered, stored and emailed to the customer as part of
+      // the purchase itself — they are never asked to ask for it. Best-effort
+      // by design: issueForOrder() never throws and is idempotent per order,
+      // so a customer cannot lose a paid order over a rendering or SMTP
+      // failure, and any later read of the invoice retries what failed.
+      await this.invoices.issueForOrder(finalOrder);
 
       return finalOrder;
     } catch (err) {

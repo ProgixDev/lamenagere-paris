@@ -30,15 +30,13 @@ export class OrdersController {
     return this.orders.tracking(user.id, id);
   }
 
+  /**
+   * The facture is emailed automatically the moment payment succeeds, so this
+   * only exists to let the customer re-open the PDF they already received.
+   */
   @Get(':id/invoice')
   getInvoice(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.orders.getInvoiceLink(user.id, id);
-  }
-
-  @Post(':id/invoice/email')
-  @HttpCode(200)
-  emailInvoice(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.orders.emailInvoice(user.id, id);
   }
 
   @Post(':id/cancel')

@@ -4,7 +4,8 @@
   "main": "expo-router/entry",
   "scripts": {
     "ota": "eas update --branch production --environment production",
-    "ota:preview": "eas update --branch preview",
+    "ota:preview": "eas update --branch preview --environment preview",
+    "env:check": "node scripts/check-env.mjs",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",

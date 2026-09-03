@@ -46,12 +46,3 @@ export const getInvoiceLinkApi = async (
   );
   return data;
 };
-
-export const emailInvoiceApi = async (
-  orderId: string,
-): Promise<{ sent: boolean; reason?: string }> => {
-  const { data } = await apiClient.post<{ sent: boolean; reason?: string }>(
-    `/orders/${orderId}/invoice/email`,
-  );
-  return data;
-};

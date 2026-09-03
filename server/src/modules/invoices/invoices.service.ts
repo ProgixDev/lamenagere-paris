@@ -1,10 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
+import { formatEUR } from '../../common/serialization/money.util';
 import type { OrderDto } from '../orders/orders.serializer';
 import { buildInvoiceData } from './invoice-data.util';
 import { renderInvoiceHtml } from './invoice-template';
 import { htmlToPdf } from './pdf.util';
-import { isSmtpConfigured, sendInvoiceEmail } from './mailer.util';
+import {
+  isSmtpConfigured,
+  renderInvoiceEmailHtml,
+  renderInvoiceEmailText,
+  sendInvoiceEmail,
+} from './mailer.util';
 
 interface SettingsRow {
   store_name: string | null;
@@ -27,12 +33,33 @@ interface OrderExtrasRow {
 interface InvoiceRow {
   invoice_number: string;
   pdf_path: string;
+  emailed_at: string | null;
 }
 
 /** A signed URL is short-lived on purpose — it's handed straight to the app and opened immediately. */
 const SIGNED_URL_TTL_SECONDS = 300;
 
 const BUCKET = 'invoices';
+
+/** "3 septembre 2026" — the long form the facture itself uses. */
+const PAID_DATE_FMT = new Intl.DateTimeFormat('fr-FR', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+});
+
+type DeliveryFailure =
+  | 'no_invoice'
+  | 'no_email'
+  | 'smtp_not_configured'
+  | 'pdf_unreadable'
+  | 'send_failed';
+
+export interface DeliveryResult {
+  sent: boolean;
+  /** Set when `sent` is false; also written to `invoices.email_error`. */
+  reason?: DeliveryFailure;
+}
 
 @Injectable()
 export class InvoicesService {
@@ -41,19 +68,37 @@ export class InvoicesService {
   constructor(private readonly supabase: SupabaseService) {}
 
   /**
-   * Generates the PDF facture for a just-paid order and stores it. Called
-   * from `OrdersService.finalizeDraft()` right after an order is created —
-   * never allowed to fail the checkout itself, so every step here is
-   * defensive and every caller wraps this in try/catch too.
+   * Issues the facture for a just-paid order: renders the PDF, stores it, and
+   * emails it to the customer. Called from `OrdersService.finalizeDraft()`
+   * right after an order is created — the invoice is *sent*, never offered:
+   * the customer is not asked whether they want it and does not have to do
+   * anything to receive it.
    *
-   * Deliberately does NOT email anything: the customer chooses, on the
-   * confirmation screen or later from "Paiements & factures", whether to
-   * download it or have it emailed — see `emailExistingInvoice()`.
+   * Never throws. A customer must not lose their paid order over a rendering
+   * or SMTP failure, so generation failures are logged and delivery failures
+   * are recorded in `invoices.email_error`. Both halves are idempotent, so
+   * any later call (the webhook backstop, or the customer opening their
+   * facture from order history) re-attempts whichever half did not succeed.
+   */
+  async issueForOrder(order: OrderDto): Promise<void> {
+    try {
+      await this.generateForOrder(order);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `Invoice generation failed for order ${order.id}: ${message}`,
+      );
+      return;
+    }
+    await this.deliverForOrder(order);
+  }
+
+  /**
+   * Renders and stores the PDF facture for a paid order.
    *
    * Idempotent: a second call for the same order (e.g. a customer opening
-   * "Télécharger la facture" before the checkout's own generation finished,
-   * or the webhook backstop racing it) is a no-op once the `invoices` row
-   * exists.
+   * their facture before the checkout's own generation finished, or the
+   * webhook backstop racing it) is a no-op once the `invoices` row exists.
    */
   async generateForOrder(order: OrderDto): Promise<void> {
     const { data: existing } = await this.supabase.client
@@ -138,7 +183,7 @@ export class InvoicesService {
   async getSignedUrl(orderId: string): Promise<{ invoiceNumber: string; url: string } | null> {
     const { data: invoice } = await this.supabase.client
       .from('invoices')
-      .select('invoice_number, pdf_path')
+      .select('invoice_number, pdf_path, emailed_at')
       .eq('order_id', orderId)
       .maybeSingle<InvoiceRow>();
     if (!invoice) return null;
@@ -153,62 +198,111 @@ export class InvoicesService {
   }
 
   /**
-   * Emails the already-generated PDF to the order's customer, on request
-   * (the confirmation screen's "Recevoir par email" button, or the same
-   * action from order history) — never automatic. Re-uses the stored PDF
-   * rather than re-rendering it, so what's emailed is byte-identical to what
-   * a download would give.
+   * Emails the stored PDF to the order's customer. Re-uses the stored file
+   * rather than re-rendering it, so what lands in the mailbox is byte-identical
+   * to the archived facture.
+   *
+   * Never throws and never sends twice: once `emailed_at` is set the call is a
+   * no-op, which is what makes it safe for `issueForOrder` to run on every
+   * finalize attempt and on every later invoice read. Every failure — a missing
+   * address, unconfigured SMTP, a rejected send — is recorded in
+   * `invoices.email_error` so a silent non-delivery is visible in the database
+   * instead of only in a log line.
    */
-  async emailExistingInvoice(
-    orderId: string,
-  ): Promise<{ sent: boolean; reason?: 'no_invoice' | 'no_email' | 'smtp_not_configured' | 'send_failed' }> {
-    const [{ data: invoice }, { data: extras }] = await Promise.all([
+  async deliverForOrder(order: OrderDto): Promise<DeliveryResult> {
+    const [{ data: invoice }, { data: extras }, { data: settings }] = await Promise.all([
       this.supabase.client
         .from('invoices')
-        .select('invoice_number, pdf_path')
-        .eq('order_id', orderId)
+        .select('invoice_number, pdf_path, emailed_at')
+        .eq('order_id', order.id)
         .maybeSingle<InvoiceRow>(),
       this.supabase.client
         .from('orders')
-        .select('order_number, profile:profiles(email)')
-        .eq('id', orderId)
-        .maybeSingle<{ order_number: string; profile: { email: string | null } | null }>(),
+        .select('profile:profiles(email,full_name)')
+        .eq('id', order.id)
+        .maybeSingle<{ profile: { email: string | null; full_name: string | null } | null }>(),
+      this.supabase.client
+        .from('settings')
+        .select('store_name, contact_email, contact_phone, warehouse_address, siret, tva_intracom')
+        .eq('id', 1)
+        .maybeSingle<SettingsRow>(),
     ]);
 
     if (!invoice) return { sent: false, reason: 'no_invoice' };
+    if (invoice.emailed_at) return { sent: true };
+
     const email = extras?.profile?.email;
-    if (!email) return { sent: false, reason: 'no_email' };
-    if (!isSmtpConfigured()) return { sent: false, reason: 'smtp_not_configured' };
+    if (!email) return this.recordFailure(order.id, 'no_email', 'order has no customer email');
+    if (!isSmtpConfigured()) {
+      return this.recordFailure(
+        order.id,
+        'smtp_not_configured',
+        'SMTP_HOST/SMTP_USER/SMTP_PASS are not all set in this environment',
+      );
+    }
 
     const { data: file, error: downloadError } = await this.supabase
       .storageBucket(BUCKET)
       .download(invoice.pdf_path);
     if (downloadError || !file) {
-      throw new Error(`Could not read stored invoice: ${downloadError?.message ?? 'unknown error'}`);
+      return this.recordFailure(
+        order.id,
+        'pdf_unreadable',
+        downloadError?.message ?? 'unknown storage error',
+      );
     }
     const pdfBuffer = Buffer.from(await file.arrayBuffer());
+
+    const pdfFilename = `${invoice.invoice_number}.pdf`;
+    const body = {
+      customerName: extras?.profile?.full_name,
+      orderNumber: order.orderNumber,
+      invoiceNumber: invoice.invoice_number,
+      pdfFilename,
+      total: formatEUR(order.total),
+      paidDateLabel: PAID_DATE_FMT.format(new Date(order.createdAt)),
+      deliveryEstimate: order.estimatedDelivery,
+      business: {
+        name: settings?.store_name ?? 'La Ménagère Paris',
+        email: settings?.contact_email,
+        phone: settings?.contact_phone,
+        siret: settings?.siret,
+        tvaIntracom: settings?.tva_intracom,
+      },
+    };
 
     try {
       await sendInvoiceEmail({
         to: email,
-        subject: `Votre facture ${invoice.invoice_number} — La Ménagère Paris`,
-        html: `<p>Bonjour,</p><p>Veuillez trouver ci-joint votre facture pour la commande ${extras?.order_number ?? ''}.</p><p>L'équipe La Ménagère Paris</p>`,
+        subject: `Votre facture ${invoice.invoice_number} — ${body.business.name}`,
+        html: renderInvoiceEmailHtml(body),
+        text: renderInvoiceEmailText(body),
         pdfBuffer,
-        pdfFilename: `${invoice.invoice_number}.pdf`,
+        pdfFilename,
       });
-      await this.supabase.client
-        .from('invoices')
-        .update({ emailed_at: new Date().toISOString(), email_error: null })
-        .eq('order_id', orderId);
-      return { sent: true };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Invoice email failed for order ${orderId}: ${message}`);
-      await this.supabase.client
-        .from('invoices')
-        .update({ email_error: message.slice(0, 300) })
-        .eq('order_id', orderId);
-      return { sent: false, reason: 'send_failed' };
+      return this.recordFailure(order.id, 'send_failed', message);
     }
+
+    await this.supabase.client
+      .from('invoices')
+      .update({ emailed_at: new Date().toISOString(), email_error: null })
+      .eq('order_id', order.id);
+    this.logger.log(`Facture ${invoice.invoice_number} emailed to ${email}`);
+    return { sent: true };
+  }
+
+  private async recordFailure(
+    orderId: string,
+    reason: DeliveryFailure,
+    detail: string,
+  ): Promise<DeliveryResult> {
+    this.logger.warn(`Invoice email failed for order ${orderId} (${reason}): ${detail}`);
+    await this.supabase.client
+      .from('invoices')
+      .update({ email_error: `${reason}: ${detail}`.slice(0, 300) })
+      .eq('order_id', orderId);
+    return { sent: false, reason };
   }
 }

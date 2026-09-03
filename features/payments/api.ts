@@ -20,12 +20,17 @@ export const createIntentDraftApi = async (
 // re-verify the PaymentIntent with Stripe and turn the draft into a real,
 // paid order immediately (the webhook is the backstop for edge cases, e.g.
 // the app being killed right after payment).
+//
+// Given a much longer timeout than the client default: this one call also
+// renders the facture PDF in headless Chromium and emails it, which is
+// comfortably more than 10s. Timing out here would show the customer a
+// failure on a payment that actually went through.
 export const confirmDraftApi = async (
   draftId: string,
 ): Promise<{ status: "paid"; order: Order } | { status: "pending" }> => {
   const { data } = await apiClient.post<
     { status: "paid"; order: Order } | { status: "pending" }
-  >("/payments/confirm-draft", { draftId });
+  >("/payments/confirm-draft", { draftId }, { timeout: 45000 });
   return data;
 };
 

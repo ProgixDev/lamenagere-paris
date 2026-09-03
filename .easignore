@@ -39,4 +39,11 @@ asc-api-key.p8
 *.jks
 *.keystore
 credentials.json
-.env*.local
+
+# Local env files. EAS builds and `eas update` take EXPO_PUBLIC_* from the EAS
+# environment named by the build profile (eas.json → "environment"), so a build
+# must never see a developer's localhost/test values: uploading .env would let
+# any variable missing from the EAS environment silently fall through to the
+# local one — which is how a dev API URL reaches a store binary.
+.env
+.env.*

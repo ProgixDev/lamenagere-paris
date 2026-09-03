@@ -92,6 +92,8 @@ function isResourceMissing(err: unknown): boolean {
 export class PaymentsService implements OnModuleInit {
   private readonly logger = new Logger(PaymentsService.name);
   private stripe!: StripeNs;
+  /** Whether this tier is allowed to act on real-money events. See onModuleInit. */
+  private expectsLiveMode = false;
 
   constructor(
     private readonly config: ConfigService,
@@ -104,6 +106,21 @@ export class PaymentsService implements OnModuleInit {
     this.stripe = new Stripe(
       this.config.getOrThrow<string>('STRIPE_SECRET_KEY'),
     );
+    this.expectsLiveMode = this.config.get<string>('APP_ENV') === 'production';
+
+    // A production deploy with no webhook secret answers every delivery with a
+    // 400. Nothing breaks visibly — checkout still reconciles through the
+    // confirm endpoint — but refunds that bounce days later and disputes go
+    // unrecorded, and the only trace is a failure count in a dashboard nobody
+    // opens. Runs here rather than in main.ts because Vercel boots through
+    // serverless.ts, which never calls it.
+    if (this.expectsLiveMode && !this.config.get<string>('STRIPE_WEBHOOK_SECRET')) {
+      this.logger.error(
+        'STRIPE_WEBHOOK_SECRET is unset in production: refund and dispute ' +
+          'reconciliation is dead. Set it from the endpoint signing secret ' +
+          '(Stripe Dashboard > Developers > Webhooks).',
+      );
+    }
   }
 
   /**
@@ -419,16 +436,46 @@ export class PaymentsService implements OnModuleInit {
     rawBody: Buffer,
     signature: string,
   ): Promise<{ received: true }> {
+    // An unset secret is defaulted to '' by env.validation, and Stripe's
+    // verifier reports that as an ordinary "no signatures found matching" —
+    // indistinguishable from a healthy endpoint being probed with a bogus
+    // signature. Saying so explicitly is what makes "is the secret actually
+    // set in production?" answerable from outside, without a real delivery.
+    const secret = this.config.get<string>('STRIPE_WEBHOOK_SECRET');
+    if (!secret) {
+      this.logger.error(
+        'Webhook delivery refused: STRIPE_WEBHOOK_SECRET is not configured.',
+      );
+      throw new BadRequestException(
+        'Webhook secret not configured on this deployment',
+      );
+    }
+
     let event: StripeNs.Event;
     try {
-      event = this.stripe.webhooks.constructEvent(
-        rawBody,
-        signature,
-        this.config.getOrThrow<string>('STRIPE_WEBHOOK_SECRET'),
-      );
+      event = this.stripe.webhooks.constructEvent(rawBody, signature, secret);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Invalid signature';
       throw new BadRequestException(`Webhook signature error: ${message}`);
+    }
+
+    // `whsec_` carries no tier marker, so a live secret pasted into a dev
+    // config (or the reverse) passes signature verification and would then
+    // mutate the *shared* database from the wrong side. The event itself does
+    // carry the tier, so check that instead of trusting the configuration.
+    //
+    // Answers 200 without claiming the event: retrying cannot fix a
+    // misconfiguration, and claiming it would poison the ledger for the
+    // correctly-configured deploy, which receives its own copy of the same
+    // delivery and is the one that should apply it.
+    if (event.livemode !== this.expectsLiveMode) {
+      this.logger.error(
+        `Refusing Stripe event ${event.id} (${event.type}): livemode=` +
+          `${event.livemode} but this deploy is ` +
+          `${this.expectsLiveMode ? 'production' : 'development'}. ` +
+          'The STRIPE_WEBHOOK_SECRET here belongs to the other tier.',
+      );
+      return { received: true };
     }
 
     if (!(await this.claimEvent(event))) {

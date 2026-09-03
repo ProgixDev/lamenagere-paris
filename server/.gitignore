@@ -1,7 +1,9 @@
 node_modules/
 dist/
+# Every local env file — they hold service-role keys, SMTP and Stripe secrets.
 .env
-.env.local
+.env.*
+!.env.example
 *.log
 coverage/
 .DS_Store

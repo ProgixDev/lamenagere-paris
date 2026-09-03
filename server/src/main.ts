@@ -46,6 +46,30 @@ async function bootstrap() {
   const port = config.get<number>('PORT') ?? 3000;
   await app.listen(port, '0.0.0.0');
   Logger.log(`🚀 lamenagere-backend listening on :${port}`, 'Bootstrap');
+
+  // Which tier this process is running as, and — the part worth seeing every
+  // boot — whether Stripe is moving real money. env.validation refuses a
+  // mismatch, so this only ever prints a pair that is already consistent.
+  const appEnv = config.get<string>('APP_ENV');
+  const stripeMode = config
+    .getOrThrow<string>('STRIPE_SECRET_KEY')
+    .startsWith('sk_live_')
+    ? 'LIVE (real money)'
+    : 'TEST';
+  Logger.log(`🌍 APP_ENV=${appEnv} · 💳 Stripe ${stripeMode}`, 'Bootstrap');
+
+  // Factures are emailed automatically at checkout, so an environment without
+  // SMTP silently stops delivering them. Say so on boot rather than letting it
+  // surface one failed order at a time.
+  const smtpHost = config.get<string>('SMTP_HOST');
+  const smtpUser = config.get<string>('SMTP_USER');
+  const smtpReady = !!smtpHost && !!smtpUser && !!config.get<string>('SMTP_PASS');
+  Logger.log(
+    smtpReady
+      ? `📧 Factures: ${smtpUser} via ${smtpHost}`
+      : '📧 Factures: SMTP NOT CONFIGURED — no invoice will be emailed',
+    'Bootstrap',
+  );
 }
 
 void bootstrap();

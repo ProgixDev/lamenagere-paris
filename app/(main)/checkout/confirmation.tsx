@@ -256,7 +256,7 @@ export default function CheckoutConfirmationScreen() {
               ...SHADOW.card,
             }}
           >
-            <InvoiceActions orderId={lastOrderId} />
+            <InvoiceActions orderId={lastOrderId} showDownload={false} />
           </Animated.View>
         ) : null}
 
