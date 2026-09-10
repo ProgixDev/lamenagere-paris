@@ -8,6 +8,10 @@ import { AdminMediaController } from './admin-media.controller';
 import { AdminMediaService } from './admin-media.service';
 import { AdminOrdersController } from './admin-orders.controller';
 import { AdminOrdersService } from './admin-orders.service';
+import { AdminLeadsController } from './admin-leads.controller';
+import { AdminLeadsService } from './admin-leads.service';
+import { AdminConsentsController } from './admin-consents.controller';
+import { AdminConsentsService } from './admin-consents.service';
 import { AdminQuotesController } from './admin-quotes.controller';
 import { AdminQuotesService } from './admin-quotes.service';
 import { AdminDashboardController } from './admin-dashboard.controller';
@@ -42,6 +46,8 @@ import { PaymentsModule } from '../payments/payments.module';
     AdminCategoriesController,
     AdminMediaController,
     AdminOrdersController,
+    AdminLeadsController,
+    AdminConsentsController,
     AdminQuotesController,
     AdminDashboardController,
     AdminCustomersController,
@@ -61,6 +67,8 @@ import { PaymentsModule } from '../payments/payments.module';
     AdminCategoriesService,
     AdminMediaService,
     AdminOrdersService,
+    AdminLeadsService,
+    AdminConsentsService,
     AdminQuotesService,
     AdminDashboardService,
     AdminCustomersService,

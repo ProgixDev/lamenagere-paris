@@ -1,8 +1,19 @@
-import nodemailer from 'nodemailer';
+import {
+  isSmtpConfigured,
+  sendMail,
+} from '../../common/mail/mailer.util';
 import { LOGO_EMAIL_PNG_BASE64 } from './assets/logo-email-base64';
 
 /** Referenced from the HTML as <img src="cid:…">; see `sendInvoiceEmail`. */
 const LOGO_CID = 'lmp-logo';
+
+/**
+ * Re-exported so every existing import site keeps working unchanged. The
+ * transport itself now lives in `common/mail/mailer.util.ts` — the contact form
+ * needs to send mail too, and one `createTransport` is one place to get the
+ * serverless timeouts right.
+ */
+export { isSmtpConfigured };
 
 export interface InvoiceEmailInput {
   to: string;
@@ -13,43 +24,11 @@ export interface InvoiceEmailInput {
   pdfFilename: string;
 }
 
-/** True once SMTP_HOST/SMTP_USER/SMTP_PASS are all set. */
-export function isSmtpConfigured(): boolean {
-  return (
-    !!process.env.SMTP_HOST &&
-    !!process.env.SMTP_USER &&
-    !!process.env.SMTP_PASS
-  );
-}
-
 /** Throws if SMTP isn't configured — callers should check `isSmtpConfigured()` first. */
 export async function sendInvoiceEmail(input: InvoiceEmailInput): Promise<void> {
-  if (!isSmtpConfigured()) {
-    throw new Error('SMTP is not configured (SMTP_HOST/SMTP_USER/SMTP_PASS)');
-  }
-
-  const transport = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT ?? 587),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-    // Serverless functions get frozen the moment the response is sent, so a
-    // hung socket must fail fast rather than hold the invoice send open.
-    connectionTimeout: 15_000,
-    greetingTimeout: 15_000,
-    socketTimeout: 30_000,
-  });
-
-  await transport.sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+  await sendMail({
     to: input.to,
     subject: input.subject,
-    // A text/plain part is not optional: without one the message scores as
-    // spam far more easily, and it is what watches, screen readers and
-    // plain-text clients actually render.
     text: input.text,
     html: input.html,
     attachments: [

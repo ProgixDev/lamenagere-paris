@@ -70,6 +70,16 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional().default(''),
   SMTP_PASS: z.string().optional().default(''),
   SMTP_FROM: z.string().optional().default(''),
+
+  // Where a new contact-form submission is announced. Falls back to
+  // SMTP_FROM/SMTP_USER when unset; when none of the three resolve, the lead is
+  // still recorded and `website_leads.notify_error` says why nobody was told.
+  LEADS_NOTIFY_TO: z.string().optional().default(''),
+
+  // Salt for sha256(ip) in website_leads.ip_hash and website_consents.ip_hash. Without it the digest is
+  // reversible by enumeration — the IPv4 space is small. Rotating it retires the
+  // rate-limit history, which is the intended way to clear it.
+  LEAD_IP_SALT: z.string().optional().default(''),
 });
 
 /**
