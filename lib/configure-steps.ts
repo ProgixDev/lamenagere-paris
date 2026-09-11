@@ -6,7 +6,7 @@ import { areaFormula } from "./area-formulas";
  * the sequence below is fixed here so a manager reordering blocks can never ask
  * for the gamme before the shape.
  *
- * Forme → Mesures → Îlot → Gamme → Couleurs → Accessoires → 3D → Récapitulatif
+ * Forme → Mesures → Îlot → Gamme → Couleurs → Accessoires → Récapitulatif
  */
 /** Reserved id of the synthetic entry that carries the product's own colour. */
 export const PRODUCT_COLOR_BLOCK_ID = "product-color";
@@ -20,7 +20,6 @@ export type Step =
   | { kind: "tiers" }
   | { kind: "colors"; block: ConfigBlock }
   | { kind: "extras"; blocks: ConfigBlock[] }
-  | { kind: "scene" }
   | { kind: "summary" };
 
 /** How many runs each shape bills. Unknown shapes bill everything filled in. */
@@ -242,52 +241,28 @@ export function buildSteps(
   );
   if (extras.length) steps.push({ kind: "extras", blocks: extras });
 
-  // The 3D view comes last, once every answer it draws from is in: it needs the
-  // shape for the runs and the measurements for the room, so it can only be
-  // shown after both — and it draws a kitchen, so only kitchens get it.
-  if (canPlanIn3D(product, blocks)) steps.push({ kind: "scene" });
+  // A 3D step used to come last, after the shape and the measurements it drew
+  // from. The studio is gone — renderer, catalogue and all — and with it the
+  // synthetic `layout` entry that carried an implantation to the workshop. The
+  // customer answers the same questions; nothing draws them a kitchen.
+  //
+  // Orders placed before the removal keep their implantation: `ConfiguredLayout`
+  // and the recap's `e.layout` branch are still there to render them.
 
   steps.push({ kind: "summary" });
   return steps;
 }
 
 /**
- * Whether this product is a kitchen laid out along walls.
- *
- * Two conditions, and both are load-bearing.
- *
- * The blocks have to describe a room: a shape block whose options declare runs
- * plus a measurement tagged `run1`. Anything else is a product the customer
- * places in a room rather than one that fills it.
- *
- * The product also has to *be* a kitchen. The studio draws cabinets, worktops
- * and an island from a fixed catalogue — there is nothing generic about it — so
- * the block shape alone is not enough. A corner sofa priced per linear metre is
- * described exactly like a kitchen (forme I/L/U, longueur tagged `run1`), and
- * before this check it earned a 3D step that showed the customer a kitchen at
- * the end of configuring a canapé.
- */
-export function canPlanIn3D(product: Product, blocks: ConfigBlock[]): boolean {
-  if (!isKitchenCategory(product.category)) return false;
-  const hasRuns = blocks.some(
-    (b) => b.type === "shape" && (b.options ?? []).some((o) => (o.runs ?? 0) > 0),
-  );
-  const hasWallMeasure = blocks.some(
-    (b) => b.type === "measurements" && (b.fields ?? []).some((f) => f.priceRole === "run1"),
-  );
-  return hasRuns && hasWallMeasure;
-}
-
-/**
  * Whether a category is kitchens — the one place the app is allowed to assume a
- * ceiling, a worktop and a run of cabinets. Gates the 3D studio and the hidden
- * heights alike.
+ * ceiling, a worktop and a run of cabinets. Gates the heights the customer is
+ * never asked for.
  *
  * Matched on the name and the slug both, accent- and case-insensitively, so
  * "Cuisines", "cuisines", "Cuisine équipée" and a "cuisines-sur-mesure"
  * sub-category all count. Kept loose on purpose: the back office renames
- * categories freely, and an id list here would silently drop the 3D the first
- * time someone created a second kitchen category.
+ * categories freely, and an id list here would silently drop the behaviour the
+ * first time someone created a second kitchen category.
  */
 export function isKitchenCategory(category: Category | undefined): boolean {
   if (!category) return false;
@@ -313,11 +288,6 @@ export function stepCopy(step: Step): { title: string; subtitle: string } {
       return { title: step.block.label || "La couleur", subtitle: "L'aperçu se met à jour à chaque choix." };
     case "extras":
       return { title: "Vos options", subtitle: "Accessoires, équipements et finitions." };
-    case "scene":
-      return {
-        title: "Votre cuisine en 3D",
-        subtitle: "Tournez autour, zoomez, vérifiez l'implantation avant de valider.",
-      };
     case "summary":
       return { title: "Récapitulatif", subtitle: "Vérifiez votre configuration avant de l'ajouter au panier." };
   }

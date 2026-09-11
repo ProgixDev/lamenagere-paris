@@ -23,6 +23,53 @@ import {
 export interface AuthResult {
   user: UserDto;
   token: string;
+  /**
+   * The Supabase refresh token, so a client can obtain a new access token
+   * without asking for the password again (`POST /auth/refresh`).
+   *
+   * ── Pourquoi ce champ existe ────────────────────────────────────────────
+   * Il était jeté. Un access token Supabase vit environ une heure, et sans
+   * moyen de le renouveler une session mourait au bout de ce délai — sur
+   * mobile c'est une reconnexion agaçante, sur le web c'était bloquant : le
+   * client pouvait se retrouver déconnecté **au milieu du tunnel de
+   * paiement**, entre la saisie de son adresse et la confirmation Stripe.
+   *
+   * ⚠️ Les refresh tokens Supabase tournent : chaque appel à `/auth/refresh`
+   * en rend un nouveau et **invalide l'ancien**. Un client doit donc stocker
+   * celui qu'il vient de recevoir, sinon le renouvellement suivant échoue.
+   *
+   * Ajout purement additif : l'application mobile déstructure `{ user, token }`
+   * et ignore ce champ tant qu'elle n'a pas été mise à jour.
+   */
+  refreshToken: string;
+  /** Seconds until `token` expires, as GoTrue reports it. */
+  expiresIn: number;
+}
+
+/** The parts of a GoTrue session this API hands on to its clients. */
+interface SessionLike {
+  access_token: string;
+  refresh_token: string;
+  expires_in?: number | null;
+}
+
+/**
+ * The single place a GoTrue session becomes an `AuthResult`.
+ *
+ * Login, register and refresh all go through it so the three can never drift —
+ * which is exactly how the refresh token came to be dropped on two of them and
+ * not the third.
+ *
+ * `expires_in` is optional in the SDK's types; GoTrue always sends it, and the
+ * hour below is the documented default if it ever stops.
+ */
+function sessionResult(user: UserDto, session: SessionLike): AuthResult {
+  return {
+    user,
+    token: session.access_token,
+    refreshToken: session.refresh_token,
+    expiresIn: session.expires_in ?? 3600,
+  };
 }
 
 @Injectable()
@@ -84,7 +131,7 @@ export class AuthService {
         ipAddress,
       })
       .catch(() => {});
-    return { user, token: data.session.access_token };
+    return sessionResult(user, data.session);
   }
 
   async register(dto: RegisterDto): Promise<AuthResult> {
@@ -121,7 +168,41 @@ export class AuthService {
     }
 
     const user = await this.loadUser(data.user.id);
-    return { user, token: session.session.access_token };
+    return sessionResult(user, session.session);
+  }
+
+  /**
+   * Trades a refresh token for a fresh access token.
+   *
+   * ── Pourquoi la route est publique ─────────────────────────────────────────
+   * Elle est appelée précisément quand l'access token est expiré : exiger un
+   * bearer valide en ferait une route qu'on ne peut jamais utiliser. Le refresh
+   * token est lui-même le justificatif, et GoTrue le vérifie.
+   *
+   * ── Le client partagé, et pourquoi ce n'est pas un problème ici ────────────
+   * `supabase.auth` est une instance unique pour tout le serveur, et
+   * `refreshSession` y range la session obtenue (en mémoire seulement :
+   * `persistSession: false`). Deux requêtes concurrentes s'écrasent donc
+   * mutuellement cette session ambiante — sans conséquence, parce que rien ne
+   * la lit : on retourne les valeurs de `data`, et `auth.guard.ts` vérifie
+   * chaque jeton en le passant explicitement à `getUser(token)`.
+   * `signInWithPassword` a exactement le même comportement depuis toujours.
+   */
+  async refresh(refreshToken: string): Promise<AuthResult> {
+    const { data, error } = await this.supabase.auth.refreshSession({
+      refresh_token: refreshToken,
+    });
+
+    if (error || !data.session || !data.user) {
+      // Un refresh token révoqué, expiré, déjà consommé (ils tournent) ou
+      // simplement faux aboutit tous ici, et la réponse est la même : il faut
+      // se reconnecter. Distinguer les cas renseignerait un attaquant sur la
+      // validité d'un jeton volé sans rien apporter au client légitime.
+      throw new UnauthorizedException('Session expirée, reconnectez-vous');
+    }
+
+    const user = await this.loadUser(data.user.id);
+    return sessionResult(user, data.session);
   }
 
   async changePassword(

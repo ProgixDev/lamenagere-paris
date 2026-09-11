@@ -10,10 +10,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "ios:sim": "bash scripts/run-ios-simulator.sh",
-    "web": "expo start --web",
-    "build:three": "node scripts/build-three-bundle.mjs",
-    "check:renderer": "node scripts/check-renderer-literal.mjs",
-    "bench": "node scripts/build-bench.mjs"
+    "web": "expo start --web"
   },
   "dependencies": {
     "@expo-google-fonts/cormorant": "^0.4.2",
@@ -66,7 +63,6 @@
     "react-native-screens": "~4.16.0",
     "react-native-svg": "15.12.1",
     "react-native-url-polyfill": "^3.0.0",
-    "react-native-webview": "13.15.0",
     "react-native-worklets": "0.5.1",
     "tailwindcss": "~3",
     "zod": "^4.3.6",
@@ -74,12 +70,9 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
-    "@types/three": "^0.169.0",
     "babel-preset-expo": "~54.0.10",
-    "esbuild": "^0.25.0",
     "eslint": "^10.2.0",
     "prettier": "^3.8.2",
-    "three": "^0.169.0",
     "typescript": "~5.9.2"
   },
   "private": true

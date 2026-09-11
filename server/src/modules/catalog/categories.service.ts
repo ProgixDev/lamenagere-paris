@@ -6,6 +6,7 @@ import {
   CategoryRow,
   toCategoryDto,
 } from './catalog.serializer';
+import { identifierColumn } from '../../common/serialization/identifier.util';
 
 @Injectable()
 export class CategoriesService {
@@ -25,14 +26,32 @@ export class CategoriesService {
     return rows.map((r) => toCategoryDto(r, counts.get(r.id) ?? 0));
   }
 
-  async findByIdOrThrow(id: string): Promise<CategoryRow> {
+  /**
+   * A category, addressed by **UUID or slug**.
+   *
+   * The storefront's category pages are `/boutique/cuisines`, so the slug is
+   * the only identifier it has. `categories.slug` is `NOT NULL UNIQUE`.
+   */
+  async findByIdOrThrow(idOrSlug: string): Promise<CategoryRow> {
     const { data } = await this.supabase.client
       .from('categories')
       .select(CATEGORY_SELECT)
-      .eq('id', id)
+      .eq(identifierColumn(idOrSlug), idOrSlug)
       .maybeSingle<CategoryRow>();
     if (!data) throw new NotFoundException('Catégorie introuvable');
     return data;
+  }
+
+  /**
+   * Resolves a public `:id` path parameter to the row's UUID.
+   *
+   * A UUID is returned untouched — deliberately without a lookup, so the
+   * mobile app's existing calls keep exactly the shape and cost they had. Only
+   * a slug, which only the storefront sends, pays for the extra query.
+   */
+  async resolveId(idOrSlug: string): Promise<string> {
+    if (identifierColumn(idOrSlug) === 'id') return idOrSlug;
+    return (await this.findByIdOrThrow(idOrSlug)).id;
   }
 
   /** Map of category_id -> count of published products. */

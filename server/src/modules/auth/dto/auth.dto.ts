@@ -114,3 +114,15 @@ export class LinkAppleDto {
   @IsNotEmpty()
   authorizationCode!: string;
 }
+
+/**
+ * The refresh token handed back by `/auth/login` or `/auth/register`.
+ *
+ * Posted on its own, without a bearer header: by the time a client calls this
+ * route its access token is expired, which is the entire point of the route.
+ */
+export class RefreshDto {
+  @IsString()
+  @IsNotEmpty()
+  refreshToken!: string;
+}
