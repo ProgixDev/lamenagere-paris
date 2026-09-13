@@ -8,6 +8,8 @@ import { AdminMediaController } from './admin-media.controller';
 import { AdminMediaService } from './admin-media.service';
 import { AdminOrdersController } from './admin-orders.controller';
 import { AdminOrdersService } from './admin-orders.service';
+import { AdminInvoicesController } from './admin-invoices.controller';
+import { AdminInvoicesService } from './admin-invoices.service';
 import { AdminLeadsController } from './admin-leads.controller';
 import { AdminLeadsService } from './admin-leads.service';
 import { AdminConsentsController } from './admin-consents.controller';
@@ -38,14 +40,16 @@ import { AdminPopupsService } from './admin-popups.service';
 import { AuditInterceptor } from '../../common/interceptors/audit.interceptor';
 import { HomeController } from '../catalog/home.controller';
 import { PaymentsModule } from '../payments/payments.module';
+import { InvoicesModule } from '../invoices/invoices.module';
 
 @Module({
-  imports: [PaymentsModule],
+  imports: [PaymentsModule, InvoicesModule],
   controllers: [
     AdminProductsController,
     AdminCategoriesController,
     AdminMediaController,
     AdminOrdersController,
+    AdminInvoicesController,
     AdminLeadsController,
     AdminConsentsController,
     AdminQuotesController,
@@ -67,6 +71,7 @@ import { PaymentsModule } from '../payments/payments.module';
     AdminCategoriesService,
     AdminMediaService,
     AdminOrdersService,
+    AdminInvoicesService,
     AdminLeadsService,
     AdminConsentsService,
     AdminQuotesService,

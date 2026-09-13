@@ -191,6 +191,8 @@ export interface AdminOrderDto {
   total: string;
   status: OrderStatus;
   statusLabel: string;
+  /** Drives the facture action in the list: only a paid order has one. */
+  paymentStatus: 'unpaid' | 'paid' | 'failed' | 'refunded';
   refundStatus: RefundStatus;
   /** Where the refund actually is with the bank; 'failed' needs a human. */
   refundSettlement: RefundSettlement;
@@ -371,6 +373,7 @@ export function toAdminOrderDto(row: OrderRow): AdminOrderDto {
     total: formatEURFromCents(row.total_cents),
     status: row.status,
     statusLabel: orderStatusLabel(row.status),
+    paymentStatus: row.payment_status,
     refundStatus: row.refund_status ?? 'none',
     refundSettlement: row.refund_settlement ?? 'none',
     refundFailureReason: row.refund_failure_reason ?? undefined,

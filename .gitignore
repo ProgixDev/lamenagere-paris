@@ -64,3 +64,6 @@ daily-report-2026-07-30.md
 # Export ponctuel des payment_intents Stripe avant purge des commandes de test
 stripe-payment-intents-avant-purge-*.csv
 daily-report-2026-08-24.md
+
+# Admin panel — its own repo (was the super_admin submodule)
+/lamenagere-admin
