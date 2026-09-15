@@ -54,6 +54,36 @@ export class CategoriesService {
     return (await this.findByIdOrThrow(idOrSlug)).id;
   }
 
+  /**
+   * Slugs (or UUIDs) to UUIDs, for the search's `?cat=` facet.
+   *
+   * ── Why this doesn't 404 like `resolveId` does ─────────────────────────────
+   * `resolveId` serves a category *page*: an unknown slug there means the page
+   * does not exist, and 404 is the right answer. This serves a *filter* on a
+   * search-results URL, which is bookmarked, shared and hand-edited. A slug
+   * that outlived a rename should narrow the search to what still exists, not
+   * turn a shared link into an error page.
+   *
+   * An empty input short-circuits, and a set of slugs that resolves to nothing
+   * returns an empty array — the caller must treat that as "no category
+   * narrowing", never as `.in('category_id', [])`, which matches no rows.
+   */
+  async resolveIds(idsOrSlugs: string[]): Promise<string[]> {
+    if (idsOrSlugs.length === 0) return [];
+
+    const uuids = idsOrSlugs.filter((v) => identifierColumn(v) === 'id');
+    const slugs = idsOrSlugs.filter((v) => identifierColumn(v) !== 'id');
+    if (slugs.length === 0) return uuids;
+
+    const { data } = await this.supabase.client
+      .from('categories')
+      .select('id')
+      .in('slug', slugs)
+      .returns<{ id: string }[]>();
+
+    return [...new Set([...uuids, ...(data ?? []).map((r) => r.id)])];
+  }
+
   /** Map of category_id -> count of published products. */
   private async publishedCounts(): Promise<Map<string, number>> {
     const { data } = await this.supabase.client

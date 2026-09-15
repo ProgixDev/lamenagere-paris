@@ -2,6 +2,7 @@ import {
   Controller,
   DefaultValuePipe,
   Get,
+  Header,
   Param,
   ParseIntPipe,
   Query,
@@ -10,7 +11,7 @@ import { Public } from '../../common/auth/public.decorator';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CategoriesService } from './categories.service';
 import { ProductsService } from './products.service';
-import { parseFilters } from './catalog-filters.util';
+import { parseFilters, parseListe } from './catalog-filters.util';
 
 /**
  * Public catalog endpoints, consumed by the mobile app and the web storefront.
@@ -69,9 +70,19 @@ export class CatalogController {
     );
   }
 
+  /**
+   * Search.
+   *
+   * `cat` and `type` are repeatable (`?cat=cuisines&cat=portes`) or
+   * comma-joined (`?cat=cuisines,portes`) — under the Fastify adapter the first
+   * form arrives as `string[]` and the second as `string`, so both parameters
+   * are typed for both and `parseListe` flattens them. The storefront's no-JS
+   * filter form produces the repeated shape; its JS island produces the comma
+   * shape; the same URL has to work either way.
+   */
   @Public()
   @Get('products/search')
-  search(
+  async search(
     @Query('q', new DefaultValuePipe('')) q: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
@@ -79,13 +90,125 @@ export class CatalogController {
     @Query('priceMin') priceMin?: string,
     @Query('priceMax') priceMax?: string,
     @Query('minRating') minRating?: string,
+    @Query('cat') cat?: string | string[],
+    @Query('type') type?: string | string[],
+    @Query('w') w?: string,
+    @Query('h') h?: string,
   ) {
-    return this.products.search(
-      q,
-      page,
-      limit,
-      parseFilters({ sort, priceMin, priceMax, minRating }),
-    );
+    const filters = parseFilters({
+      sort,
+      priceMin,
+      priceMax,
+      minRating,
+      type,
+      w,
+      h,
+    });
+
+    // Résolu ici et non dans le service, comme `productsByCategory` : le
+    // service ne voit que des UUID, donc il reste à une seule requête.
+    const slugs = parseListe(cat);
+    if (slugs.length) {
+      const ids = await this.categories.resolveIds(slugs);
+      // Aucun slug connu : on n'ajoute pas le filtre. Un `.in()` vide ne rend
+      // rien, et une URL partagée dont la rubrique a été renommée doit rendre
+      // la recherche, pas une page vide.
+      if (ids.length) filters.categoryIds = ids;
+    }
+
+    return this.products.search(q, page, limit, filters);
+  }
+
+  /**
+   * Search-as-you-type, for the storefront's header panel.
+   *
+   * ⚠️ **Must stay above `products/:id`**, which is declared last on purpose at
+   * the bottom of this file: route matching is ordered, and `:id` would
+   * otherwise swallow `suggest` and look up a product with that slug.
+   *
+   * Returns a **bare array**, like `/products/popular` and `/products/by-ids` —
+   * nothing here paginates. The contract note at the top of this file already
+   * documents that irregularity.
+   *
+   * The cache header is what makes the hot prefixes ("cui", "cuis", "cuisi")
+   * cheap: they are the same for every visitor, so an edge that holds them for
+   * a minute absorbs most of the typing in the catalogue. `max-age=0` keeps the
+   * browser from serving a stale suggestion after the back office republishes.
+   */
+  @Public()
+  @Get('products/suggest')
+  @Header(
+    'Cache-Control',
+    'public, max-age=0, s-maxage=60, stale-while-revalidate=300',
+  )
+  async suggest(
+    @Query('q', new DefaultValuePipe('')) q: string,
+    @Query('limit', new DefaultValuePipe(8), ParseIntPipe) limit: number,
+    @Query('priceMin') priceMin?: string,
+    @Query('priceMax') priceMax?: string,
+    @Query('minRating') minRating?: string,
+    @Query('cat') cat?: string | string[],
+    @Query('type') type?: string | string[],
+    @Query('w') w?: string,
+    @Query('h') h?: string,
+  ) {
+    const filters = parseFilters({ priceMin, priceMax, minRating, type, w, h });
+
+    const slugs = parseListe(cat);
+    if (slugs.length) {
+      const ids = await this.categories.resolveIds(slugs);
+      if (ids.length) filters.categoryIds = ids;
+    }
+
+    return this.products.suggest(q, limit, filters);
+  }
+
+  /**
+   * The newest published products, in the suggestion shape — what the header
+   * panel shows before anything is typed.
+   *
+   * ⚠️ Same constraint as `suggest`: **must stay above `products/:id`**.
+   */
+  @Public()
+  @Get('products/latest')
+  @Header(
+    'Cache-Control',
+    'public, max-age=0, s-maxage=60, stale-while-revalidate=300',
+  )
+  async latest(
+    @Query('limit', new DefaultValuePipe(8), ParseIntPipe) limit: number,
+    @Query('priceMin') priceMin?: string,
+    @Query('priceMax') priceMax?: string,
+    @Query('minRating') minRating?: string,
+    @Query('cat') cat?: string | string[],
+    @Query('type') type?: string | string[],
+    @Query('w') w?: string,
+    @Query('h') h?: string,
+  ) {
+    const filters = parseFilters({ priceMin, priceMax, minRating, type, w, h });
+
+    const slugs = parseListe(cat);
+    if (slugs.length) {
+      const ids = await this.categories.resolveIds(slugs);
+      if (ids.length) filters.categoryIds = ids;
+    }
+
+    return this.products.latest(limit, filters);
+  }
+
+  /**
+   * The spread of published prices, for the storefront's price-range slider.
+   *
+   * ⚠️ Same constraint as `suggest`: **must stay above `products/:id`**.
+   */
+  @Public()
+  @Get('products/price-histogram')
+  @Header(
+    'Cache-Control',
+    'public, max-age=0, s-maxage=300, stale-while-revalidate=900',
+  )
+  priceHistogram() {
+    return this.products.priceHistogram();
   }
 
   @Public()

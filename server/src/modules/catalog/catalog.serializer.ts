@@ -529,6 +529,104 @@ export function toAdminCategoryDto(
   };
 }
 
+// ── Suggestions (the storefront's search-as-you-type) ───────────────────────
+//
+// A separate, deliberately small shape. `ProductDto` weighs 7-10 KB per product
+// — `description` averages 1882 bytes, `config_blocks` 3732, plus the whole
+// category row with its own `config_blocks` embedded. Eight of those per
+// keystroke is 60-80 KB down the wire for a panel that shows a thumbnail, a
+// name and a price. Nothing here is optional decoration: every field is on the
+// suggestion row.
+
+export interface SuggestRow {
+  id: string;
+  name: string;
+  slug: string;
+  product_type: ProductType;
+  price_mode: PriceMode;
+  price_sort_cents: number | null;
+  customizable: boolean;
+  min_width: number | null;
+  max_width: number | null;
+  min_height: number | null;
+  max_height: number | null;
+  stock_qty: number | null;
+  low_stock_threshold: number | null;
+  colors: ProductColorRow[] | null;
+  category: { name: string; slug: string } | null;
+  media: ProductMediaRow[] | null;
+}
+
+export interface SuggestDto {
+  id: string;
+  name: string;
+  slug: string;
+  category: { name: string; slug: string };
+  /** Absent for the products whose gallery holds neither image nor variant. */
+  thumb?: string;
+  /**
+   * The displayed price, in cents — `price_sort_cents`, the generated column
+   * from migration 0045. **Not** `base_price_cents`: for a tiered per-m²
+   * product the two disagree on 22 of 67 rows, and the suggestion panel would
+   * then quote a different price from the results grid it opens onto.
+   */
+  fromCents?: number;
+  /** Tells the client whether to print "1 290 €" or "dès 390 €/m²". */
+  priceMode: PriceMode;
+  productType: ProductType;
+  customizable: boolean;
+  /**
+   * What the workshop can build this at, in cm. Sparse on purpose: 16 of the 71
+   * made-to-measure products are missing at least one bound, and a missing
+   * bound means "unconstrained", not zero. The client prints only what it gets.
+   */
+  minW?: number;
+  maxW?: number;
+  minH?: number;
+  maxH?: number;
+  stock?: Exclude<StockLabel, null>;
+}
+
+export function toSuggestDto(row: SuggestRow): SuggestDto {
+  // Same fallback as `toAdminProductDto`: 19 published products have only a
+  // video in `product_media` and keep their photos on the colour variants.
+  // Without this, roughly one suggestion in seven shows a blank tile.
+  const thumb =
+    sortedMedia(row.media ?? []).find((m) => m.type === 'image')?.url ??
+    row.colors?.find((c) => c.images?.length)?.images?.[0];
+
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    category: {
+      name: row.category?.name ?? '',
+      slug: row.category?.slug ?? '',
+    },
+    thumb: thumb ?? undefined,
+    fromCents: row.price_sort_cents ?? undefined,
+    priceMode: row.price_mode,
+    productType: row.product_type,
+    customizable: row.customizable,
+    minW: row.min_width ?? undefined,
+    maxW: row.max_width ?? undefined,
+    minH: row.min_height ?? undefined,
+    maxH: row.max_height ?? undefined,
+    stock: deriveStock(row.stock_qty, row.low_stock_threshold) ?? undefined,
+  };
+}
+
+/**
+ * The suggestion select.
+ *
+ * `colors` is pulled whole (623 bytes on average) rather than through a lateral
+ * `limit(1)` on `product_media`. The lateral would save about a hundred bytes
+ * on an eight-row response — there are 1.5 media rows per product — and it
+ * cannot express the colour-variant fallback above at all.
+ */
+export const SUGGEST_SELECT =
+  'id, name, slug, product_type, price_mode, price_sort_cents, customizable, min_width, max_width, min_height, max_height, stock_qty, low_stock_threshold, colors, category:categories(name, slug), media:product_media(id, url, type, is_primary, sort_order)';
+
 export const PRODUCT_SELECT =
   'id, sku, name, slug, description, short_description, category_id, product_type, price_mode, status, base_price_cents, width_coef_cents, height_coef_cents, price_per_sqm_cents, area_formula, quality_tiers, dim_width, dim_height, dim_depth, dim_unit, ref_width, ref_height, ref_unit, min_width, min_height, max_width, max_height, customizable, delivery_metropole, delivery_outremer, stock_qty, low_stock_threshold, max_per_order, config_blocks, colors, created_at, rating_avg, rating_count, category:categories(*), media:product_media(*)';
 

@@ -1,3 +1,15 @@
+type Browser = import('puppeteer-core').Browser;
+
+/**
+ * Native `import()` that survives compilation. With `"module": "commonjs"`,
+ * tsc rewrites `await import('x')` into `require('x')`, which throws
+ * ERR_REQUIRE_ESM on `@sparticuz/chromium`, `puppeteer-core` and `puppeteer`
+ * (all ESM-only). Building the call through `new Function` hides it from tsc.
+ */
+const importEsm = new Function('specifier', 'return import(specifier)') as <T>(
+  specifier: string,
+) => Promise<T>;
+
 /**
  * Renders an HTML document to a PDF buffer via headless Chromium.
  *
@@ -7,13 +19,20 @@
  * far too large to deploy. `VERCEL`/`AWS_LAMBDA_FUNCTION_NAME` reliably tells
  * the two environments apart.
  */
-async function launchBrowser(): Promise<import('puppeteer-core').Browser> {
+async function launchBrowser(): Promise<Browser> {
   const isServerless =
     !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
 
   if (isServerless) {
-    const { default: chromium } = await import('@sparticuz/chromium');
-    const puppeteer = await import('puppeteer-core');
+    // Static `require.resolve` calls so Vercel's file tracer still bundles
+    // these packages — it can't see through the `importEsm` indirection.
+    require.resolve('@sparticuz/chromium');
+    require.resolve('puppeteer-core');
+
+    const { default: chromium } =
+      await importEsm<typeof import('@sparticuz/chromium')>('@sparticuz/chromium');
+    const puppeteer =
+      await importEsm<typeof import('puppeteer-core')>('puppeteer-core');
     return puppeteer.launch({
       args: chromium.args,
       executablePath: await chromium.executablePath(),
@@ -21,12 +40,10 @@ async function launchBrowser(): Promise<import('puppeteer-core').Browser> {
     });
   }
 
-  // Local dev: no import type for the full `puppeteer` package's own Browser
-  // is needed here since it satisfies the same puppeteer-core surface.
-  const puppeteerFull = await import('puppeteer');
-  return puppeteerFull.launch({
-    headless: true,
-  }) as unknown as Promise<import('puppeteer-core').Browser> as any;
+  // Local dev: the full `puppeteer` Browser satisfies the same
+  // puppeteer-core surface.
+  const puppeteerFull = await importEsm<typeof import('puppeteer')>('puppeteer');
+  return (await puppeteerFull.launch({ headless: true })) as unknown as Browser;
 }
 
 export async function htmlToPdf(html: string): Promise<Buffer> {
