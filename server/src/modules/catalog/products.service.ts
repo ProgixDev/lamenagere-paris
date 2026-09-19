@@ -32,13 +32,19 @@ export interface PriceHistogramDto {
 }
 
 /** How a catalogue listing may be ordered. */
-export type CatalogSort = 'popular' | 'recent' | 'price_asc' | 'price_desc';
+export type CatalogSort =
+  | 'popular'
+  | 'recent'
+  | 'price_asc'
+  | 'price_desc'
+  | 'rating';
 
 export const CATALOG_SORTS: CatalogSort[] = [
   'popular',
   'recent',
   'price_asc',
   'price_desc',
+  'rating',
 ];
 
 /**
@@ -213,6 +219,13 @@ function applySort<T extends FilterableQuery<T>>(query: T, sort: CatalogSort): T
     case 'price_desc':
       return query
         .order('price_sort_cents', { ascending: false, nullsFirst: false })
+        .order('id', { ascending: true });
+    // La note, puis le nombre d'avis : un 5/5 sur un seul avis ne passe pas
+    // devant un 4,9 sur quarante. Les produits jamais notes ferment la liste.
+    case 'rating':
+      return query
+        .order('rating_avg', { ascending: false, nullsFirst: false })
+        .order('rating_count', { ascending: false, nullsFirst: false })
         .order('id', { ascending: true });
     case 'popular':
     default:

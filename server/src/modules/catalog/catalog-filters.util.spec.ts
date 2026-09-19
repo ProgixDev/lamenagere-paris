@@ -14,8 +14,8 @@ describe('catalog filters', () => {
   });
 
   describe('sort', () => {
-    it('accepts the four supported orders', () => {
-      for (const sort of ['popular', 'recent', 'price_asc', 'price_desc']) {
+    it('accepts the supported orders', () => {
+      for (const sort of ['popular', 'recent', 'price_asc', 'price_desc', 'rating']) {
         expect(parseFilters({ sort }).sort).toBe(sort);
       }
     });
