@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, Image, ActivityIndicator, Alert, Modal } from "react-native";
+import { View, Text, TouchableOpacity, Image, ActivityIndicator, Alert } from "react-native";
 import * as Haptics from "expo-haptics";
 import Svg, { Path } from "react-native-svg";
 import Icon from "../ui/Icon";
@@ -10,6 +10,7 @@ import type { ConfigBlock } from "../../lib/types";
 import { ilotSurchargeCents, type ConfigState } from "../../lib/config-blocks";
 import { SPACE } from "../../lib/typography";
 import { pickMessageMedia, uploadMessageMedia } from "../../features/messaging/upload";
+import ImageViewerModal from "../ui/ImageViewerModal";
 
 interface Props {
   blocks: ConfigBlock[];
@@ -190,7 +191,7 @@ function OptionCard({
         {image ? (
           <>
             <Image source={{ uri: image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
-            <ImageZoomOverlay uri={image} />
+            <ImageZoomOverlay uri={image} title={label} priceCents={priceCents} selected={active} onToggle={onPress} />
           </>
         ) : (
           <Icon name="image-off-outline" size={22} color={COLORS.outline} />
@@ -250,31 +251,44 @@ function OptionCard({
   );
 }
 
-// Small "view fullscreen" badge + modal, meant to sit inside a relatively
+// "View fullscreen" button + viewer, meant to sit inside a relatively
 // positioned image box. Tapping it never bubbles to the box's own onPress.
-function ImageZoomOverlay({ uri }: { uri: string }) {
+// Big enough to be found and hit with a thumb: the customer judges an
+// accessory from its photo, so a thumbnail-sized tile isn't enough.
+function ImageZoomOverlay({
+  uri,
+  title,
+  priceCents,
+  selected,
+  onToggle,
+}: {
+  uri: string;
+  title?: string;
+  priceCents?: number;
+  selected?: boolean;
+  onToggle?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <TouchableOpacity
         onPress={() => setOpen(true)}
-        hitSlop={6}
-        style={{ position: "absolute", bottom: 2, right: 2, width: 18, height: 18, borderRadius: 9, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center" }}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={title ? `Voir ${title} en plein écran` : "Voir en plein écran"}
+        style={{ position: "absolute", top: SPACE.xs, left: SPACE.xs, width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center" }}
       >
-        <Icon name="fullscreen" size={12} color="#fff" />
+        <Icon name="fullscreen" size={20} color="#fff" />
       </TouchableOpacity>
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.96)", alignItems: "center", justifyContent: "center" }}>
-          <Image source={{ uri }} style={{ width: "100%", height: "70%" }} resizeMode="contain" />
-          <TouchableOpacity
-            onPress={() => setOpen(false)}
-            hitSlop={10}
-            style={{ position: "absolute", top: 50, right: 20, width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" }}
-          >
-            <Icon name="close" size={22} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </Modal>
+      <ImageViewerModal
+        uri={uri}
+        visible={open}
+        onClose={() => setOpen(false)}
+        title={title}
+        priceCents={priceCents}
+        selected={selected}
+        onToggle={onToggle}
+      />
     </>
   );
 }

@@ -10,7 +10,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "ios:sim": "bash scripts/run-ios-simulator.sh",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "dev:all": "concurrently -k -n api,web,boutique -c blue,magenta,green \"npm --prefix server run start:dev\" \"npm --prefix web run dev\" \"npm --prefix web run dev:boutique\""
   },
   "dependencies": {
     "@expo-google-fonts/cormorant": "^0.4.2",
@@ -71,6 +72,7 @@
   "devDependencies": {
     "@types/react": "~19.1.0",
     "babel-preset-expo": "~54.0.10",
+    "concurrently": "^10.0.5",
     "eslint": "^10.2.0",
     "prettier": "^3.8.2",
     "typescript": "~5.9.2"

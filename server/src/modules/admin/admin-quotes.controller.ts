@@ -9,12 +9,12 @@ import {
   Query,
 } from '@nestjs/common';
 import { Roles } from '../../common/auth/roles.decorator';
+import { CurrentUser } from '../../common/auth/current-user.decorator';
+import { AuthUser } from '../../common/auth/auth-user';
 import { QuoteStatus } from '../../common/serialization/status-labels';
 import { AdminQuotesService } from './admin-quotes.service';
-import {
-  UpdateQuoteDto,
-  UpdateQuoteStatusDto,
-} from './dto/quote-admin.dto';
+import { AdminReplyDto } from './dto/conversation-admin.dto';
+import { UpdateQuoteDto, UpdateQuoteStatusDto } from './dto/quote-admin.dto';
 
 @Roles('admin', 'super_admin', 'manager')
 @Controller('admin/quotes')
@@ -40,6 +40,15 @@ export class AdminQuotesController {
   @HttpCode(200)
   send(@Param('id') id: string) {
     return this.quotes.send(id);
+  }
+
+  @Post(':id/message')
+  message(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: AdminReplyDto,
+  ) {
+    return this.quotes.message(id, user.id, dto.content, dto.attachments);
   }
 
   @Post(':id/reject')
