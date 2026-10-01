@@ -24,15 +24,10 @@ import {
   ProductStatus,
   UpsertProductDto,
 } from './dto/product-admin.dto';
-
-function slugify(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
+import {
+  nextFreeSlug,
+  slugify,
+} from '../../common/serialization/slug.util';
 
 @Injectable()
 export class AdminProductsService {
@@ -183,7 +178,7 @@ export class AdminProductsService {
   ): Promise<string> {
     const row: Record<string, unknown> = {
       name: dto.name,
-      slug: dto.slug?.trim() || slugify(dto.name),
+      slug: await this.resolveSlug(dto, id),
       sku: dto.sku,
       description: dto.description ?? '',
       short_description: dto.shortDescription,
@@ -256,6 +251,40 @@ export class AdminProductsService {
       );
     }
     return data.id;
+  }
+
+  /**
+   * The slug to store: normalised, unique, and stable once published.
+   *
+   * - On update, an unchanged (or omitted) slug is kept **as stored**, even a
+   *   legacy one like `VENDÔME`: re-saving a product must never move its URL.
+   *   The storefront decodes route params, so those still resolve.
+   * - Anything new goes through `slugify` — typed by hand or derived from the
+   *   name — then gets a `-2`, `-3`… suffix if another product holds it.
+   */
+  private async resolveSlug(
+    dto: UpsertProductDto,
+    id: string | null,
+  ): Promise<string> {
+    const typed = dto.slug?.trim();
+    if (id) {
+      const { data } = await this.supabase.client
+        .from('products')
+        .select('slug')
+        .eq('id', id)
+        .maybeSingle<{ slug: string }>();
+      if (data && (!typed || typed === data.slug)) return data.slug;
+    }
+
+    const base = slugify(typed || dto.name) || slugify(dto.name) || 'produit';
+    // `base` is [a-z0-9-] only, so it carries no LIKE wildcard.
+    let query = this.supabase.client
+      .from('products')
+      .select('slug')
+      .like('slug', `${base}%`);
+    if (id) query = query.neq('id', id);
+    const { data: rows } = await query.returns<{ slug: string }[]>();
+    return nextFreeSlug(base, new Set((rows ?? []).map((r) => r.slug)));
   }
 
   private async replaceMedia(id: string, dto: UpsertProductDto): Promise<void> {

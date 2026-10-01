@@ -12,15 +12,29 @@ import {
   toAdminCategoryDto,
 } from '../catalog/catalog.serializer';
 import { ReorderDto, UpsertCategoryDto } from './dto/category-admin.dto';
+import {
+  nextFreeSlug,
+  slugify,
+} from '../../common/serialization/slug.util';
 
-function slugify(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
+/**
+ * First-level paths the storefront already serves. A category is mounted at
+ * `/:slug`, so one of these names would be shadowed by the fixed route and its
+ * page would never be reached. Keep in step with `web/boutique/src/app`.
+ */
+const RESERVED_SLUGS: ReadonlySet<string> = new Set([
+  'api',
+  'commande',
+  'compte',
+  'configurateur',
+  'connexion',
+  'images',
+  'inscription',
+  'og',
+  'p',
+  'panier',
+  'recherche',
+]);
 
 @Injectable()
 export class AdminCategoriesService {
@@ -81,7 +95,7 @@ export class AdminCategoriesService {
   ): Promise<string> {
     const row: Record<string, unknown> = {
       name: dto.name,
-      slug: dto.slug?.trim() || slugify(dto.name),
+      slug: await this.resolveSlug(dto, id),
       icon: dto.icon ?? '',
       description: dto.description,
       image_url: dto.imageUrl,
@@ -107,6 +121,41 @@ export class AdminCategoriesService {
       );
     }
     return data.id;
+  }
+
+  /**
+   * The slug to store: normalised, unique, clear of the storefront's fixed
+   * routes, and stable once set — same rules as products
+   * (`AdminProductsService.resolveSlug`): an unchanged slug is kept as stored
+   * so re-saving never moves the category's URL.
+   */
+  private async resolveSlug(
+    dto: UpsertCategoryDto,
+    id: string | null,
+  ): Promise<string> {
+    const typed = dto.slug?.trim();
+    if (id) {
+      const { data } = await this.supabase.client
+        .from('categories')
+        .select('slug')
+        .eq('id', id)
+        .maybeSingle<{ slug: string }>();
+      if (data && (!typed || typed === data.slug)) return data.slug;
+    }
+
+    const base = slugify(typed || dto.name) || slugify(dto.name) || 'rubrique';
+    // `base` is [a-z0-9-] only, so it carries no LIKE wildcard.
+    let query = this.supabase.client
+      .from('categories')
+      .select('slug')
+      .like('slug', `${base}%`);
+    if (id) query = query.neq('id', id);
+    const { data: rows } = await query.returns<{ slug: string }[]>();
+    return nextFreeSlug(
+      base,
+      new Set((rows ?? []).map((r) => r.slug)),
+      RESERVED_SLUGS,
+    );
   }
 
   private async getRow(id: string): Promise<CategoryRow> {
